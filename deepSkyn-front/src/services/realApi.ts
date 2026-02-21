@@ -1,0 +1,137 @@
+// Real Backend API for PostgreSQL
+// Replace mockApi with real database calls
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  authMethod: 'email' | 'google';
+  createdAt: string;
+  lastLoginAt: string;
+  aiVerified?: boolean;
+  aiScore?: number;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+  success: boolean;
+}
+
+// Real Backend API functions
+export const realApi = {
+  // Email/Password login
+  async login(email: string, password: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Login failed');
+    }
+
+    return response.json();
+  },
+
+  // Check if user exists
+  async checkUser(email: string): Promise<User | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/check-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check user');
+      }
+
+      const result = await response.json();
+      return result.user || null;
+    } catch (error) {
+      console.error('Check user error:', error);
+      return null;
+    }
+  },
+
+  // Create Google user
+  async createGoogleUser(googleUser: any): Promise<User> {
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(googleUser),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Google login failed');
+    }
+
+    const result = await response.json();
+    return result.user;
+  },
+
+  // Link Google account to existing user
+  async linkGoogleAccount(_userId: string, googleUser: any): Promise<User> {
+    // Le backend gère automatiquement le linking lors du login Google
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(googleUser),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Google account linking failed');
+    }
+
+    const result = await response.json();
+    return result.user;
+  },
+
+  // Update AI score
+  async updateAIScore(userId: string, aiVerified: boolean, aiScore: number): Promise<User> {
+    const response = await fetch(`${API_BASE_URL}/auth/update-ai-score`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, aiVerified, aiScore }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update AI score');
+    }
+
+    const result = await response.json();
+    return result.user;
+  },
+
+  // Health check
+  async healthCheck(): Promise<boolean> {
+    try {
+const response = await fetch(`${API_BASE_URL}/auth/health`);
+      return response.ok;
+    } catch (error) {
+      console.error('Health check failed:', error);
+      return false;
+    }
+  }
+};
+
+export default realApi;

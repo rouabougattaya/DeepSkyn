@@ -38,18 +38,25 @@ class AIService {
     if (isGooglePhoto) {
       try {
         const response = await fetch(highResUrl, { method: 'HEAD' });
-        const contentLength = response.headers.get('content-length');
         
-        // Avatar lettre = fichier très petit (~2-5KB)
-        // Vraie photo = fichier plus grand (>10KB)
-        const fileSize = parseInt(contentLength || '0');
-        isRealPhoto = fileSize > 8000; // > 8KB = vraie photo
-        
-        console.log(`� Taille image: ${fileSize} bytes → ${isRealPhoto ? 'VRAIE PHOTO' : 'AVATAR'}`);
+        if (response.status === 429) {
+          // Rate limited — fallback sur détection URL
+          console.log('⚠️ Google CDN rate limited, fallback URL analysis');
+          isRealPhoto = !photoUrl.includes('ACg8oc');
+        } else {
+          const contentLength = response.headers.get('content-length');
+          
+          // Avatar lettre = fichier très petit (~2-5KB)
+          // Vraie photo = fichier plus grand (>10KB)
+          const fileSize = parseInt(contentLength || '0');
+          isRealPhoto = fileSize > 8000; // > 8KB = vraie photo
+          
+          console.log(`📏 Taille image: ${fileSize} bytes → ${isRealPhoto ? 'VRAIE PHOTO' : 'AVATAR'}`);
+        }
       } catch (e) {
-        // Si fetch échoue (CORS), fallback sur l'URL
+        // Si fetch échoue (CORS ou autre), fallback sur l'URL
         console.log('⚠️ Fetch bloqué par CORS, fallback URL analysis');
-        isRealPhoto = false;
+        isRealPhoto = !photoUrl.includes('ACg8oc'); // fallback sur détection signature ACg8oc
       }
     }
 

@@ -8,14 +8,32 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ nullable: true })
   passwordHash: string;
 
-  @Column()
+  @Column({ nullable: true })
   firstName: string;
 
-  @Column()
+  @Column({ nullable: true })
   lastName: string;
+
+  @Column({ nullable: true })
+  name: string;
+
+  @Column({ nullable: true, unique: true })
+  googleId: string;
+
+  @Column({ nullable: true })
+  avatarUrl: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  photoAnalysis: any;
+
+  @Column({ type: 'jsonb', nullable: true })
+  emailAnalysis: any;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, nullable: true, default: 0.5 })
+  aiScore: number;
 
   @Column({ type: 'enum', enum: ['USER', 'ADMIN'], default: 'USER' })
   role: 'USER' | 'ADMIN';

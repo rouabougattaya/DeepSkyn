@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { authService } from '../services/authService';
+import { simpleAuthService } from '../services/authService-simple';
 
 interface GoogleUserInfo {
   id: string;
@@ -26,7 +26,7 @@ export const useGoogleAuth = () => {
       const googleUser = await signInWithGoogleAPI();
       
       // Authenticate with our backend
-      const authResponse = await authService.loginWithGoogle(googleUser);
+const authResponse = await simpleAuthService.loginWithGoogle(googleUser);
       
       return authResponse;
     } catch (err) {

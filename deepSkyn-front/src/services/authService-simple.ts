@@ -1,4 +1,4 @@
-import mockApi from '@/mocks/backendApi';
+import realApi from '@/services/realApi';
 import { aiService } from '@/services/aiService';
 
 // Simple Auth Service sans JWT
@@ -59,7 +59,7 @@ class SimpleAuthService {
   // Email/Password login
   async loginWithEmail(email: string, password: string): Promise<AuthResponse> {
     try {
-      const response = await mockApi.login(email, password);
+      const response = await realApi.login(email, password);
       
       // AI Verification pour email/password
       const aiVerification = await aiService.verifyIdentity({
@@ -133,7 +133,7 @@ class SimpleAuthService {
   // Check if user exists
   private async checkExistingUser(email: string): Promise<User | null> {
     try {
-      const user = await mockApi.checkUser(email);
+      const user = await realApi.checkUser(email);
       return user;
     } catch (error) {
       console.error('Error checking existing user:', error);
@@ -144,7 +144,7 @@ class SimpleAuthService {
   // Link Google account to existing user
   private async linkGoogleAccount(userId: string, googleUser: any): Promise<User> {
     try {
-      const user = await mockApi.linkGoogleAccount(userId, googleUser);
+      const user = await realApi.linkGoogleAccount(userId, googleUser);
       return user;
     } catch (error) {
       console.error('Error linking Google account:', error);
@@ -155,7 +155,7 @@ class SimpleAuthService {
   // Create new Google user
   private async createGoogleUser(googleUser: any): Promise<User> {
     try {
-      const user = await mockApi.createGoogleUser(googleUser);
+      const user = await realApi.createGoogleUser(googleUser);
       return user;
     } catch (error) {
       console.error('Error creating Google user:', error);

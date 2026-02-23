@@ -1,54 +1,141 @@
+// frontend/src/pages/LoginPage.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Sparkles, Eye, EyeOff } from "lucide-react"
+import { Sparkles, Eye, EyeOff, Shield } from "lucide-react"
 import { useGoogleAuth } from "@/hooks/useGoogleAuth"
 import { simpleAuthService } from '@/services/authService-simple';
+import ReCAPTCHA from "react-google-recaptcha";
+
+type AuthResponse = any;
+
+// Clé reCAPTCHA (utilise la clé de test si pas de variable d'environnement)
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const recaptchaRef = useRef<ReCAPTCHA>(null)
   const navigate = useNavigate()
   
-  const { signInWithGoogle, isLoading: googleLoading, error: googleError } = useGoogleAuth()
+  const { signInWithGoogle, isLoading: googleLoading } = useGoogleAuth()
+
+  // Vérifier si déjà connecté
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      console.log('✅ Déjà connecté, redirection vers home');
+      navigate('/')
+    }
+  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Vérifier que le captcha est validé
+    if (!captchaToken) {
+      setErrorMessage("Veuillez valider le captcha");
+      return;
+    }
+    
     setIsLoading(true)
+    setErrorMessage(null)
     
     try {
-      const authData = await simpleAuthService.loginWithEmail(email, password)
+      console.log('📤 Tentative login avec captcha:', captchaToken.substring(0, 10) + '...');
       
-      // Show AI verification result
-      if (authData.aiVerification) {
-        const aiStatus = authData.aiVerification.verified ? '✅' : '⚠️';
-        console.log(`${aiStatus} ${authData.aiVerification.message}`);
+      const authData: AuthResponse = await simpleAuthService.loginWithEmail(
+        email, 
+        password,
+        captchaToken
+      )
+      
+      console.log('📦 Réponse brute:', authData)
+      
+      // Récupération du token
+      let token = null;
+      if (authData?.token) {
+        token = authData.token;
+        console.log('🔑 Token trouvé dans authData.token');
+      } else if (authData?.accessToken) {
+        token = authData.accessToken;
+        console.log('🔑 Token trouvé dans authData.accessToken');
+      } else if (authData?.jwt) {
+        token = authData.jwt;
+        console.log('🔑 Token trouvé dans authData.jwt');
+      } else if (authData?.data?.token) {
+        token = authData.data.token;
+        console.log('🔑 Token trouvé dans authData.data.token');
       }
       
-      navigate('/')
-    } catch (error) {
-      console.error('Login failed:', error)
-      // Handle login error (show message to user)
+      if (token) {
+        // Sauvegarde le token
+        localStorage.setItem('token', token);
+        console.log('✅ Token sauvegardé dans localStorage');
+        
+        // Sauvegarde aussi les infos user si disponibles
+        if (authData.user) {
+          localStorage.setItem('auth_user', JSON.stringify(authData.user));
+        }
+        
+        // Réinitialise le captcha
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setCaptchaToken(null);
+        
+        // Redirection vers la page d'accueil
+        console.log('🔄 Redirection vers /');
+        window.location.href = '/';
+        
+      } else {
+        console.error('❌ Aucun token trouvé dans:', authData);
+        setErrorMessage('Erreur: Token non reçu');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Login failed:', error)
+      
+      // Message d'erreur plus détaillé
+      if (error.response?.status === 401) {
+        setErrorMessage('Email ou mot de passe incorrect');
+      } else if (error.response?.data?.message) {
+        setErrorMessage(error.response.data.message);
+      } else {
+        setErrorMessage('Erreur de connexion au serveur');
+      }
+      
+      // Réinitialise le captcha en cas d'erreur
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+      }
+      setCaptchaToken(null);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   const handleGoogleSignIn = async () => {
     try {
-      // Use redirect method to avoid popup blockers
       const { signInWithGoogleRedirect } = await import('@/hooks/useGoogleAuth');
       signInWithGoogleRedirect();
     } catch (error) {
       console.error('Google sign-in failed:', error);
-      // Handle Google sign-in error
+      setErrorMessage('Erreur lors de la connexion Google');
     }
-  }
+  };
+
+  const handleCaptchaChange = (token: string | null) => {
+    setCaptchaToken(token);
+    console.log('🔐 Captcha validé:', token ? 'Oui' : 'Non');
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center p-4">
@@ -73,7 +160,15 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Form */}
+        {/* Message d'erreur */}
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Formulaire de connexion */}
         <form onSubmit={handleEmailLogin} className="space-y-6">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium text-slate-900">
@@ -114,6 +209,16 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* reCAPTCHA */}
+          <div className="flex justify-center my-4">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={RECAPTCHA_SITE_KEY}
+              onChange={handleCaptchaChange}
+              theme="light"
+            />
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <input 
@@ -136,7 +241,7 @@ export default function LoginPage() {
           <Button 
             type="submit" 
             className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-semibold rounded-lg transition-colors"
-            disabled={isLoading}
+            disabled={isLoading || !captchaToken}
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </Button>
@@ -156,7 +261,12 @@ export default function LoginPage() {
 
         {/* Social Logins */}
         <div className="grid grid-cols-2 gap-4">
-          <Button variant="outline" className="h-12 border-slate-200 font-medium bg-white" onClick={handleGoogleSignIn}>
+          <Button 
+            variant="outline" 
+            className="h-12 border-slate-200 font-medium bg-white hover:bg-slate-50" 
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading}
+          >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -165,11 +275,13 @@ export default function LoginPage() {
             </svg>
             {googleLoading ? 'Connecting...' : 'Google'}
           </Button>
-          <Button variant="outline" className="h-12 border-slate-200 font-medium bg-white">
+          
+          <Button 
+            variant="outline" 
+            className="h-12 border-slate-200 font-medium bg-white hover:bg-slate-50"
+          >
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
               <path d="M17.073 21.376c-1.447 0-2.626-1.18-2.626-2.626s1.18-2.627 2.626-2.627c1.448 0 2.627 1.181 2.627 2.627s-1.18 2.626-2.627 2.626zm-10.146 0c-1.448 0-2.627-1.18-2.627-2.626s1.18-2.627 2.627-2.627c1.447 0 2.626 1.181 2.626 2.627s-1.18 2.626-2.626 2.626zm1.586-15.402c2.31 0 4.182 1.873 4.182 4.182 0 2.31-1.873 4.182-4.182 4.182-2.31 0-4.182-1.872-4.182-4.182 0-2.309 1.872-4.182 4.182-4.182zm0-1.974c-3.4 0-6.156 2.756-6.156 6.156s2.756 6.156 6.156 6.156 6.156-2.756 6.156-6.156-2.756-6.156-6.156-6.156z" />
-              {/* Note: Simplified Apple Icon path for demo */}
-              <path d="M18.71 14.45c-.05.1-.1.19-.15.29-.7.15-1.38.56-1.38 1.48 0 1.07.9 1.53 1.37 1.77-.11.35-.41.87-.9 1.58-.45.63-.92 1.25-1.63 1.26-.7 0-.91-.43-1.72-.43-.8 0-1.04.42-1.7.44-.7.01-1.2-.66-1.65-1.31-.92-1.33-1.62-3.75-.68-5.38.47-.81 1.3-1.32 2.21-1.33.69 0 1.34.48 1.76.48.42 0 1.21-.6 2.04-.51.35.01.66.13.91.33-.08.07-.4.32-.4.81 0 .6.49.88.58.93zM15.98 8.56c-.44 0-.84-.24-1.08-.6-.35-.55-.26-1.28.21-1.73.44-.43 1.11-.53 1.63-.2.35.22.56.59.56 1-.01.83-.8 1.53-1.32 1.53z"/>
             </svg>
             Apple
           </Button>

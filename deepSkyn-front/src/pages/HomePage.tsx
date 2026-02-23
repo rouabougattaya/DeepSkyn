@@ -16,7 +16,8 @@ import {
   CheckCircle,
   CreditCard,
   Brain,
-  Menu
+  Menu,
+  Smartphone // ← AJOUTE CET IMPORT
 } from "lucide-react"
 
 export default function HomePage() {
@@ -41,6 +42,10 @@ export default function HomePage() {
     navigate('/dashboard');
   };
 
+  const handleSessions = () => {
+    navigate('/sessions');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* --- NAVIGATION --- */}
@@ -63,6 +68,16 @@ export default function HomePage() {
                   >
                     Dashboard
                   </button>
+                  
+                  {/* 👇 NOUVEAU BOUTON SESSIONS */}
+                  <button 
+                    onClick={handleSessions}
+                    className="px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors flex items-center gap-2 border border-teal-200 rounded-lg bg-teal-50"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Mes Sessions</span>
+                  </button>
+                  
                   <button 
                     onClick={handleLogout}
                     className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
@@ -150,6 +165,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* --- RESTE DU CODE IDENTIQUE --- */}
       {/* --- HOW IT WORKS --- */}
       <section className="py-24 bg-white border-y border-slate-100 px-4">
         <div className="max-w-7xl mx-auto">
@@ -204,7 +220,6 @@ export default function HomePage() {
 }
 
 // --- LIBRLESS COMPONENTS ---
-
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
   return (
     <div className="bg-white p-8 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all group">

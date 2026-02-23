@@ -1,5 +1,7 @@
 import realApi from '@/services/realApi';
 import { aiService } from '@/services/aiService';
+import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Simple Auth Service sans JWT
 export interface User {
@@ -57,36 +59,15 @@ class SimpleAuthService {
   }
 
   // Email/Password login
-  async loginWithEmail(email: string, password: string): Promise<AuthResponse> {
-    try {
-      const response = await realApi.login(email, password);
-      
-      // AI Verification pour email/password
-      const aiVerification = await aiService.verifyIdentity({
-        name: response.user.name,
-        email: response.user.email,
-        picture: response.user.picture,
-      });
-      
-      // Mettre à jour l'utilisateur avec les infos AI
-      const userWithAI = {
-        ...response.user,
-        aiVerified: aiVerification.verified,
-        aiScore: aiVerification.score,
-      };
-      
-      this.saveToStorage(userWithAI);
-      
-      return {
-        user: userWithAI,
-        success: true,
-        aiVerification,
-      };
-    } catch (error) {
-      console.error('Email login error:', error);
-      throw error;
-    }
-  }
+ async loginWithEmail(email: string, password: string, captchaToken?: string) {
+  // Envoie le captchaToken au backend
+  const response = await axios.post(`${API_URL}/auth/login`, {
+    email,
+    password,
+    captchaToken // ← AJOUTE ÇA
+  });
+  return response.data;
+}
 
   // Google OAuth login avec AI
   async loginWithGoogle(googleUser: any): Promise<AuthResponse> {

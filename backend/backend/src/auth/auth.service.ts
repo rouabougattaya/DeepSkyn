@@ -1,9 +1,11 @@
+// backend/src/auth/auth.service.ts
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../user/user.entity';
+import { SessionService } from './session/session.service';
 import { GoogleAuthDto, CheckUserDto, UpdateAIScoreDto } from './dto/auth.dto';
 
 @Injectable()
@@ -12,9 +14,10 @@ export class AuthService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
+    private sessionService: SessionService,
   ) {}
 
-  async loginWithEmail(email: string, password: string) {
+  async loginWithEmail(email: string, password: string, req: any) {
     const user = await this.userRepository.findOne({ where: { email } });
     
     if (!user) {
@@ -23,7 +26,19 @@ export class AuthService {
 
     // For demo, accept any password for demo user
     if (email === 'demo@example.com') {
-      return this.generateToken(user);
+      const token = this.generateToken(user);
+      
+      // Créer la session avec le fingerprint
+      await this.sessionService.createSession(
+        user.id,
+        token,
+        req
+      );
+      
+      return {
+        token,
+        user: { email: user.email }
+      };
     }
 
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -31,10 +46,22 @@ export class AuthService {
       throw new Error('Invalid password');
     }
 
-    return this.generateToken(user);
+    const token = this.generateToken(user);
+    
+    // Créer la session avec le fingerprint
+    await this.sessionService.createSession(
+      user.id,
+      token,
+      req
+    );
+
+    return {
+      token,
+      user: { email: user.email }
+    };
   }
 
-  async loginWithGoogle(googleUser: GoogleAuthDto) {
+  async loginWithGoogle(googleUser: GoogleAuthDto, req: any) { // ← AJOUTE req
     // Check if user exists
     const existingUser = await this.userRepository.findOne({
       where: [
@@ -71,7 +98,19 @@ export class AuthService {
       console.log('✅ Updated existing Google user:', user.email);
     }
 
-    return this.generateToken(user);
+    const token = this.generateToken(user);
+    
+    // ✅ Créer la session pour Google aussi
+    await this.sessionService.createSession(
+      user.id,
+      token,
+      req
+    );
+
+    return {
+      token,
+      user: { email: user.email }
+    };
   }
 
   async checkUser(checkUserDto: CheckUserDto) {
@@ -120,7 +159,6 @@ export class AuthService {
       email: user.email,
       name: user.name,
     };
-
     return this.jwtService.sign(payload);
   }
 

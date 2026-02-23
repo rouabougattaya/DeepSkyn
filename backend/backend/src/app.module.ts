@@ -1,3 +1,4 @@
+// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
@@ -5,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { User } from './user/user.entity';
+import { Session } from './auth/session/session.entity'; // ← IMPORTER SESSION
 
 @Module({
   imports: [
@@ -19,7 +21,7 @@ import { User } from './user/user.entity';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME || 'deepskyn_db',
-      entities: [User],
+      entities: [User, Session], // ← AJOUTER SESSION ICI
       synchronize: true,
     }),
     AuthModule,

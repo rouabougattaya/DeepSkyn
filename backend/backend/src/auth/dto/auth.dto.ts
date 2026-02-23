@@ -6,6 +6,8 @@ export class LoginDto {
 
   @IsString()
   password: string;
+
+   captchaToken?: string;
 }
 
 export class GoogleAuthDto {

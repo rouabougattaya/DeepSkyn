@@ -1,3 +1,4 @@
+// backend/src/auth/auth.controller.ts
 import { 
   Controller, 
   Post, 
@@ -6,6 +7,7 @@ import {
   HttpStatus, 
   Get,
   Put,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -17,11 +19,13 @@ import {
 } from './dto/auth.dto';
 import { UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import { Public } from './decorators/public.decorator';
+import type { Request } from 'express';
+import { RecaptchaService } from './services/recaptcha.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private readonly recaptchaService: RecaptchaService) {}
 
   @Post('login')
   @Public()
@@ -29,20 +33,29 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async login(@Body() loginDto: LoginDto) {
-    try {
-      const token = await this.authService.loginWithEmail(
-        loginDto.email, 
-        loginDto.password
-      );
-      return { 
-        token, 
-        user: { email: loginDto.email } 
-      };
-    } catch (error) {
-throw new UnauthorizedException(error.message);
-    }
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
+  // ✅ VALIDATION CAPTCHA
+  if (!loginDto.captchaToken) {
+    throw new UnauthorizedException('Captcha requis');
   }
+
+  const isValidCaptcha = await this.recaptchaService.validateToken(loginDto.captchaToken);
+  if (!isValidCaptcha) {
+    throw new UnauthorizedException('Validation captcha échouée');
+  }
+  console.log('✅ Captcha validé avec succès');
+
+  try {
+    const result = await this.authService.loginWithEmail(
+      loginDto.email, 
+      loginDto.password,
+      req
+    );
+    return result;
+  } catch (error) {
+    throw new UnauthorizedException(error.message);
+  }
+}
 
   @Post('google')
   @Public()
@@ -50,13 +63,15 @@ throw new UnauthorizedException(error.message);
   @ApiOperation({ summary: 'Login or register with Google' })
   @ApiResponse({ status: 200, description: 'Google auth successful' })
   @ApiResponse({ status: 401, description: 'Google auth failed' })
-  async googleAuth(@Body() googleUser: GoogleAuthDto) {
+  async googleAuth(@Body() googleUser: GoogleAuthDto, @Req() req: Request) {
     try {
-      const token = await this.authService.loginWithGoogle(googleUser);
-      return { 
-        token, 
-        user: googleUser 
-      };
+      const result = await this.authService.loginWithGoogle(
+        googleUser,
+        req
+      );
+      
+      // ✅ Retourne directement le résultat du service
+      return result;
     } catch (error) {
       console.error('Google auth error:', error);
       throw new InternalServerErrorException(error.message);

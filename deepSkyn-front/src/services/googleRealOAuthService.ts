@@ -254,38 +254,22 @@ class GoogleRealOAuthService {
     }
 
     const isGooglePhoto = pictureUrl.includes('googleusercontent.com');
-    
-    // More precise default photo detection
-    const isDefaultPhoto = pictureUrl.includes('default-user') || 
-                          pictureUrl.includes('placeholder') ||
-                          pictureUrl.includes('silhouette') ||
-                          pictureUrl.includes('avatar') ||
-                          pictureUrl.includes('=s96-c') && pictureUrl.includes('a/ACg8oc') ||
-                          pictureUrl.includes('photo.jpg') ||
-                          pictureUrl.includes('profile-icon') ||
-                          pictureUrl.includes('user-icon');
 
+    // Base qualities
     let quality = 0.3;
     let source = 'unknown';
     let description = 'Unknown photo source';
 
-    if (isGooglePhoto && !isDefaultPhoto) {
-      // Check if it's a real user photo (not default)
-      if (pictureUrl.includes('a/') && !pictureUrl.includes('ACg8oc')) {
-        quality = 0.9;
-        source = 'google_real';
-        description = 'Real Google profile photo';
-      } else if (pictureUrl.includes('d/') || pictureUrl.includes('photo/')) {
-        quality = 0.8;
-        source = 'google_high_quality';
-        description = 'High quality Google photo';
-      } else {
-        quality = 0.6;
-        source = 'google_possible';
-        description = 'Possible Google photo';
-      }
-    } else if (isGooglePhoto && isDefaultPhoto) {
-      quality = 0.2; // Lower score for default photos
+    const isLikelyAvatar = pictureUrl.includes('ACg8oc');
+
+    if (isGooglePhoto && !isLikelyAvatar) {
+      // Photo Google probablement réelle
+      quality = 0.9;
+      source = 'google_real';
+      description = 'Real Google profile photo';
+    } else if (isGooglePhoto && isLikelyAvatar) {
+      // Avatar Google par défaut
+      quality = 0.2;
       source = 'google_default';
       description = 'Default Google profile photo (letter/avatar)';
     } else if (pictureUrl.startsWith('https://lh3.googleusercontent.com/a/')) {
@@ -309,8 +293,8 @@ class GoogleRealOAuthService {
     }
 
     return {
-      hasRealPhoto: isGooglePhoto && !isDefaultPhoto,
-      isDefaultPhoto,
+      hasRealPhoto: isGooglePhoto && !isLikelyAvatar,
+      isDefaultPhoto: isLikelyAvatar,
       quality,
       source,
       description,
@@ -338,7 +322,7 @@ class GoogleRealOAuthService {
     }
 
     const domain = email.split('@')[1]?.toLowerCase() || '';
-    
+
     const trustedDomains = ['gmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'protonmail.com'];
     const businessPatterns = ['company', 'corp', 'tech', 'studio', 'office'];
     const suspiciousPatterns = ['temp', 'fake', '10minutemail', 'guerrillamail', 'mailinator'];

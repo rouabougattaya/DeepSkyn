@@ -1,7 +1,7 @@
 // Real Backend API for PostgreSQL
 // Replace mockApi with real database calls
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 export interface User {
   id: string;
@@ -13,6 +13,7 @@ export interface User {
   lastLoginAt: string;
   aiVerified?: boolean;
   aiScore?: number;
+  googleId?: string;
 }
 
 export interface AuthResponse {
@@ -65,7 +66,7 @@ export const realApi = {
   },
 
   // Create Google user
-  async createGoogleUser(googleUser: any): Promise<User> {
+  async createGoogleUser(googleUser: any): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/google`, {
       method: 'POST',
       headers: {
@@ -79,12 +80,11 @@ export const realApi = {
       throw new Error(error.message || 'Google login failed');
     }
 
-    const result = await response.json();
-    return result.user;
+    return response.json();
   },
 
   // Link Google account to existing user
-  async linkGoogleAccount(_userId: string, googleUser: any): Promise<User> {
+  async linkGoogleAccount(_userId: string, googleUser: any): Promise<AuthResponse> {
     // Le backend gère automatiquement le linking lors du login Google
     const response = await fetch(`${API_BASE_URL}/auth/google`, {
       method: 'POST',
@@ -99,18 +99,23 @@ export const realApi = {
       throw new Error(error.message || 'Google account linking failed');
     }
 
-    const result = await response.json();
-    return result.user;
+    return response.json();
   },
 
   // Update AI score
-  async updateAIScore(userId: string, aiVerified: boolean, aiScore: number): Promise<User> {
+  async updateAIScore(userId: string, aiVerified: boolean, aiScore: number, photoAnalysis: any = {}, emailAnalysis: any = {}): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/auth/update-ai-score`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, aiVerified, aiScore }),
+      body: JSON.stringify({
+        userId,
+        aiVerified,
+        aiScore: aiScore.toString(), // Send as string to match old DTO if needed
+        photoAnalysis,
+        emailAnalysis
+      }),
     });
 
     if (!response.ok) {
@@ -125,7 +130,7 @@ export const realApi = {
   // Health check
   async healthCheck(): Promise<boolean> {
     try {
-const response = await fetch(`${API_BASE_URL}/auth/health`);
+      const response = await fetch(`${API_BASE_URL}/auth/health`);
       return response.ok;
     } catch (error) {
       console.error('Health check failed:', error);

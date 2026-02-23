@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import GoogleCallback from './pages/GoogleCallback'
 import HomePage from './pages/HomePage'
 import DashboardPage from './pages/DashboardPage'
+import SecurityPage from './pages/SecurityPage'
 import './App.css'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/callback/google" element={<GoogleCallback />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/security" element={<SecurityPage />} />
         <Route path="/analysis" element={
           <>
             <Navbar />

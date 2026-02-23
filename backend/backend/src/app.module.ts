@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { User } from './user/user.entity';
+import { Activity } from './auth/activity.entity';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { User } from './user/user.entity';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME || 'deepskyn_db',
-      entities: [User],
+      entities: [User, Activity],
       synchronize: true,
     }),
     AuthModule,
@@ -27,4 +28,5 @@ import { User } from './user/user.entity';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
+

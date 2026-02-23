@@ -21,9 +21,9 @@ export class GoogleAuthDto {
   @IsString()
   picture: string;
 
-    @IsOptional()
-  verified_email?: boolean; 
-  
+  @IsOptional()
+  verified_email?: boolean;
+
   @IsString()
   given_name: string;
 
@@ -51,12 +51,14 @@ export class UpdateAIScoreDto {
   @IsString()
   userId: string;
 
-  @IsString()
-  aiScore: string;
+  @IsOptional()
+  aiScore?: any;
 
+  @IsOptional()
   @IsObject()
-  photoAnalysis: any;
+  photoAnalysis?: any;
 
+  @IsOptional()
   @IsObject()
-  emailAnalysis: any;
+  emailAnalysis?: any;
 }

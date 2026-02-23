@@ -12,6 +12,7 @@ export interface User {
   lastLoginAt: string;
   aiVerified?: boolean;
   aiScore?: number;
+  googleId?: string;
 }
 
 export interface AuthResponse {
@@ -45,14 +46,18 @@ class SimpleAuthService {
   }
 
   // Sauvegarder dans localStorage
-  private saveToStorage(user: User): void {
+  private saveToStorage(user: User, token?: string): void {
     localStorage.setItem('auth_user', JSON.stringify(user));
+    if (token) {
+      localStorage.setItem('auth_token', token);
+    }
     this.user = user;
   }
 
   // Vider storage
   private clearStorage(): void {
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_token');
     this.user = null;
   }
 
@@ -60,23 +65,39 @@ class SimpleAuthService {
   async loginWithEmail(email: string, password: string): Promise<AuthResponse> {
     try {
       const response = await realApi.login(email, password);
-      
+
       // AI Verification pour email/password
       const aiVerification = await aiService.verifyIdentity({
         name: response.user.name,
         email: response.user.email,
         picture: response.user.picture,
       });
-      
+
       // Mettre à jour l'utilisateur avec les infos AI
       const userWithAI = {
         ...response.user,
         aiVerified: aiVerification.verified,
         aiScore: aiVerification.score,
       };
-      
-      this.saveToStorage(userWithAI);
-      
+
+      console.log(`🤖 AI Verification Score: ${Math.round(aiVerification.score * 100)}% (Verified: ${aiVerification.verified})`);
+
+      // Sauvegarder sur le serveur
+      try {
+        await realApi.updateAIScore(
+          userWithAI.id,
+          userWithAI.aiVerified,
+          userWithAI.aiScore,
+          { quality: aiVerification.details.photoQuality },
+          aiVerification.details
+        );
+        console.log('✅ AI Score synced to backend');
+      } catch (err) {
+        console.warn('❌ Backend AI score update failed:', err);
+      }
+
+      this.saveToStorage(userWithAI, response.token);
+
       return {
         user: userWithAI,
         success: true,
@@ -91,17 +112,19 @@ class SimpleAuthService {
   // Google OAuth login avec AI
   async loginWithGoogle(googleUser: any): Promise<AuthResponse> {
     try {
-      // Check if user exists with this email
+      // Check if user exists
       const existingUser = await this.checkExistingUser(googleUser.email);
-      
-      let user: User;
+      let authResponse: any;
+
       if (existingUser) {
-        // Account linking - Update existing user with Google info
-        user = await this.linkGoogleAccount(existingUser.id, googleUser);
+        // Link or login with existing user
+        authResponse = await this.linkGoogleAccount(existingUser.id, googleUser);
       } else {
         // Create new user
-        user = await this.createGoogleUser(googleUser);
+        authResponse = await this.createGoogleUser(googleUser);
       }
+
+      const user = authResponse.user;
 
       // AI Verification pour Google OAuth
       const aiVerification = await aiService.verifyIdentity({
@@ -109,16 +132,32 @@ class SimpleAuthService {
         email: user.email,
         picture: user.picture,
       });
-      
+
       // Mettre à jour l'utilisateur avec les infos AI
       const userWithAI = {
-        ...user,
+        ...authResponse.user,
         aiVerified: aiVerification.verified,
         aiScore: aiVerification.score,
       };
-      
-      this.saveToStorage(userWithAI);
-      
+
+      console.log(`🤖 Google AI Verification Score: ${Math.round(aiVerification.score * 100)}%`);
+
+      // Sauvegarder sur le serveur
+      try {
+        await realApi.updateAIScore(
+          userWithAI.id,
+          userWithAI.aiVerified,
+          userWithAI.aiScore,
+          { ...aiVerification.details, source: 'google' },
+          aiVerification.details
+        );
+        console.log('✅ AI Score synced to backend (Google)');
+      } catch (err) {
+        console.warn('❌ Backend AI score update failed:', err);
+      }
+
+      this.saveToStorage(userWithAI, authResponse.token);
+
       return {
         user: userWithAI,
         success: true,
@@ -142,10 +181,9 @@ class SimpleAuthService {
   }
 
   // Link Google account to existing user
-  private async linkGoogleAccount(userId: string, googleUser: any): Promise<User> {
+  private async linkGoogleAccount(userId: string, googleUser: any): Promise<any> {
     try {
-      const user = await realApi.linkGoogleAccount(userId, googleUser);
-      return user;
+      return await realApi.linkGoogleAccount(userId, googleUser);
     } catch (error) {
       console.error('Error linking Google account:', error);
       throw error;
@@ -153,10 +191,9 @@ class SimpleAuthService {
   }
 
   // Create new Google user
-  private async createGoogleUser(googleUser: any): Promise<User> {
+  private async createGoogleUser(googleUser: any): Promise<any> {
     try {
-      const user = await realApi.createGoogleUser(googleUser);
-      return user;
+      return await realApi.createGoogleUser(googleUser);
     } catch (error) {
       console.error('Error creating Google user:', error);
       throw error;
@@ -196,10 +233,11 @@ class SimpleAuthService {
     if (!this.user) {
       return { verified: false, score: 0 };
     }
-    
+
+    const u = this.user;
     return {
-      verified: this.user.aiVerified || false,
-      score: this.user.aiScore || 0,
+      verified: !!u.aiVerified || (u.aiScore ? Number(u.aiScore) >= 0.7 : false),
+      score: u.aiScore ? Number(u.aiScore) : 0,
     };
   }
 
@@ -221,14 +259,28 @@ class SimpleAuthService {
       aiVerified: aiVerification.verified,
       aiScore: aiVerification.score,
     };
-    
+
     this.saveToStorage(updatedUser);
-    
+
     return {
       verified: aiVerification.verified,
       score: aiVerification.score,
       message: aiVerification.message,
     };
+  }
+
+  // Fetch full profile from backend
+  async getProfile(): Promise<User> {
+    if (!this.user) throw new Error('No user logged in');
+
+    // Check user by email to get full record
+    const remoteUser = await realApi.checkUser(this.user.email);
+    if (!remoteUser) throw new Error('User record not found');
+
+    // Merge with current data (like authMethod which might be local-only if not in DB)
+    const updatedUser = { ...this.user, ...remoteUser };
+    this.saveToStorage(updatedUser);
+    return updatedUser;
   }
 }
 

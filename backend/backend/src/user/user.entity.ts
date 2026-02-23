@@ -38,6 +38,9 @@ export class User {
   @Column({ type: 'enum', enum: ['USER', 'ADMIN'], default: 'USER' })
   role: 'USER' | 'ADMIN';
 
+  @Column({ type: 'enum', enum: ['email', 'google', 'apple'], default: 'email' })
+  authMethod: 'email' | 'google' | 'apple';
+
   @Column({ default: false })
   isEmailVerified: boolean;
 

@@ -8,6 +8,17 @@ export class LoginDto {
   password: string;
 }
 
+export class SignUpDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  password: string;
+
+  @IsString()
+  name: string;
+}
+
 export class GoogleAuthDto {
   @IsString()
   id: string;
@@ -61,4 +72,17 @@ export class UpdateAIScoreDto {
   @IsOptional()
   @IsObject()
   emailAnalysis?: any;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  token: string;
+
+  @IsString()
+  newPassword: string;
 }

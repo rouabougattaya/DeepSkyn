@@ -5,6 +5,8 @@ import GoogleCallback from './pages/GoogleCallback'
 import HomePage from './pages/HomePage'
 import DashboardPage from './pages/DashboardPage'
 import SecurityPage from './pages/SecurityPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import './App.css'
 
 function App() {
@@ -13,6 +15,8 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/auth/callback/google" element={<GoogleCallback />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/security" element={<SecurityPage />} />

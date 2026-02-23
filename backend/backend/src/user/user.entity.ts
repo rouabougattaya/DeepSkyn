@@ -53,6 +53,15 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Column({ type: 'varchar', nullable: true })
+  resetPasswordToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetPasswordExpires: Date | null;
+
+  @Column({ type: 'jsonb', nullable: true, default: [] })
+  authHistory: any[];
+
   // Relations (to be implemented)
   // @OneToMany(() => Session, session => session.user)
   // sessions: Session[];

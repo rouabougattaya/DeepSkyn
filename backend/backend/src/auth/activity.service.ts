@@ -41,10 +41,10 @@ export class ActivityService {
     private async classifyRiskWithGemini(
         activity: Partial<Activity>,
     ): Promise<GeminiRiskResult> {
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
 
         if (!apiKey) {
-            this.logger.warn('GEMINI_API_KEY not set – using heuristic risk classification');
+            this.logger.warn('Gemini API Key not set – using heuristic risk classification');
             return this.heuristicRiskClassification(activity);
         }
 
@@ -65,36 +65,54 @@ Respond ONLY with a valid JSON object (no markdown, no code block):
   "recommendedAction": "none | notify | temporary_lock"
 }`;
 
-        try {
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 256 },
-                    }),
-                },
-            );
+        const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
 
-            const data = await response.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        for (const modelName of models) {
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { temperature: 0.1, maxOutputTokens: 256 },
+                        }),
+                    },
+                );
 
-            // Strip markdown code block if present
-            const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
-            const result = JSON.parse(cleaned) as GeminiRiskResult;
+                if (!response.ok) {
+                    const errBody = await response.json().catch(() => ({}));
+                    this.logger.warn(`Gemini API error for model ${modelName}: ${response.status} ${JSON.stringify(errBody)}`);
+                    continue; // Try next model
+                }
 
-            // Validate
-            if (!['low', 'medium', 'high'].includes(result.riskLevel)) {
-                throw new Error('Invalid riskLevel from Gemini');
+                const data = await response.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+                if (!text) {
+                    this.logger.warn(`Gemini returned empty text for model ${modelName}`);
+                    continue;
+                }
+
+                // Strip markdown code block if present
+                const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+                const result = JSON.parse(cleaned) as GeminiRiskResult;
+
+                // Validate
+                if (!['low', 'medium', 'high'].includes(result.riskLevel)) {
+                    throw new Error('Invalid riskLevel from Gemini');
+                }
+
+                return result;
+            } catch (err) {
+                this.logger.error(`Gemini risk classification failed for model ${modelName}:`, err.message || err);
+                // Continue to next model
             }
-
-            return result;
-        } catch (err) {
-            this.logger.error('Gemini risk classification failed:', err);
-            return this.heuristicRiskClassification(activity);
         }
+
+        this.logger.error('All Gemini models failed, using heuristic fallback');
+        return this.heuristicRiskClassification(activity);
     }
 
     private heuristicRiskClassification(activity: Partial<Activity>): GeminiRiskResult {
@@ -191,7 +209,7 @@ Write a concise, professional security summary (2-3 sentences) for the user. Be 
 
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -202,11 +220,15 @@ Write a concise, professional security summary (2-3 sentences) for the user. Be 
                 },
             );
 
+            if (!response.ok) {
+                throw new Error(`Gemini API error: ${response.status}`);
+            }
+
             const data = await response.json();
             const summary = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Unable to generate summary.';
             return { summary: summary.trim(), stats };
         } catch (err) {
-            this.logger.error('Gemini summary generation failed:', err);
+            this.logger.error('Gemini summary generation failed:', err.message || err);
             return {
                 summary: `In the past 7 days, ${stats.total} security events were recorded. ${stats.high} high-risk events require your attention.`,
                 stats,

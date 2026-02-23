@@ -19,7 +19,7 @@ import { Public } from './decorators/public.decorator';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import type { User } from '../user/user.entity';
-
+import { LoginFaceDto } from './dto/login-face.dto';
 function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {
   const ip = req.ip ?? req.socket?.remoteAddress ?? null;
   const userAgent = (req.headers['user-agent'] as string) ?? null;
@@ -67,7 +67,64 @@ export class AuthController {
 
     return res.json(result);
   }
+  /**
+   * POST /auth/login-face
+   * Authentifie l'utilisateur par reconnaissance faciale et retourne les tokens JWT
+   */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('login-face')
+  @HttpCode(HttpStatus.OK)
+  async loginFace(
+    @Body() dto: LoginFaceDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    const result = await this.authService.loginFace(dto, metadata, req);
 
+    // Si 2FA requis, retourner sans tokens
+    if (result.requiresTwoFa) {
+      return res.json(result);
+    }
+
+    // Sinon, mettre le refreshToken en HttpOnly cookie
+    if (result.refreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { refreshToken, ...responseData } = result;
+      return res.json(responseData);
+    }
+
+    return res.json(result);
+  }
+ @Public()
+@Post('register-fingerprint/options')
+async registerFingerprintOptions(@Body('email') email: string) {
+  return this.authService.generateFingerprintRegistrationOptions(email);
+}
+
+@Public()
+@Post('register-fingerprint/verify')
+async verifyFingerprint(@Body() body: any) {
+  return this.authService.verifyFingerprintRegistration(body);
+}
+@Public()
+@Post('login-fingerprint/options')
+generateFingerprintLoginOptions(@Body('email') email: string) {
+  return this.authService.generateFingerprintLoginOptions(email);
+}
+@Public()
+@Post('login-fingerprint/verify')
+verifyFingerprintLogin(@Body() body: any) {
+  return this.authService.verifyFingerprintLogin(body);
+}
   /**
    * POST /auth/register
    * Crée un nouvel utilisateur et retourne les tokens JWT

@@ -9,14 +9,22 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../user/user.entity';
 import { RegisterDto } from './dto/register.dto';
-import { LoginDto, LoginResponseDto } from './dto/login.dto';
+import { LoginDto } from './dto/login.dto';
 import { EmailSecurityService } from '../email-security/email-security.service';
 import { TwoFactorService } from '../twofactor/twofactor.service';
 import { tempTwoFAStorage } from '../twofactor/temp-2fa-storage';
 import { JwtTokenService } from './services/jwt-token.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { LoginAttemptService } from './services/login-attempt.service';
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server';
+import { randomUUID } from 'crypto';
 
+const webauthnChallengeStore = new Map<string, string>();
 const SALT_ROUNDS = 12;
 
 export interface SessionTokens {
@@ -27,7 +35,13 @@ export interface SessionTokens {
   refreshToken?: string;
   accessTokenExpiresAt?: Date;
   refreshTokenExpiresAt?: Date;
-  user?: { id: string; email: string; firstName: string; lastName: string; isTwoFAEnabled?: boolean };
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isTwoFAEnabled?: boolean;
+  };
 }
 
 export type SessionMetadata = {
@@ -40,6 +54,7 @@ export type SessionMetadata = {
  * - Authentification avec JWT access tokens + refresh tokens
  * - Rotation des refresh tokens
  * - Intégration 2FA
+ * - (AJOUT) Login via reconnaissance faciale
  */
 @Injectable()
 export class AuthService {
@@ -51,11 +66,10 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly loginAttemptService: LoginAttemptService,
-  ) {}
+  ) { }
 
   /**
-   * LOGIN: Authentifie l'utilisateur et retourne les tokens JWT
-   * Si 2FA activé: retourne requiresTwoFa=true (sans tokens)
+   * LOGIN: email + password
    */
   async login(
     dto: LoginDto,
@@ -63,6 +77,7 @@ export class AuthService {
     req?: any,
   ): Promise<SessionTokens> {
     const emailNorm = dto.email.toLowerCase().trim();
+
     const user = await this.userRepository.findOne({
       where: { email: emailNorm },
       select: [
@@ -81,7 +96,7 @@ export class AuthService {
       throw new UnauthorizedException('Email ou mot de passe incorrect.');
     }
 
-    // Vérifier le blocage (3 tentatives échouées = blocage 3 min)
+    // Blocage login
     const blockedMinutes = this.loginAttemptService.isBlocked(emailNorm);
     if (blockedMinutes !== null) {
       throw new UnauthorizedException(
@@ -105,13 +120,9 @@ export class AuthService {
 
     this.loginAttemptService.clearAttempts(emailNorm);
 
-    // Si 2FA activé, retourner sans tokens
+    // 2FA
     if (user.isTwoFAEnabled && user.totpSecret) {
-      console.log(`[AUTH] 2FA enabled for user ${user.id}, storing temporary session`);
-      tempTwoFAStorage.set(user.id, {
-        totpSecret: user.totpSecret,
-      });
-      console.log(`[AUTH] Temporary 2FA session stored for userId: ${user.id}`);
+      tempTwoFAStorage.set(user.id, { totpSecret: user.totpSecret });
 
       return {
         success: true,
@@ -127,12 +138,11 @@ export class AuthService {
       };
     }
 
-    // Sinon, créer et retourner les tokens
     return this.issueTokens(user, metadata);
   }
 
   /**
-   * REGISTER: Crée un nouvel utilisateur et retourne les tokens JWT
+   * REGISTER: crée user + stocke (optionnel) faceDescriptor
    */
   async register(
     dto: RegisterDto,
@@ -141,13 +151,13 @@ export class AuthService {
   ): Promise<SessionTokens> {
     const emailNorm = dto.email.toLowerCase().trim();
 
-    // Vérifier email suspect
+    // Email suspect
     const suspicious = this.emailSecurityService.isSuspicious(emailNorm);
     if (suspicious.suspicious) {
       throw new BadRequestException("Cet email n'est pas accepté pour l'inscription.");
     }
 
-    // Vérifier email en doublon
+    // Doublon
     const existing = await this.userRepository.findOne({
       where: { email: emailNorm },
     });
@@ -155,8 +165,11 @@ export class AuthService {
       throw new ConflictException('Un compte existe déjà avec cet email.');
     }
 
-    // Hash password et créer user
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+
+    // ✅ si RegisterDto contient faceDescriptor?: number[]
+    const faceDescriptor = (dto as any).faceDescriptor ?? null;
+
     const user = this.userRepository.create({
       email: emailNorm,
       passwordHash,
@@ -167,19 +180,84 @@ export class AuthService {
       isPremium: false,
       isTwoFAEnabled: false,
       totpSecret: null,
+
+      // ✅ AJOUT visage
+      faceDescriptor,
+      faceUpdatedAt: faceDescriptor ? new Date() : null,
     });
 
     await this.userRepository.save(user);
 
-    // Créer et retourner les tokens
     return this.issueTokens(user, metadata);
   }
 
   /**
-   * REFRESH: Renouvelle l'access token en effectuant la rotation du refresh token
-   * - Valide le refresh token
-   * - Crée un nouveau refresh token (ancien révoqué)
-   * - Retourne nouveau access token
+   * LOGIN FACE: email + liveDescriptor(128)
+   */
+  async loginFace(
+    dto: { email: string; liveDescriptor: number[] },
+    metadata?: SessionMetadata,
+    req?: any,
+  ): Promise<SessionTokens> {
+    const emailNorm = dto.email.toLowerCase().trim();
+
+    const user = await this.userRepository.findOne({
+      where: { email: emailNorm },
+      select: [
+        'id',
+        'email',
+        'firstName',
+        'lastName',
+        'role',
+        'isTwoFAEnabled',
+        'totpSecret',
+        'faceDescriptor', // ✅ IMPORTANT
+      ],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Email incorrect.');
+    }
+
+    if (!user.faceDescriptor || user.faceDescriptor.length !== 128) {
+      throw new BadRequestException("Aucune empreinte visage enregistrée pour ce compte.");
+    }
+
+    const dist = euclideanDistance(user.faceDescriptor, dto.liveDescriptor);
+
+
+    // ✅ seuil à ajuster
+    const THRESHOLD = 0.75;;
+    if (dist > THRESHOLD) {
+      throw new UnauthorizedException('Visage non reconnu.');
+    }
+    console.log('-------------------------');
+console.log('Distance visage:', dist);
+console.log('Threshold:', THRESHOLD);
+console.log('-------------------------');
+    // 2FA (même logique que login)
+    if (user.isTwoFAEnabled && user.totpSecret) {
+      tempTwoFAStorage.set(user.id, { totpSecret: user.totpSecret });
+
+      return {
+        success: true,
+        requiresTwoFa: true,
+        message: 'Veuillez entrer votre code 2FA',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isTwoFAEnabled: true,
+        },
+      };
+    }
+
+    return this.issueTokens(user, metadata);
+  }
+
+  /**
+   * REFRESH
    */
   async refresh(
     user: any,
@@ -187,10 +265,8 @@ export class AuthService {
     metadata?: SessionMetadata,
     req?: any,
   ): Promise<any> {
-    // Valider le refresh token
     await this.refreshTokenService.validateRefreshToken(user.id, refreshToken);
 
-    // Obtenir l'user complet
     const fullUser = await this.userRepository.findOne({
       where: { id: user.id },
     });
@@ -199,8 +275,8 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // Effectuer la rotation du refresh token
     const newVersion = (user.tokenVersion || 1) + 1;
+
     const rotatedToken = await this.refreshTokenService.rotateRefreshToken(
       fullUser,
       refreshToken,
@@ -209,7 +285,6 @@ export class AuthService {
       metadata?.userAgent ?? undefined,
     );
 
-    // Générer nouveau access token
     const newAccessToken = this.jwtTokenService.generateAccessToken(fullUser, newVersion);
     const newAccessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(
       this.jwtTokenService.getAccessTokenTtl(),
@@ -225,14 +300,14 @@ export class AuthService {
   }
 
   /**
-   * LOGOUT: Révoque le refresh token
+   * LOGOUT
    */
   async logout(userId: string): Promise<void> {
     await this.refreshTokenService.revokeAllUserTokens(userId);
   }
 
   /**
-   * VERIFY 2FA: Après vérification du code 2FA, créer et retourner les tokens
+   * VERIFY 2FA
    */
   async verify2FA(userId: string, metadata?: SessionMetadata): Promise<SessionTokens> {
     const user = await this.userRepository.findOne({
@@ -246,21 +321,180 @@ export class AuthService {
 
     return this.issueTokens(user, metadata);
   }
+  /* ================= WEB AUTHN - FINGERPRINT ================= */
 
+async generateFingerprintRegistrationOptions(email: string) {
+  const emailNorm = email.toLowerCase().trim();
+
+  const existingUser = await this.userRepository.findOne({
+    where: { email: emailNorm },
+  });
+
+  if (existingUser) {
+    throw new BadRequestException('Cet email est déjà utilisé.');
+  }
+
+  const userId = randomUUID();
+
+  const options = await generateRegistrationOptions({
+    rpName: 'DeepSkyn',
+    rpID: 'localhost',
+    userID: new TextEncoder().encode(userId),
+    userName: emailNorm,
+    timeout: 60000,
+    attestationType: 'none',
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      userVerification: 'required',
+    },
+  });
+
+  webauthnChallengeStore.set(emailNorm, options.challenge);
+
+  return options;
+}
+
+/* ================= VERIFY REGISTER ================= */
+
+async verifyFingerprintRegistration(body: any) {
+  const { credential, email, password, firstName, lastName } = body;
+
+  const emailNorm = email.toLowerCase().trim();
+  const expectedChallenge = webauthnChallengeStore.get(emailNorm);
+
+  if (!expectedChallenge) {
+    throw new UnauthorizedException('Challenge expiré.');
+  }
+
+  const verification = await verifyRegistrationResponse({
+    response: credential,
+    expectedChallenge,
+    expectedOrigin: 'http://localhost:5173',
+    expectedRPID: 'localhost',
+  });
+
+  if (!verification.verified || !verification.registrationInfo) {
+    throw new UnauthorizedException('Échec vérification biométrique.');
+  }
+
+  const { credential: cred } = verification.registrationInfo;
+
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+  const newUser = this.userRepository.create({
+    email: emailNorm,
+    passwordHash,
+    firstName,
+    lastName,
+    role: 'USER',
+    isEmailVerified: false,
+    isPremium: false,
+    isTwoFAEnabled: false,
+
+    // ✅ IMPORTANT : on ne modifie PAS l’id
+    webauthnCredentialID: cred.id,
+
+    // ✅ PublicKey en base64 pour stockage
+    webauthnPublicKey: Buffer.from(cred.publicKey).toString('base64'),
+
+    webauthnCounter: cred.counter,
+  });
+
+  await this.userRepository.save(newUser);
+  webauthnChallengeStore.delete(emailNorm);
+
+  return { success: true };
+}
+
+/* ================= LOGIN OPTIONS ================= */
+
+async generateFingerprintLoginOptions(email: string) {
+  const emailNorm = email.toLowerCase().trim();
+
+  const user = await this.userRepository.findOne({
+    where: { email: emailNorm },
+  });
+
+  if (!user || !user.webauthnCredentialID) {
+    throw new UnauthorizedException('Aucune empreinte enregistrée.');
+  }
+
+  const options = await generateAuthenticationOptions({
+    timeout: 120000,
+    rpID: 'localhost',
+    userVerification: 'required',
+    allowCredentials: [
+      {
+        id: user.webauthnCredentialID, // ✅ STRING EXACTEMENT stockée
+        transports: ['internal'],
+      },
+    ],
+  });
+
+  user.webauthnChallenge = options.challenge;
+  await this.userRepository.save(user);
+
+  return options;
+}
+
+/* ================= VERIFY LOGIN ================= */
+
+async verifyFingerprintLogin(body: any, metadata?: SessionMetadata) {
+  const { credential, email } = body;
+  const emailNorm = email.toLowerCase().trim();
+
+  const user = await this.userRepository.findOne({
+    where: { email: emailNorm },
+  });
+
+  if (
+    !user ||
+    !user.webauthnCredentialID ||
+    !user.webauthnPublicKey ||
+    !user.webauthnChallenge
+  ) {
+    throw new UnauthorizedException('Utilisateur invalide.');
+  }
+
+  const verification = await verifyAuthenticationResponse({
+    response: credential,
+    expectedChallenge: user.webauthnChallenge,
+    expectedOrigin: 'http://localhost:5173',
+    expectedRPID: 'localhost',
+    credential: {
+      id: user.webauthnCredentialID, // ✅ STRING
+      publicKey: Buffer.from(user.webauthnPublicKey, 'base64'),
+      counter: user.webauthnCounter ?? 0,
+      transports: ['internal'],
+    },
+  });
+
+  if (!verification.verified) {
+    throw new UnauthorizedException('Empreinte non valide.');
+  }
+
+  if (verification.authenticationInfo) {
+    user.webauthnCounter = verification.authenticationInfo.newCounter;
+  }
+
+  user.webauthnChallenge = null;
+  await this.userRepository.save(user);
+
+  return this.issueTokens(user, metadata);
+}
   /**
-   * Helper: Génère et stocke les tokens JWT
+   * Helper: tokens
    */
+
   private async issueTokens(
     user: User,
     metadata?: SessionMetadata,
   ): Promise<SessionTokens> {
-    // Générer access token
     const accessToken = this.jwtTokenService.generateAccessToken(user);
     const accessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(
       this.jwtTokenService.getAccessTokenTtl(),
     );
 
-    // Créer et stocker refresh token
     const refreshTokenRecord = await this.refreshTokenService.createRefreshToken(
       user,
       metadata?.ipAddress ?? null,
@@ -282,4 +516,17 @@ export class AuthService {
       },
     };
   }
+}
+
+/**
+ * ✅ Fonction UTILITAIRE (en dehors de la classe)
+ */
+function euclideanDistance(a: number[], b: number[]) {
+  if (a.length !== b.length) return Number.POSITIVE_INFINITY;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
+  }
+  return Math.sqrt(sum);
 }

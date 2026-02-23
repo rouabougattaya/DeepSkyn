@@ -8,7 +8,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { EmailSecurityModule } from './email-security/email-security.module';
-
+import { UsersModule } from './user/users.module';
+import { ModerationModule } from './moderation/moderation.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,13 +28,15 @@ import { EmailSecurityModule } from './email-security/email-security.module';
             host: process.env.DB_HOST || 'localhost',
             port: parseInt(process.env.DB_PORT || '5432', 10),
             username: process.env.DB_USERNAME || 'postgres',
-            password: process.env.DB_PASSWORD || 'postgres',
-            database: process.env.DB_DATABASE || 'deepskyn',
+            password: process.env.DB_PASSWORD || 'asia2015',
+            database: process.env.DB_DATABASE || 'deepskyn_db',
           }),
       entities: [join(__dirname, '**', '*.entity.{ts,js}')],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
     AuthModule,
+      UsersModule,
+       ModerationModule
   ],
   controllers: [AppController],
   providers: [

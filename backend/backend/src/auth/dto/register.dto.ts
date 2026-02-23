@@ -1,4 +1,14 @@
-import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  IsOptional,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+  IsNumber,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -17,4 +27,12 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(100)
   lastName: string;
+
+  // ✅ AJOUT : empreinte visage (128 valeurs)
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(128)
+  @ArrayMaxSize(128)
+  @IsNumber({}, { each: true })
+  faceDescriptor?: number[];
 }

@@ -23,8 +23,18 @@ async function bootstrap() {
   const publicRoutes = [
     '/auth/login',
     '/auth/register',
+     '/auth/login-face',
     '/auth/2fa/verify',
-    '/auth/logout', // Logout est protégé par Bearer token, pas besoin de CSRF
+    '/auth/logout',
+    
+     '/auth/2fa/setup',
+    '/auth/2fa/enable',
+    '/auth/2fa/disable',
+    '/auth/register-fingerprint/options',
+  '/auth/register-fingerprint/verify',
+  '/auth/login-fingerprint/options',
+  '/auth/login-fingerprint/verify',
+     // Logout est protégé par Bearer token, pas besoin de CSRF
   ];
 
   const csrfProtection = csrf({
@@ -36,10 +46,14 @@ async function bootstrap() {
   });
 
   // Middleware CSRF intelligente
-  app.use((req, res, next) => {
-    // Route spéciale: /auth/csrf-token - toujours générer le token (GET ou POST)
+  app.use((req: any, res: any, next: any) => {
+    // ✅ Route spéciale: /auth/csrf-token - générer ET RETOURNER le token
     if (req.path === '/auth/csrf-token') {
-      return csrfProtection(req, res, next);
+      return csrfProtection(req, res, () => {
+        const token = req.csrfToken();
+        res.setHeader('X-CSRF-Token', token);
+        return res.status(200).json({ csrfToken: token });
+      });
     }
 
     // Routes publiques: pas de CSRF du tout
@@ -52,7 +66,7 @@ async function bootstrap() {
       return csrfProtection(req, res, next);
     }
 
-    // GET sur les autres routes: générer le token seulement
+    // GET sur les autres routes: générer le token seulement (ça crée le cookie _csrf)
     if (req.method === 'GET') {
       return csrfProtection(req, res, next);
     }
@@ -72,9 +86,11 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
+
   console.log(`✅ JWT Authentication Server running on http://localhost:${port}`);
   console.log(`🔐 CSRF Protection: Enabled (on protected routes)`);
   console.log(`🍪 HttpOnly Cookies: Enabled`);
   console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
 }
+
 bootstrap();

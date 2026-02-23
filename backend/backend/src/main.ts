@@ -19,10 +19,14 @@ async function bootstrap() {
   // Cookie parser
   app.use(cookieParser());
 
-  // Routes publiques (pas de CSRF requis)
+  // Routes publiques ou sécurisées par Bearer uniquement (pas de CSRF requis)
   const publicRoutes = [
     '/auth/login',
     '/auth/register',
+    // 2FA routes: protégées par JWT Bearer, pas vulnérables au CSRF classique
+    '/auth/2fa/setup',
+    '/auth/2fa/enable',
+    '/auth/2fa/disable',
     '/auth/2fa/verify',
     '/auth/logout', // Logout est protégé par Bearer token, pas besoin de CSRF
   ];

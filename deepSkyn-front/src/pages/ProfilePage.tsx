@@ -1,17 +1,22 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Save, Trash2 } from "lucide-react"
 import { authFetch, getAccessToken, clearSession, updateSessionUser } from "@/lib/authSession"
+import { aiService } from "@/services/aiService"
 type MeUser = {
   id: string
   email: string
   firstName: string
   lastName: string
   bio: string | null
+  aiScore?: number
+  googleName?: string
+  picture?: string
+  authMethod?: string
   role?: "USER" | "ADMIN"
   createdAt?: string
   updatedAt?: string
@@ -47,6 +52,7 @@ export default function ProfilePage() {
   const [loadingMe, setLoadingMe] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [isFirstLogin, setIsFirstLogin] = useState(false)
 
   const clearFieldError = (field: keyof FieldErrors) => {
     setFieldErrors((prev) => ({ ...prev, [field]: "" }))
@@ -65,19 +71,35 @@ export default function ProfilePage() {
       setSuccess("")
 
       try {
-        const res = await authFetch("/users/me", { method: "GET" })
-        const data = await res.json().catch(() => ({}))
+        // Pour Google login, utiliser les données localStorage directement
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          setMe(userData);
 
-        if (!res.ok) {
-          setError(Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Erreur chargement profil."))
-          return
+          // Charger les données existantes
+          const initialFirstName = userData.firstName ?? ""
+          const initialLastName = userData.lastName ?? ""
+          const initialBio = userData.bio ?? ""
+
+          // Si les champs sont vides mais qu'on a un nom complet (ex: Google)
+          if (!initialFirstName && !initialLastName && userData.name) {
+            const nameParts = userData.name.split(' ')
+            setFirstName(nameParts[0] || "")
+            setLastName(nameParts.slice(1).join(' ') || "")
+          } else {
+            setFirstName(initialFirstName)
+            setLastName(initialLastName)
+          }
+
+          setBio(initialBio)
+
+          // Déterminer si c'est une première connexion
+          const hasProfileData = !!(userData.firstName && userData.lastName);
+          if (!hasProfileData) {
+            setIsFirstLogin(true)
+          }
         }
-
-        setMe(data)
-        
-        setFirstName(data.firstName ?? "")
-        setLastName(data.lastName ?? "")
-        setBio(data.bio ?? "")
       } catch {
         setError("Impossible de joindre le serveur. Vérifie le backend.")
       } finally {
@@ -88,15 +110,7 @@ export default function ProfilePage() {
     run()
   }, [])
 
-  // CSRF token
-  const getCsrfToken = async (): Promise<string> => {
-    const res = await authFetch("/auth/csrf-token", { method: "GET" })
-    const data = await res.json().catch(() => ({}))
-    const token = data?.csrfToken || res.headers.get("X-CSRF-Token")
-    if (!token) throw new Error("CSRF token introuvable")
-    return token
-  }
-
+  // handleSave
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -117,25 +131,51 @@ export default function ProfilePage() {
 
     setSaving(true)
     try {
-      const csrfToken = await getCsrfToken()
+      const newName = `${payload.firstName} ${payload.lastName}`;
 
-      const res = await authFetch("/users/me", {
-        method: "PATCH",
-        headers: {
-          "X-CSRF-Token": csrfToken,
-        },
-        body: JSON.stringify(payload),
-      })
+      // Recalculer le score AI basé sur le nouveau nom
+      const { score: newScore, bioStatus } = aiService.calculateTrustScore({
+        name: newName,
+        email: me?.email || '',
+        bio: payload.bio,
+        picture: me?.picture,
+        googleName: me?.googleName
+      });
 
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Erreur update profil."))
-        return
+      // Sauvegarder directement dans localStorage pour le moment
+      const updatedUser = {
+        ...me,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        name: newName,
+        bio: payload.bio,
+        aiScore: newScore
+      } as MeUser;
+
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      updateSessionUser({ firstName: payload.firstName, lastName: payload.lastName });
+
+      // Synchroniser avec historyService pour que la page historique soit à jour
+      const { historyService } = await import('@/services/historyService');
+      const used2FA = await historyService.was2FAUsedRecently();
+
+      // On simule un "login" success pour rafraîchir le score global
+      historyService.updateUserScoreSimple(
+        'success',
+        used2FA,
+        newScore,
+        {
+          nameConsistency: newScore < 0.6 ? 0.4 : 1.0,
+          bioStatus: bioStatus
+        }
+      );
+
+      setMe(updatedUser);
+      setSuccess("Profil mis à jour ✅")
+
+      if (me?.googleName && newName.toLowerCase().trim() !== me.googleName.toLowerCase().trim()) {
+        setError("Note: Votre nom diffère de celui de Google. Votre score de confiance a été ajusté.");
       }
-
-     setMe(data)
-updateSessionUser({ firstName: data.firstName, lastName: data.lastName })
-setSuccess("Profil mis à jour ✅")
     } catch (err: any) {
       setError(err?.message || "Erreur réseau.")
     } finally {
@@ -151,13 +191,8 @@ setSuccess("Profil mis à jour ✅")
 
     setDeleting(true)
     try {
-      const csrfToken = await getCsrfToken()
-
       const res = await authFetch("/users/me", {
         method: "DELETE",
-        headers: {
-          "X-CSRF-Token": csrfToken,
-        },
       })
 
       const data = await res.json().catch(() => ({}))
@@ -179,8 +214,15 @@ setSuccess("Profil mis à jour ✅")
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center p-4">
       <div className="w-full max-w-[560px] mt-6">
         <div className="text-center mb-8">
-          <h1 className="text-[32px] font-bold text-slate-900 mb-2">Mon profil</h1>
-          <p className="text-slate-500 text-sm">Modifiez vos informations personnelles</p>
+          <h1 className="text-[32px] font-bold text-slate-900 mb-2">
+            {isFirstLogin ? "Complétez votre profil" : "Mon profil"}
+          </h1>
+          <p className="text-slate-500 text-sm">
+            {isFirstLogin
+              ? "Bienvenue ! Veuillez compléter vos informations pour commencer"
+              : "Modifiez vos informations personnelles"
+            }
+          </p>
         </div>
 
         {loadingMe ? (
@@ -190,9 +232,21 @@ setSuccess("Profil mis à jour ✅")
         ) : (
           <form onSubmit={handleSave} className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
             {(error || success) && (
-              <p className={`text-sm p-3 rounded-lg ${error ? "text-red-600 bg-red-50" : "text-emerald-700 bg-emerald-50"}`}>
+              <p className={`text-sm p-3 rounded-lg ${error && !success ? "text-red-600 bg-red-50" : (error && success ? "text-yellow-700 bg-yellow-50" : "text-emerald-700 bg-emerald-50")}`}>
                 {error || success}
               </p>
+            )}
+
+            {me?.aiScore !== undefined && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Score d'identité IA</p>
+                  <p className="text-sm text-slate-600">Basé sur la cohérence de vos informations</p>
+                </div>
+                <div className={`text-2xl font-black ${me.aiScore > 0.7 ? "text-[#0d9488]" : me.aiScore > 0.4 ? "text-yellow-600" : "text-red-600"}`}>
+                  {Math.round(me.aiScore * 100)}%
+                </div>
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -228,9 +282,8 @@ setSuccess("Profil mis à jour ✅")
               <textarea
                 value={bio}
                 onChange={(e) => { setBio(e.target.value); clearFieldError("bio") }}
-                className={`w-full min-h-[120px] rounded-lg border bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-[#0d9488] border-slate-200 ${
-                  fieldErrors.bio ? "border-red-500" : ""
-                }`}
+                className={`w-full min-h-[120px] rounded-lg border bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-[#0d9488] border-slate-200 ${fieldErrors.bio ? "border-red-500" : ""
+                  }`}
                 maxLength={500}
               />
               <div className="flex items-center justify-between">
@@ -254,6 +307,17 @@ setSuccess("Profil mis à jour ✅")
                 {deleting ? "Suppression..." : "Supprimer"}
               </Button>
             </div>
+
+            {/* Bouton pour aller à la homepage après profil complété */}
+            {success && (
+              <div className="mt-4">
+                <Link to="/" className="w-full">
+                  <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg">
+                    Aller à la homepage →
+                  </Button>
+                </Link>
+              </div>
+            )}
           </form>
         )}
       </div>

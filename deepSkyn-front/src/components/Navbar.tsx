@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sparkles, LogOut, Settings } from "lucide-react"
+import { Menu, X, Sparkles, LogOut, Settings, User as UserIcon, LayoutDashboard } from "lucide-react"
 import { getUser, logout } from "@/lib/authSession"
+import { simpleAuthService } from "@/services/authService-simple"
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -21,6 +22,8 @@ export function Navbar() {
   const user = getUser()
 
   const handleLogout = async () => {
+    // Nettoyer les deux systèmes d'authentification
+    await simpleAuthService.logout()
     await logout()
     navigate("/auth/login", { replace: true })
     setIsOpen(false)
@@ -53,7 +56,11 @@ export function Navbar() {
             {!user ? (
               <>
                 <Link to="/auth/login">
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-[#0d9488] text-[#0d9488] hover:bg-[#0d9488] hover:text-white transition-all font-semibold"
+                  >
                     Sign In
                   </Button>
                 </Link>
@@ -65,9 +72,26 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <span className="text-sm text-gray-600">
-                  {user.firstName}
-                </span>
+                {/* Admin Dashboard Icon */}
+                <Link
+                  to="/dashboard"
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Dashboard Admin"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-gray-600 hover:text-gray-900" />
+                </Link>
+
+                {/* Username with Profile Link */}
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Profil"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  {user.firstName} {user.lastName}
+                </Link>
+
+                {/* Settings Icon */}
                 <Link
                   to="/settings"
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -75,6 +99,7 @@ export function Navbar() {
                 >
                   <Settings className="w-4 h-4 text-gray-600 hover:text-gray-900" />
                 </Link>
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -128,13 +153,36 @@ export function Navbar() {
                 </>
               ) : (
                 <>
+                  {/* Admin Dashboard */}
                   <Link
-                    to="/settings"
-                    className="block px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    to="/dashboard"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                     onClick={() => setIsOpen(false)}
                   >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard Admin
+                  </Link>
+
+                  {/* Profile */}
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    Mon Profil
+                  </Link>
+
+                  {/* Settings */}
+                  <Link
+                    to="/settings"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Settings className="w-4 h-4" />
                     Paramètres
                   </Link>
+
                   <div className="pt-2">
                     <Button
                       variant="outline"

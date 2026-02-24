@@ -2,7 +2,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './components/AppLayout'
 import LoginPage from './pages/LoginPage'
+import LoginFacePage from "./pages/LoginFacePage"
+import LoginFingerprintPage from "./pages/LoginFingerprintPage"
 import RegisterPage from './pages/RegisterPage'
+import RegisterFingerprintPage from "@/pages/RegisterFingerprintPage"
 import GoogleCallback from './pages/GoogleCallback'
 import HomePage from './pages/HomePage'
 import DashboardPage from './pages/DashboardPage'
@@ -12,9 +15,11 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import { TwoFactorPage } from './pages/TwoFactorPage'
 import { TwoFactorSetupPage } from './pages/TwoFactorSettingsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import ProfilePage from "./pages/ProfilePage"
+import ActivityHistoryPage from './pages/ActivityHistoryPage'
 import './App.css'
 
-function HomePlaceholder() {
+function Home() {
   return (
     <div className="min-h-screen bg-white pt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -43,6 +48,9 @@ function App() {
         <Route path="/auth/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/auth/callback/google" element={<GoogleCallback />} />
         <Route path="/auth/2fa" element={<TwoFactorPage />} />
+        <Route path="/auth/login-empreinte" element={<LoginFingerprintPage />} />
+        <Route path="/auth/register-fingerprint" element={<RegisterFingerprintPage />} />
+        <Route path="/auth/login-face" element={<LoginFacePage />} />
 
         {/* Protected Routes inside AppLayout */}
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -50,7 +58,9 @@ function App() {
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/2fa" element={<TwoFactorSetupPage />} />
-          <Route path="/home" element={<HomePlaceholder />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/security-history" element={<ActivityHistoryPage />} />
+          <Route path="/home" element={<Home />} />
 
           <Route path="/analysis" element={<HomePage />} />
           <Route path="/pricing" element={<HomePage />} />

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Sparkles, Fingerprint } from "lucide-react"
 import { setSession } from "@/lib/authSession"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001"
+const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
 
 export default function LoginFingerprintPage() {
   const navigate = useNavigate()
@@ -50,107 +50,107 @@ export default function LoginFingerprintPage() {
   /* ================= LOGIN ================= */
 
   const handleFingerprintLogin = async () => {
-  setError("")
+    setError("")
 
-  if (!email) {
-    setError("Veuillez entrer votre email.")
-    return
-  }
-
-  if (!window.PublicKeyCredential) {
-    setError("WebAuthn non supporté par ce navigateur.")
-    return
-  }
-
-  try {
-    setIsLoading(true)
-
-    // 1️⃣ Récupérer les options du backend
-    const res = await fetch(`${API_URL}/auth/login-fingerprint/options`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    })
-
-    const options = await res.json()
-
-    if (!res.ok) {
-      setError(options.message || "Erreur biométrique")
+    if (!email) {
+      setError("Veuillez entrer votre email.")
       return
     }
 
-    // 🔥 Conversion obligatoire
-    options.challenge = base64ToUint8Array(options.challenge)
-
-    if (options.allowCredentials) {
-      options.allowCredentials = options.allowCredentials.map((cred: any) => ({
-        ...cred,
-        id: base64ToUint8Array(cred.id),
-      }))
-    }
-
-    // ✅ FORCER la vérification utilisateur
-    options.userVerification = "required"
-
-    // 🚀 CETTE LIGNE OUVRE WINDOWS HELLO
-    const credential = await navigator.credentials.get({
-      publicKey: options,
-    }) as PublicKeyCredential | null
-
-    if (!credential) {
-      setError("Authentification annulée.")
+    if (!window.PublicKeyCredential) {
+      setError("WebAuthn non supporté par ce navigateur.")
       return
     }
 
-    const response = credential.response as AuthenticatorAssertionResponse
+    try {
+      setIsLoading(true)
 
-    const credentialData = {
-      id: credential.id,
-      rawId: bufferToBase64url(credential.rawId),
-      type: credential.type,
-      response: {
-        authenticatorData: bufferToBase64url(response.authenticatorData),
-        clientDataJSON: bufferToBase64url(response.clientDataJSON),
-        signature: bufferToBase64url(response.signature),
-        userHandle: response.userHandle
-          ? bufferToBase64url(response.userHandle)
-          : null,
-      },
-    }
-
-    // 3️⃣ Vérification backend
-    const verifyRes = await fetch(
-      `${API_URL}/auth/login-fingerprint/verify`,
-      {
+      // 1️⃣ Récupérer les options du backend
+      const res = await fetch(`${API_URL}/auth/login-fingerprint/options`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, credential: credentialData }),
+        body: JSON.stringify({ email }),
+      })
+
+      const options = await res.json()
+
+      if (!res.ok) {
+        setError(options.message || "Erreur biométrique")
+        return
       }
-    )
 
-    const data = await verifyRes.json()
+      // 🔥 Conversion obligatoire
+      options.challenge = base64ToUint8Array(options.challenge)
 
-    if (!verifyRes.ok) {
-      setError(data.message || "Empreinte non reconnue")
-      return
+      if (options.allowCredentials) {
+        options.allowCredentials = options.allowCredentials.map((cred: any) => ({
+          ...cred,
+          id: base64ToUint8Array(cred.id),
+        }))
+      }
+
+      // ✅ FORCER la vérification utilisateur
+      options.userVerification = "required"
+
+      // 🚀 CETTE LIGNE OUVRE WINDOWS HELLO
+      const credential = await navigator.credentials.get({
+        publicKey: options,
+      }) as PublicKeyCredential | null
+
+      if (!credential) {
+        setError("Authentification annulée.")
+        return
+      }
+
+      const response = credential.response as AuthenticatorAssertionResponse
+
+      const credentialData = {
+        id: credential.id,
+        rawId: bufferToBase64url(credential.rawId),
+        type: credential.type,
+        response: {
+          authenticatorData: bufferToBase64url(response.authenticatorData),
+          clientDataJSON: bufferToBase64url(response.clientDataJSON),
+          signature: bufferToBase64url(response.signature),
+          userHandle: response.userHandle
+            ? bufferToBase64url(response.userHandle)
+            : null,
+        },
+      }
+
+      // 3️⃣ Vérification backend
+      const verifyRes = await fetch(
+        `${API_URL}/auth/login-fingerprint/verify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, credential: credentialData }),
+        }
+      )
+
+      const data = await verifyRes.json()
+
+      if (!verifyRes.ok) {
+        setError(data.message || "Empreinte non reconnue")
+        return
+      }
+
+      setSession(data)
+      navigate("/", { replace: true })
+
+    } catch (err: any) {
+      console.error(err)
+
+      if (err.name === "NotAllowedError") {
+        setError("Authentification annulée ou refusée.")
+      } else {
+        setError("Erreur WebAuthn")
+      }
+
+    } finally {
+      setIsLoading(false)
     }
-
-    setSession(data)
-    navigate("/", { replace: true })
-
-  } catch (err: any) {
-    console.error(err)
-
-    if (err.name === "NotAllowedError") {
-      setError("Authentification annulée ou refusée.")
-    } else {
-      setError("Erreur WebAuthn")
-    }
-
-  } finally {
-    setIsLoading(false)
   }
-}
   /* ================= UI ================= */
 
   return (

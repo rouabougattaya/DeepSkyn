@@ -6,6 +6,7 @@ export interface AIVerificationResult {
     photoQuality: number;
     nameConsistency: number;
     emailTrust: number;
+    bioStatus: number;
     overallScore: number;
   };
   message: string;
@@ -113,7 +114,7 @@ class AIService {
         return 0.3;
       }
 
-      const domain = email.split('@')[1];
+      const domain = email.split('@')[1]?.toLowerCase();
 
       if (!domain) {
         return 0.2;
@@ -125,15 +126,17 @@ class AIService {
         'protonmail.com', 'tutanota.com', 'zoho.com'
       ];
 
-      // Domaines d'entreprise
-      const businessDomains = [
-        'company.com', 'corp.com', 'tech.com', 'studio.com'
-      ];
-
       let trustScore = 0.5; // Base score
 
-      if (trustedDomains.includes(domain)) trustScore += 0.3;
-      if (businessDomains.some(bd => domain.includes(bd))) trustScore += 0.2;
+      // Règle spécifique : @gmail.com est le plus fiable
+      if (domain === 'gmail.com') {
+        trustScore += 0.4;
+      } else if (trustedDomains.includes(domain)) {
+        trustScore += 0.2;
+      } else {
+        // Autres domaines diminuent le score comme demandé
+        trustScore -= 0.15;
+      }
 
       // Vérifier format email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -141,7 +144,7 @@ class AIService {
 
       // Pénaliser les emails suspects
       if (domain.includes('temp') || domain.includes('fake') || domain.includes('10minutemail')) {
-        trustScore -= 0.3;
+        trustScore = 0.1;
       }
 
       return Math.max(0.1, Math.min(trustScore, 1.0));
@@ -155,65 +158,86 @@ class AIService {
   calculateTrustScore(user: {
     name: string;
     email: string;
+    bio?: string;
     picture?: string;
     photoAnalysis?: PhotoAnalysis;
-  }): number {
+    googleName?: string;
+  }): { score: number, bioStatus: number } {
     try {
       const email = user.email || '';
       const name = user.name || 'User';
+      const bio = user.bio || '';
       const emailTrust = this.analyzeEmailTrust(email);
       const photoQuality = user.photoAnalysis?.quality || 0.5;
-      const nameLength = name.length;
-      const hasValidName = nameLength >= 3 && name.split(' ').length >= 2;
 
-      // Critères strictes additionnels
+      const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1);
+      const emailHandle = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, ' ');
+
+      // 1. Cohérence Nom vs Email Prefix
+      let nameEmailConsistency = 0.4;
+      if (nameParts.length > 0) {
+        const matches = nameParts.filter(part => emailHandle.includes(part));
+        if (matches.length > 0) {
+          nameEmailConsistency = 0.5 + (matches.length / nameParts.length) * 0.5;
+        }
+      }
+
+      // 2. Comparaison avec le nom Google
+      let nameGoogleMatch = 1.0;
+      if (user.googleName) {
+        const profileName = name.toLowerCase().trim();
+        const gName = user.googleName.toLowerCase().trim();
+
+        if (profileName !== gName) {
+          const gParts = gName.split(/\s+/);
+          const hasCommonPart = nameParts.some(p => gParts.includes(p));
+          nameGoogleMatch = hasCommonPart ? 0.5 : 0.1;
+        }
+      }
+
+      const nameConsistency = user.googleName
+        ? (nameGoogleMatch * 0.7 + nameEmailConsistency * 0.3)
+        : nameEmailConsistency;
+
+      // 3. Vérification de la BIO
+      const hasBio = bio.trim().length > 10;
+      const bioStatus = hasBio ? 1.0 : 0.0;
+      const bioPenalty = hasBio ? 0 : 0.15;
+
+      // Critères de photo et complétude
       const hasPhoto = !!user.picture;
       const photoAnalysis = user.photoAnalysis;
       const hasFaceDetection = photoAnalysis?.hasFace || false;
-      const photoBrightnessScore = photoAnalysis?.brightness || 0;
+      const isRealPerson = hasFaceDetection && photoQuality > 0.6;
+      const isCompleteProfile = nameParts.length >= 2 && hasPhoto && !!user.email && hasBio;
 
-      // Vérifications ULTRA strictes
-      const isRealPerson = hasFaceDetection && photoBrightnessScore > 0.3 && photoQuality > 0.6;
-      const isCompleteProfile = hasValidName && hasPhoto && !!user.email;
-
-      // Nouveaux critères anti-avatar
-      const isLikelyAvatar = hasPhoto && (!hasFaceDetection || photoQuality < 0.6);
-      const isDefaultPhoto = user.picture?.includes('default') || user.picture?.includes('avatar') || user.picture?.includes('placeholder');
-
-      // Nouvelles pondérations plus équilibrées
+      // Pondérations PLUS STRICTES
       const weights = {
         email: 0.25,
-        photo: 0.35,
-        name: 0.15,
-        completeness: 0.15,
-        authenticity: 0.10,
+        photo: 0.25,
+        nameConsistency: 0.35,
+        completeness: 0.15
       };
 
       let score = 0;
       score += emailTrust * weights.email;
-      score += photoQuality * weights.photo;
-      score += (hasValidName ? 1.0 : 0.4) * weights.name;
-      score += (isCompleteProfile ? 1.0 : 0.3) * weights.completeness;
-      score += (isRealPerson ? 1.0 : 0.2) * weights.authenticity;
+      score += (hasPhoto ? photoQuality : 0.1) * weights.photo;
+      score += nameConsistency * weights.nameConsistency;
+      score += (isCompleteProfile ? 1.0 : 0.2) * weights.completeness;
 
-      // Pénalités ciblées
-      if (!hasPhoto) score -= 0.15; // Moins sévère
-      if (isLikelyAvatar) score -= 0.1;
-      if (isDefaultPhoto) score -= 0.2;
+      // Bonus/Malus
+      if (isRealPerson) score += 0.05;
+      if (hasPhoto && !hasFaceDetection) score -= 0.2;
+      score -= bioPenalty;
 
-      // Plafonner la détection d'avatar mais de manière plus souple
-      if (hasPhoto && !hasFaceDetection) {
-        score = Math.min(score, 0.45); // Max 45% pour photos sans visage détecté
-      } else if (!hasPhoto) {
-        score = Math.min(score, 0.25); // Max 25% sans photo du tout
-      }
+      const finalScore = Math.max(0.01, Math.min(score, 1.0));
 
-      console.log(`📊 Resulting AI Score: ${score.toFixed(4)} (EmailTrust: ${emailTrust.toFixed(2)}, PhotoQual: ${photoQuality.toFixed(2)})`);
+      console.log(`📊 AI Score Final: ${finalScore.toFixed(4)} | Bio: ${bioStatus} | Name: ${nameConsistency.toFixed(2)}`);
 
-      return Math.max(0.05, Math.min(score, 1.0)); // Plancher à 5%
+      return { score: finalScore, bioStatus };
     } catch (error) {
       console.error('Trust score calculation failed:', error);
-      return 0.3;
+      return { score: 0.3, bioStatus: 0 };
     }
   }
 
@@ -221,7 +245,9 @@ class AIService {
   async verifyIdentity(user: {
     name: string;
     email: string;
+    bio?: string;
     picture?: string;
+    googleName?: string;
   }): Promise<AIVerificationResult> {
     try {
       // 1. Analyser la photo
@@ -234,7 +260,7 @@ class AIService {
       const emailTrust = this.analyzeEmailTrust(user.email);
 
       // 4. Calculer score global
-      const overallScore = this.calculateTrustScore({
+      const { score: overallScore, bioStatus } = this.calculateTrustScore({
         ...user,
         photoAnalysis,
       });
@@ -265,6 +291,7 @@ class AIService {
           photoQuality: photoAnalysis.quality,
           nameConsistency,
           emailTrust,
+          bioStatus,
           overallScore,
         },
         message,
@@ -278,6 +305,7 @@ class AIService {
           photoQuality: 0.3,
           nameConsistency: 0.3,
           emailTrust: 0.3,
+          bioStatus: 0.3,
           overallScore: 0.2,
         },
         message: 'Erreur lors de la vérification d\'identité',

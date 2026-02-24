@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
-import { authFetch } from '@/lib/authSession';
+import { authFetch, getAccessToken } from '@/lib/authSession';
 
 interface TwoFAStatus {
   success: boolean;
@@ -23,13 +23,22 @@ export function SettingsPanel() {
 
   const checkTwoFAStatus = async () => {
     try {
+      // Vérifier si c'est un token Google temporaire
+      const accessToken = getAccessToken();
+      if (accessToken?.startsWith('google_')) {
+        // Mode offline pour Google login
+        setTwoFAEnabled(false);
+        return;
+      }
+      
       const res = await authFetch('/auth/2fa/status');
       const data: TwoFAStatus = await res.json();
       if (res.ok) {
         setTwoFAEnabled(data.isTwoFAEnabled);
       }
-    } catch (err) {
-      console.error('Error checking 2FA status:', err);
+    } catch (error) {
+      console.error('Error checking 2FA status:', error);
+      setTwoFAEnabled(false);
     } finally {
       setLoading(false);
     }

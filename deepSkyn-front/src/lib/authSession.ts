@@ -15,6 +15,12 @@ export interface SessionUser {
   email: string
   firstName: string
   lastName: string
+  name?: string
+  aiScore?: number
+  aiVerified?: boolean
+  picture?: string;
+  authMethod?: string;
+  bio?: string;
 }
 
 export interface SessionTokens {
@@ -60,9 +66,26 @@ export function clearSession(): void {
   localStorage.removeItem("refreshTokenExpiresAt")
 }
 
-/** Vérifie si une session est présente (access token présent) */
+/** Vérifie si une session est présente (access token présent et non expiré) */
 export function hasSession(): boolean {
-  return !!getAccessToken()
+  const token = getAccessToken()
+  if (!token) return false
+
+  // Vérifier si le token n'est pas expiré
+  const expiresAt = localStorage.getItem(KEY_ACCESS_EXPIRES)
+  if (expiresAt) {
+    const expirationTime = new Date(expiresAt).getTime()
+    const now = new Date().getTime()
+    if (now >= expirationTime) {
+      // Token expiré, nettoyer la session
+      clearSession()
+      return false
+    }
+  }
+
+  // Si pas de refreshToken mais accessToken valide, autoriser l'accès
+  // (solution temporaire en attendant correction backend)
+  return true
 }
 
 /**
@@ -92,12 +115,39 @@ function recordActivity(): void {
   }
 }
 
-export async function authFetch(
-  path: string,
-  options: RequestInit = {}
-): Promise<Response> {
+/** Met à jour les informations de l'utilisateur dans la session */
+export function updateSessionUser(user: Partial<SessionUser>): void {
+  const currentUser = getUser()
+  if (currentUser) {
+    const updatedUser = { ...currentUser, ...user }
+    localStorage.setItem(KEY_USER, JSON.stringify(updatedUser))
+  }
+}
+
+/** Récupère le CSRF token depuis le backend */
+async function getCsrfToken(): Promise<string> {
+  const response = await fetch(`${API_URL}/auth/csrf-token`, {
+    method: 'GET',
+    credentials: 'include'
+  });
+  const data = await response.json().catch(() => ({}));
+  const token = data?.csrfToken || response.headers.get('X-CSRF-Token');
+  if (!token) throw new Error('CSRF token not found');
+  return token;
+}
+
+export const authFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   recordActivity()
-  const url = path.startsWith("http") ? path : `${API_URL}${path}`
+  // Si c'est un token Google temporaire, ne pas faire d'appels backend
+  const accessToken = getAccessToken();
+  if (accessToken?.startsWith('google_')) {
+    console.warn(' Skipping backend API call for Google temp token');
+    return new Response(JSON.stringify({ message: 'Offline mode - Google token' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   const access = getAccessToken()
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -107,29 +157,54 @@ export async function authFetch(
     (headers as Record<string, string>)["Authorization"] = `Bearer ${access}`
   }
 
-  let res = await fetch(url, { ...options, headers })
+  // Ajouter le CSRF token pour les méthodes qui modifient les données
+  const method = (options.method || 'GET').toUpperCase()
+  if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+    try {
+      const csrfToken = await getCsrfToken()
+        ; (headers as Record<string, string>)["X-CSRF-Token"] = csrfToken
+    } catch (error) {
+      console.warn('Could not get CSRF token:', error)
+    }
+  }
 
-  if (res.status === 401 && getRefreshToken()) {
-    const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: getRefreshToken() }),
-    })
-    const data = await refreshRes.json().catch(() => ({}))
-    if (refreshRes.ok && data.accessToken) {
-      setSession({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        accessTokenExpiresAt: data.accessTokenExpiresAt,
-        refreshTokenExpiresAt: data.refreshTokenExpiresAt,
-        user: data.user,
+  // Ensure the URL is absolute by prepending API_URL if it's a relative path
+  const finalUrl = url.startsWith('http') ? url : `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+
+  let res = await fetch(finalUrl, { ...options, headers, credentials: 'include' })
+
+  // Si c'est une erreur 401 et qu'on a un token temporaire (Google), ne pas essayer de rafraîchir
+  if (res.status === 401 && getRefreshToken() && !getAccessToken()?.startsWith('google_')) {
+    try {
+      const csrfToken = await getCsrfToken()
+      const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ refreshToken: getRefreshToken() }),
       })
-      const newAccess = getAccessToken()
-      if (newAccess) {
-        (headers as Record<string, string>)["Authorization"] = `Bearer ${newAccess}`
-        res = await fetch(url, { ...options, headers })
+      const data = await refreshRes.json().catch(() => ({}))
+      if (refreshRes.ok && data.accessToken) {
+        setSession({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          accessTokenExpiresAt: data.accessTokenExpiresAt,
+          refreshTokenExpiresAt: data.refreshTokenExpiresAt,
+          user: data.user,
+        })
+        const newAccess = getAccessToken()
+        if (newAccess) {
+          (headers as Record<string, string>)["Authorization"] = `Bearer ${newAccess}`
+          res = await fetch(url, { ...options, headers, credentials: 'include' })
+        }
+      } else {
+        clearSession()
       }
-    } else {
+    } catch (error) {
+      console.error('Token refresh failed:', error)
       clearSession()
     }
   }

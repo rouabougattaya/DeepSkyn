@@ -295,21 +295,28 @@ export class AuthService {
     req?: any,
   ): Promise<SessionTokens> {
     const emailNorm = dto.email.toLowerCase().trim();
+    console.log(`[FaceLogin] Attempt for ${emailNorm}`);
 
     const user = await this.userRepository.findOne({
       where: { email: emailNorm },
     });
 
     if (!user) {
+      console.warn(`[FaceLogin] User not found: ${emailNorm}`);
       throw new UnauthorizedException('Email incorrect.');
     }
 
+    console.log(`[FaceLogin] User found. Stored descriptor length: ${user.faceDescriptor?.length}. Live descriptor length: ${dto.liveDescriptor?.length}`);
+
     if (!user.faceDescriptor || user.faceDescriptor.length !== 128) {
-      throw new BadRequestException("Aucune empreinte visage enregistrée pour ce compte.");
+      console.error(`[FaceLogin] Invalid stored face descriptor for ${emailNorm}. Length: ${user.faceDescriptor?.length}`);
+      throw new BadRequestException("Aucune empreinte visage enregistrée pour ce compte ou format invalide.");
     }
 
     const dist = euclideanDistance(user.faceDescriptor, dto.liveDescriptor);
     const THRESHOLD = 0.75;
+
+    console.log(`[FaceLogin] Distance: ${dist.toFixed(4)} (Threshold: ${THRESHOLD})`);
 
     if (dist > THRESHOLD) {
       throw new UnauthorizedException('Visage non reconnu.');

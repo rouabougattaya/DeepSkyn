@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sparkles } from "lucide-react"
 
-import { loadFaceModels, getFaceDescriptor } from "@/lib/face"
+import { loadFaceModels, getFaceDescriptor } from "../lib/face"
 import { setSession } from "@/lib/authSession"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000"
+const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
 
 export default function LoginFacePage() {
   const navigate = useNavigate()
@@ -21,7 +21,15 @@ export default function LoginFacePage() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    loadFaceModels()
+    const loadModels = async () => {
+      try {
+        await loadFaceModels()
+      } catch (error) {
+        console.error("Failed to load face models:", error)
+        setError("Erreur lors du chargement des modèles de reconnaissance faciale.")
+      }
+    }
+    loadModels()
   }, [])
 
   const openCamera = async () => {
@@ -65,6 +73,8 @@ export default function LoginFacePage() {
       return
     }
 
+    console.log(`[FaceLogin] Captured descriptor length: ${descriptor.length}`);
+
     try {
       const res = await fetch(`${API_URL}/auth/login-face`, {
         method: "POST",
@@ -78,7 +88,7 @@ export default function LoginFacePage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError("Visage non reconnu.")
+        setError(data.message || "Visage non reconnu.")
         setIsLoading(false)
         return
       }

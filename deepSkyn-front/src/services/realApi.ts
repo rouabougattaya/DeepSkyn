@@ -3,6 +3,21 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
+// Helper function to get CSRF token
+async function getCsrfToken(): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/auth/csrf-token`, { 
+    method: 'GET',
+    credentials: 'include'
+  });
+  const data = await response.json().catch(() => ({}));
+  const token = data?.csrfToken || response.headers.get('X-CSRF-Token');
+  if (!token) throw new Error('CSRF token not found');
+  return token;
+}
+
+// Import authFetch for authenticated requests
+import { authFetch } from '@/lib/authSession';
+
 export interface User {
   id: string;
   email: string;
@@ -26,11 +41,14 @@ export interface AuthResponse {
 export const realApi = {
   // Email/Password login
   async login(email: string, password: string): Promise<AuthResponse> {
+    const csrfToken = await getCsrfToken();
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
       },
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
 
@@ -45,11 +63,14 @@ export const realApi = {
   // Check if user exists
   async checkUser(email: string): Promise<User | null> {
     try {
+      const csrfToken = await getCsrfToken();
       const response = await fetch(`${API_BASE_URL}/auth/check-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
         },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       });
 
@@ -67,7 +88,7 @@ export const realApi = {
 
   // Create Google user
   async createGoogleUser(googleUser: any): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    const response = await authFetch(`${API_BASE_URL}/auth/google`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,7 +107,7 @@ export const realApi = {
   // Link Google account to existing user
   async linkGoogleAccount(_userId: string, googleUser: any): Promise<AuthResponse> {
     // Le backend gère automatiquement le linking lors du login Google
-    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    const response = await authFetch(`${API_BASE_URL}/auth/google`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,7 +125,7 @@ export const realApi = {
 
   // Update AI score
   async updateAIScore(userId: string, aiVerified: boolean, aiScore: number, photoAnalysis: any = {}, emailAnalysis: any = {}): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/auth/update-ai-score`, {
+    const response = await authFetch(`${API_BASE_URL}/auth/update-ai-score`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -130,7 +151,7 @@ export const realApi = {
   // Health check
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/health`);
+      const response = await authFetch(`${API_BASE_URL}/auth/health`);
       return response.ok;
     } catch (error) {
       console.error('Health check failed:', error);

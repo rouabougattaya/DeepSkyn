@@ -15,4 +15,10 @@ export class UpdateUserDto {
   @IsString()
   @Length(0, 500)
   bio?: string;
+
+  @IsOptional()
+  faceDescriptor?: number[];
+
+  @IsOptional()
+  faceUpdatedAt?: Date;
 }

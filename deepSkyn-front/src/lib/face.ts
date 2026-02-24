@@ -18,6 +18,11 @@ export async function loadFaceModels() {
 export async function getFaceDescriptor(video: HTMLVideoElement) {
   if (!video) return null
 
+  // Ensure models are loaded before inference
+  if (!modelsLoaded) {
+    await loadFaceModels()
+  }
+
   const detection = await faceapi
     .detectSingleFace(
       video,
@@ -34,5 +39,5 @@ export async function getFaceDescriptor(video: HTMLVideoElement) {
   }
 
   console.log("✅ Face detected")
-  return Array.from(detection.descriptor)
+  return Array.from(detection.descriptor) as number[]
 }

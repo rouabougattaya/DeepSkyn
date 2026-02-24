@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-const otplib = require('otplib');
-const QRCode = require('qrcode');
+import { generateSecret, generateURI, verifySync } from 'otplib';
+import * as QRCode from 'qrcode';
 
 export interface TwoFASetupDto {
   secret: string;
@@ -14,14 +14,13 @@ export class TwoFactorService {
    */
   async generateSecret(email: string, appName: string = 'DeepSkyn'): Promise<TwoFASetupDto> {
     // Generate a random secret
-    const secret = otplib.generateSecret();
+    const secret = generateSecret();
 
     // Create OTPAuth URL (standard format for authenticators)
-    const otpauthUrl = otplib.generateURI({
-      secret,
-      label: email,
+    const otpauthUrl = generateURI({
       issuer: appName,
-      encoding: 'base32',
+      label: email,
+      secret: secret,
     });
 
     // Generate QR Code as base64
@@ -38,15 +37,17 @@ export class TwoFactorService {
    */
   verifyToken(secret: string, token: string): boolean {
     try {
-      // Validate 6-digit code
-      const isValid = otplib.verify({
-        secret,
-        encoding: 'base32',
+      if (!secret || !token) return false;
+
+      // Validate 6-digit code using the functional verifySync
+      const result = verifySync({
         token: token.trim(),
-        window: 1, // Accept codes from previous and next window (30 seconds)
+        secret: secret,
       });
-      return isValid;
+
+      return result.valid;
     } catch (error) {
+      console.error('2FA Verification Error:', error);
       return false;
     }
   }

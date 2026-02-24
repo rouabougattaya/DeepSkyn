@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { simpleAuthService } from '@/services/authService-simple';
+import { getUser } from '@/lib/authSession';
 import { Brain, Camera, BarChart3, Shield, History, Sparkles, RefreshCw, LogOut } from 'lucide-react';
 import AIStatusBadge from '@/components/AIStatusBadge';
+import { simpleAuthService } from '@/services/authService-simple';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
@@ -13,21 +14,19 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const currentUser = simpleAuthService.getCurrentUser();
+        const currentUser = getUser();
         if (!currentUser) {
           navigate('/auth/login');
           return;
         }
         setUser(currentUser);
-        setAiStatus(simpleAuthService.getAIStatus());
+        setAiStatus({
+          verified: currentUser.aiVerified || false,
+          score: currentUser.aiScore || 0
+        });
         setLoading(false);
-
-        // Fetch fresh data in background to update createdAt/authMethod
-        const freshUser = await simpleAuthService.getProfile();
-        setUser(freshUser);
       } catch (error) {
         console.error('Error loading user data:', error);
-        // If it was just the background fetch failing, don't redirect
         if (!user) navigate('/auth/login');
       }
     };
@@ -39,7 +38,7 @@ export default function DashboardPage() {
       setLoading(true);
       const result = await simpleAuthService.refreshAIVerification();
       setAiStatus({ verified: result.verified, score: result.score });
-      const updatedUser = simpleAuthService.getCurrentUser();
+      const updatedUser = getUser();
       setUser(updatedUser);
     } catch (error) {
       console.error('Error refreshing AI verification:', error);
@@ -50,7 +49,8 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      await simpleAuthService.logout();
+      // TODO: Implement logout with authSession
+      // await simpleAuthService.logout();
       navigate('/auth/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -174,7 +174,7 @@ export default function DashboardPage() {
               {[
                 { to: '/analysis', icon: Camera, label: 'Skin Analysis', desc: 'Scan and analyze your skin health with AI.', color: 'text-teal-600', bg: 'bg-teal-50' },
                 { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                { to: '/security', icon: History, label: 'Account Activity', desc: 'Monitor login history and security alerts.', color: 'text-amber-600', bg: 'bg-amber-50' },
+                { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
                 { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
               ].map((action) => (
                 <Link

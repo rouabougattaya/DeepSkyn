@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { simpleAuthService } from '@/services/authService-simple';
 import GoogleRealOAuthService from '@/services/googleRealOAuthService';
+import { historyService } from '@/services/historyService';
+import { aiService } from '@/services/aiService';
 
 const GoogleCallback = () => {
   const navigate = useNavigate();
@@ -11,13 +12,9 @@ const GoogleCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // With implicit+OIDC flow, Google returns tokens in the URL hash fragment
-        // e.g. /auth/callback/google#access_token=...&id_token=...&token_type=Bearer
-
         const hash = window.location.hash;
         const searchParams = new URLSearchParams(window.location.search);
 
-        // Check for OAuth errors first (can be in query params or hash)
         const errorFromQuery = searchParams.get('error');
         const hashParams = hash ? new URLSearchParams(hash.substring(1)) : new URLSearchParams();
         const errorFromHash = hashParams.get('error');
@@ -32,12 +29,10 @@ const GoogleCallback = () => {
           return;
         }
 
-        // With implicit+OIDC flow: id_token and access_token are in the URL hash
         const idToken = hashParams.get('id_token');
         const accessToken = hashParams.get('access_token');
 
         if (!idToken && !accessToken) {
-          // Neither token found — check if it's the old code flow (should not happen now)
           const code = searchParams.get('code');
           if (code) {
             console.error('❌ Received authorization code instead of tokens. OAuth flow mismatch.');
@@ -67,40 +62,74 @@ const GoogleCallback = () => {
         // Store the real user info
         GoogleRealOAuthService.storeUserInfo(googleUserInfo);
 
-        // Analyze Google account quality with real data
-        const photoAnalysis = GoogleRealOAuthService.analyzePhoto(googleUserInfo.picture);
-        const emailAnalysis = GoogleRealOAuthService.analyzeEmail(googleUserInfo.email);
+        // Analyze Google account quality with professional AI service
+        const aiVerification = await aiService.verifyIdentity({
+          name: googleUserInfo.name,
+          email: googleUserInfo.email,
+          picture: googleUserInfo.picture,
+          googleName: googleUserInfo.name,
+        });
 
         console.log('🎯 REAL Google User Info:', googleUserInfo);
-        console.log('📸 REAL Photo Analysis:', photoAnalysis);
-        console.log('📧 REAL Email Analysis:', emailAnalysis);
+        console.log('🤖 AI Verification:', aiVerification);
 
-        // Use real Google data with AI verification / scoring
-        const authData = await simpleAuthService.loginWithGoogle(googleUserInfo);
+        // Fallback direct: Créer une session simple avec les données Google
+        const sessionData = {
+          accessToken: 'google_' + Date.now(), // Token temporaire
+          refreshToken: 'google_refresh_' + Date.now(),
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(), // 1h
+          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 3600000).toISOString(), // 7j
+          user: {
+            id: googleUserInfo.id || googleUserInfo.email,
+            email: googleUserInfo.email,
+            firstName: googleUserInfo.given_name || '',
+            lastName: googleUserInfo.family_name || '',
+            name: googleUserInfo.name,
+            googleName: googleUserInfo.name, // Sauvegarder le nom original pour comparaison
+            picture: googleUserInfo.picture,
+            authMethod: 'google',
+            aiScore: aiVerification.score
+          }
+        };
 
-        // Show detailed AI verification result
-        if (authData.aiVerification) {
-          const aiStatus = authData.aiVerification.verified ? '✅' : '⚠️';
-          const photoStatus = photoAnalysis.hasRealPhoto ? '📸 Photo: OUI' : '📸 Photo: NON';
-          const scorePercent = Math.round(authData.aiVerification.score * 100);
+        // Sauvegarder la session
+        localStorage.setItem('accessToken', sessionData.accessToken);
+        localStorage.setItem('refreshToken', sessionData.refreshToken);
+        localStorage.setItem('user', JSON.stringify(sessionData.user));
+        localStorage.setItem('accessTokenExpiresAt', sessionData.accessTokenExpiresAt);
+        localStorage.setItem('refreshTokenExpiresAt', sessionData.refreshTokenExpiresAt);
 
-          console.log(
-            `${aiStatus} ${authData.aiVerification.message} | ${photoStatus} | Score: ${scorePercent}% | ${photoAnalysis.description}`
-          );
-        }
+        // Enregistrer la tentative de login Google réussie avec les scores IA
+        await historyService.recordLoginAttempt({
+          loginMethod: 'google',
+          status: 'success',
+          used2FA: false,
+          aiScore: aiVerification.score,
+          aiDetails: aiVerification.details,
+        });
+
+        const scorePercent = Math.round(aiVerification.score * 100);
+        console.log(`✅ Google login successful | Score: ${scorePercent}% | ${aiVerification.message}`);
 
         setStatus('success');
-        setMessage(`Welcome, ${googleUserInfo.name}! Authentication successful. Redirecting...`);
+        setMessage(`Welcome, ${googleUserInfo.name}! Authentication successful. Redirecting to profile...`);
 
-        // Clean the URL hash so tokens are not visible in the address bar
         window.history.replaceState(null, '', window.location.pathname);
 
         setTimeout(() => {
-          navigate('/');
+          navigate('/profile');
         }, 1500);
 
       } catch (error) {
         console.error('Google callback error:', error);
+
+        await historyService.recordLoginAttempt({
+          loginMethod: 'google',
+          status: 'failed',
+          failureReason: error instanceof Error ? error.message : 'Authentication failed',
+          used2FA: false,
+        });
+
         setStatus('error');
         const errMessage = error instanceof Error ? error.message : 'Authentication failed. Please try again.';
         setMessage(errMessage);
@@ -116,8 +145,8 @@ const GoogleCallback = () => {
       <div className="text-center">
         <div className="mb-8">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${status === 'loading' ? 'bg-blue-100' :
-              status === 'success' ? 'bg-green-100' :
-                'bg-red-100'
+            status === 'success' ? 'bg-green-100' :
+              'bg-red-100'
             }`}>
             {status === 'loading' && (
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

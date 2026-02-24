@@ -1,90 +1,137 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sparkles, Eye, EyeOff } from "lucide-react"
 
+import { loadFaceModels, getFaceDescriptor } from "../lib/face"
 import { setSession } from "@/lib/authSession"
-import { registerSchema } from "@/lib/schemas/auth"
-import { getCsrfToken } from "@/lib/csrf"
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const videoRef = useRef<HTMLVideoElement>(null)
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null)
+
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [csrfToken, setCsrfToken] = useState("")
 
-  // Récupérer le token CSRF au chargement du composant
+  /* ================= LOAD MODELS ================= */
+
   useEffect(() => {
-    getCsrfToken().then(token => {
-      setCsrfToken(token)
-    }).catch(error => {
-      console.error("Failed to get CSRF token:", error)
-    })
+    const loadModels = async () => {
+      try {
+        await loadFaceModels()
+      } catch (error) {
+        console.error("Failed to load face models:", error)
+        setError("Erreur lors du chargement des modèles de reconnaissance faciale.")
+      }
+    }
+    loadModels()
   }, [])
 
-  const clearFieldError = (field: string) => {
-    setFieldErrors((prev) => ({ ...prev, [field]: "" }))
+  /* ================= CAMERA ================= */
+
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      })
+
+      setCameraOpen(true)
+
+      setTimeout(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+      }, 100)
+    } catch (err) {
+      setError("Impossible d'accéder à la caméra.")
+    }
   }
+
+  const stopCamera = () => {
+    if (!videoRef.current) return
+    const stream = videoRef.current.srcObject as MediaStream
+    stream?.getTracks().forEach((track) => track.stop())
+    setCameraOpen(false)
+  }
+
+  const captureFace = async () => {
+    if (!videoRef.current) return
+
+    setError("")
+    const descriptor = await getFaceDescriptor(videoRef.current)
+
+    if (!descriptor) {
+      setError("Aucun visage détecté. Essayez avec plus de lumière.")
+      return
+    }
+
+    setFaceDescriptor(descriptor)
+    stopCamera()
+  }
+
+  /* ================= REGISTER ================= */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setFieldErrors({})
-    const parsed = registerSchema.safeParse({ email, password, firstName, lastName })
-    if (!parsed.success) {
-      const err: Record<string, string> = {}
-      const flat = parsed.error.flatten().fieldErrors
-      if (flat.email?.[0]) err.email = flat.email[0]
-      if (flat.password?.[0]) err.password = flat.password[0]
-      if (flat.firstName?.[0]) err.firstName = flat.firstName[0]
-      if (flat.lastName?.[0]) err.lastName = flat.lastName[0]
-      setFieldErrors(err)
+
+    if (!faceDescriptor) {
+      setError("Veuillez capturer votre visage avant l'inscription.")
       return
     }
+
     setIsLoading(true)
+
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        credentials: "include",
-        body: JSON.stringify(parsed.data),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+          faceDescriptor,
+        }),
       })
-      const data = await res.json().catch(() => ({}))
+
+      const data = await res.json()
+
       if (!res.ok) {
-        setError(Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Erreur lors de l'inscription."))
+        setError(data.message || "Erreur lors de l'inscription.")
         return
       }
-      setSession({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        accessTokenExpiresAt: data.accessTokenExpiresAt,
-        refreshTokenExpiresAt: data.refreshTokenExpiresAt,
-        user: data.user,
-      })
+
+      setSession(data)
       navigate("/", { replace: true })
     } catch {
-      setError("Impossible de joindre le serveur. Vérifiez que le backend est démarré.")
+      setError("Impossible de joindre le serveur.")
     } finally {
       setIsLoading(false)
     }
   }
 
+  /* ================= UI ================= */
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center p-4">
+
+      {/* Header */}
       <div className="w-full max-w-7xl flex justify-start p-4">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-[#0d9488] flex items-center justify-center">
@@ -95,104 +142,118 @@ export default function RegisterPage() {
       </div>
 
       <div className="w-full max-w-[440px] mt-12">
+
         <div className="text-center mb-10">
           <h1 className="text-[32px] font-bold text-slate-900 mb-2">
             Créer un compte
           </h1>
           <p className="text-slate-500 text-sm">
-            Inscrivez-vous pour accéder à DeepSkyn
+            Inscrivez-vous avec reconnaissance faciale
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>
+            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+              {error}
+            </p>
           )}
+
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="firstName" className="text-sm font-medium text-slate-900">
-                Prénom
-              </label>
-              <Input
-                id="firstName"
-                type="text"
-                placeholder="Jean"
-                value={firstName}
-                onChange={(e) => { setFirstName(e.target.value); clearFieldError("firstName") }}
-                className={`h-12 bg-white border-slate-200 focus:ring-[#0d9488] ${fieldErrors.firstName ? "border-red-500" : ""}`}
-              />
-              {fieldErrors.firstName && (
-                <p className="text-sm text-red-600">{fieldErrors.firstName}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="lastName" className="text-sm font-medium text-slate-900">
-                Nom
-              </label>
-              <Input
-                id="lastName"
-                type="text"
-                placeholder="Dupont"
-                value={lastName}
-                onChange={(e) => { setLastName(e.target.value); clearFieldError("lastName") }}
-                className={`h-12 bg-white border-slate-200 focus:ring-[#0d9488] ${fieldErrors.lastName ? "border-red-500" : ""}`}
-              />
-              {fieldErrors.lastName && (
-                <p className="text-sm text-red-600">{fieldErrors.lastName}</p>
-              )}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-slate-900">
-              Email
-            </label>
             <Input
-              id="email"
-              type="email"
-              placeholder="vous@exemple.com"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); clearFieldError("email") }}
-              className={`h-12 bg-white border-slate-200 focus:ring-[#0d9488] ${fieldErrors.email ? "border-red-500" : ""}`}
+              placeholder="Prénom"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="h-12 bg-white border-slate-200 focus:ring-[#0d9488]"
             />
-            {fieldErrors.email && (
-              <p className="text-sm text-red-600">{fieldErrors.email}</p>
-            )}
+            <Input
+              placeholder="Nom"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="h-12 bg-white border-slate-200 focus:ring-[#0d9488]"
+            />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-slate-900">
-              Mot de passe (8 caractères min.)
-            </label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); clearFieldError("password") }}
-                className={`h-12 bg-white border-slate-200 pr-10 focus:ring-[#0d9488] ${fieldErrors.password ? "border-red-500" : ""}`}
+
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 bg-white border-slate-200 focus:ring-[#0d9488]"
+          />
+
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Mot de passe"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 bg-white border-slate-200 pr-10 focus:ring-[#0d9488]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          {/* CAMERA SECTION */}
+
+          {!cameraOpen && !faceDescriptor && (
+            <Button
+              type="button"
+              onClick={openCamera}
+              className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white rounded-lg"
+            >
+              Activer la caméra
+            </Button>
+          )}
+
+          {cameraOpen && (
+            <div className="space-y-4">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-[300px] object-cover rounded-xl border border-slate-200"
               />
-              <button
+              <Button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                onClick={captureFace}
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+                Capturer le visage
+              </Button>
             </div>
-            {fieldErrors.password && (
-              <p className="text-sm text-red-600">{fieldErrors.password}</p>
-            )}
-          </div>
+          )}
+
+          {faceDescriptor && (
+            <p className="text-green-600 text-center text-sm">
+              ✅ Visage capturé avec succès
+            </p>
+          )}
 
           <Button
             type="submit"
-            className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-semibold rounded-lg transition-colors"
             disabled={isLoading}
+            className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-semibold rounded-lg"
           >
             {isLoading ? "Inscription..." : "S'inscrire"}
           </Button>
         </form>
-
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => navigate("/auth/register-fingerprint")}
+            className="text-sm text-[#0d9488] hover:underline font-semibold"
+          >
+            Utiliser l'empreinte digitale à la place
+          </button>
+        </div>
         <div className="text-center mt-8">
           <p className="text-slate-500 text-sm">
             Vous avez déjà un compte ?{" "}

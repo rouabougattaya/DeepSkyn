@@ -7,6 +7,7 @@ export interface User {
   email: string;
   name: string;
   picture?: string;
+  googleName?: string;
   authMethod: 'email' | 'google' | 'apple';
   createdAt: string;
   lastLoginAt: string;
@@ -71,6 +72,8 @@ class SimpleAuthService {
         name: response.user.name,
         email: response.user.email,
         picture: response.user.picture,
+        googleName: (response.user as any).googleName,
+        bio: (response.user as any).bio,
       });
 
       // Mettre à jour l'utilisateur avec les infos AI
@@ -112,16 +115,28 @@ class SimpleAuthService {
   // Google OAuth login avec AI
   async loginWithGoogle(googleUser: any): Promise<AuthResponse> {
     try {
-      // Check if user exists
-      const existingUser = await this.checkExistingUser(googleUser.email);
+      // Vérifier si l'utilisateur est actuellement connecté avec email
+      const currentUser = this.getCurrentUser();
+
       let authResponse: any;
 
-      if (existingUser) {
-        // Link or login with existing user
-        authResponse = await this.linkGoogleAccount(existingUser.id, googleUser);
+      // Si l'utilisateur est déjà connecté avec le même email, lier les comptes
+      if (currentUser && currentUser.email === googleUser.email) {
+        console.log('Linking Google to existing email account');
+        authResponse = await this.linkGoogleAccount(currentUser.id, googleUser);
       } else {
-        // Create new user
-        authResponse = await this.createGoogleUser(googleUser);
+        // Sinon, vérifier si un utilisateur existe avec cet email
+        const existingUser = await this.checkExistingUser(googleUser.email);
+
+        if (existingUser) {
+          // Si l'utilisateur existe mais n'est pas connecté, créer une nouvelle session Google
+          console.log('Creating new Google session for existing email');
+          authResponse = await this.createGoogleUser(googleUser);
+        } else {
+          // Créer un nouvel utilisateur Google
+          console.log('Creating new Google user');
+          authResponse = await this.createGoogleUser(googleUser);
+        }
       }
 
       const user = authResponse.user;
@@ -131,6 +146,8 @@ class SimpleAuthService {
         name: user.name,
         email: user.email,
         picture: user.picture,
+        googleName: user.googleName,
+        bio: (user as any).bio,
       });
 
       // Mettre à jour l'utilisateur avec les infos AI
@@ -213,6 +230,12 @@ class SimpleAuthService {
   // Logout
   async logout(): Promise<void> {
     this.clearStorage();
+    // Also clear authSession data
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessTokenExpiresAt');
+    localStorage.removeItem('refreshTokenExpiresAt');
   }
 
   // Update user profile
@@ -251,6 +274,8 @@ class SimpleAuthService {
       name: this.user.name,
       email: this.user.email,
       picture: this.user.picture,
+      googleName: this.user.googleName,
+      bio: (this.user as any).bio,
     });
 
     // Mettre à jour l'utilisateur
@@ -261,6 +286,20 @@ class SimpleAuthService {
     };
 
     this.saveToStorage(updatedUser);
+
+    // Synchroniser avec historyService
+    try {
+      const { historyService } = await import('./historyService');
+      const used2FA = await historyService.was2FAUsedRecently();
+      historyService.updateUserScoreSimple(
+        'success',
+        used2FA,
+        aiVerification.score,
+        aiVerification.details
+      );
+    } catch (e) {
+      console.warn('Could not sync with historyService:', e);
+    }
 
     return {
       verified: aiVerification.verified,

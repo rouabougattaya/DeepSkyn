@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, Shield, Sparkles } from 'lucide-react';
 import ActivityTimeline from '@/components/ActivityTimeline';

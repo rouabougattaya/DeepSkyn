@@ -1,15 +1,63 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../user/user.entity';
-import { GoogleAuthDto, CheckUserDto, UpdateAIScoreDto, SignUpDto } from './dto/auth.dto';
 import { ActivityService } from './activity.service';
 import { ActivityType } from './activity.entity';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
+import { GoogleAuthDto, CheckUserDto, UpdateAIScoreDto, SignUpDto } from './dto/auth.dto';
+
+// Modular Auth Imports
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { EmailSecurityService } from '../email-security/email-security.service';
+import { TwoFactorService } from '../twofactor/twofactor.service';
+import { tempTwoFAStorage } from '../twofactor/temp-2fa-storage';
+import { JwtTokenService } from './services/jwt-token.service';
+import { RefreshTokenService } from './services/refresh-token.service';
+import { LoginAttemptService } from './services/login-attempt.service';
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server';
+import { randomUUID } from 'crypto';
+
+const webauthnChallengeStore = new Map<string, string>();
+const SALT_ROUNDS = 12;
+
+export interface SessionTokens {
+  success?: boolean;
+  requiresTwoFa?: boolean;
+  message?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: Date;
+  refreshTokenExpiresAt?: Date;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isTwoFAEnabled?: boolean;
+    name?: string;
+  };
+}
+
+export type SessionMetadata = {
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
 
 @Injectable()
 export class AuthService {
@@ -18,9 +66,14 @@ export class AuthService {
 
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
-    private jwtService: JwtService,
-    private activityService: ActivityService,
+    private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
+    private readonly activityService: ActivityService,
+    private readonly emailSecurityService: EmailSecurityService,
+    private readonly twoFactorService: TwoFactorService,
+    private readonly jwtTokenService: JwtTokenService,
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly loginAttemptService: LoginAttemptService,
   ) {
     this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || '');
     this.transporter = nodemailer.createTransport({
@@ -33,63 +86,27 @@ export class AuthService {
     });
   }
 
-  async forgotPassword(email: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
-    if (!user) {
-      return { message: 'If an account exists with this email, a reset link has been sent.' };
-    }
+  /* ================= LEGACY / UTILITY METHODS ================= */
 
-    const token = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+  private generateToken(user: User) {
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role || 'USER',
+    };
+    return this.jwtService.sign(payload);
+  }
 
-    await this.userRepository.save(user);
-
-    const resetLink = `http://localhost:5173/auth/reset-password/${token}`;
-
+  async verifyToken(token: string) {
     try {
-      await this.transporter.sendMail({
-        from: '"DeepSkyn Support" <support@deepskyn.com>',
-        to: email,
-        subject: 'Password Reset Request',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #0d9488;">Reset Your Password</h2>
-            <p>You requested a password reset for your DeepSkyn account.</p>
-            <p>Click the button below to set a new password. This link will expire in 1 hour.</p>
-            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #0d9488; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
-            <p style="margin-top: 20px; color: #64748b; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
-          </div>
-        `,
-      });
-      console.log(`✅ Email sent successfully to: ${email}`);
+      return this.jwtService.verify(token);
     } catch (error) {
-      console.error('❌ Failed to send reset email:', error);
-      console.log(`🔗 Reset Link (Fallback): ${resetLink}`);
+      throw new Error('Invalid token');
     }
-
-    return { message: 'Reset link sent to your email.' };
   }
 
-  async resetPassword(resetDto: { token: string; newPassword: string }) {
-    const user = await this.userRepository.findOne({
-      where: {
-        resetPasswordToken: resetDto.token,
-      },
-    });
-
-    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
-      throw new Error('Invalid or expired reset token');
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    user.passwordHash = await bcrypt.hash(resetDto.newPassword, salt);
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
-
-    await this.userRepository.save(user);
-    return { message: 'Password has been reset successfully.' };
-  }
+  /* ================= AI ABUSE ANALYSIS ================= */
 
   async analyzeAbuseBehavior(email: string, context: { ip: string; userAgent: string }) {
     const user = await this.userRepository.findOne({ where: { email } });
@@ -119,7 +136,6 @@ export class AuthService {
     Respond only with a JSON object: { "riskScore": 0.0 to 1.0, "reason": "short explanation" }`;
 
     try {
-      // Using the fetch approach with v1beta as it's more reliable for specific model versions
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
@@ -139,7 +155,6 @@ export class AuthService {
       const data = await response.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      // Robust JSON cleaning
       const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
 
@@ -153,27 +168,64 @@ export class AuthService {
     }
   }
 
-  async signUp(signUpDto: SignUpDto) {
-    const existingUser = await this.userRepository.findOne({
-      where: { email: signUpDto.email }
+  /* ================= LOGIN METHODS ================= */
+
+  async login(
+    dto: LoginDto,
+    metadata?: SessionMetadata,
+    req?: any,
+  ): Promise<SessionTokens> {
+    const emailNorm = dto.email.toLowerCase().trim();
+
+    const user = await this.userRepository.findOne({
+      where: { email: emailNorm },
     });
 
-    if (existingUser) {
-      throw new Error('User already exists');
+    if (!user) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(signUpDto.password, salt);
+    const blockedMinutes = this.loginAttemptService.isBlocked(emailNorm);
+    if (blockedMinutes !== null) {
+      throw new UnauthorizedException(
+        `Compte temporairement bloqué. Réessayez dans ${blockedMinutes} minute(s).`,
+      );
+    }
 
-    const user = this.userRepository.create({
-      email: signUpDto.email,
-      name: signUpDto.name,
-      passwordHash: passwordHash,
-      aiScore: 0.5,
-    });
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
+      this.loginAttemptService.recordFailure(emailNorm);
+      const remaining = this.loginAttemptService.getRemainingAttempts(emailNorm);
+      if (remaining === 0) {
+        throw new UnauthorizedException(
+          'Trop de tentatives. Compte bloqué pendant 3 minutes.',
+        );
+      }
+      throw new UnauthorizedException(
+        `Email ou mot de passe incorrect. ${remaining} tentative(s) restante(s).`,
+      );
+    }
 
-    await this.userRepository.save(user);
-    return this.generateToken(user);
+    this.loginAttemptService.clearAttempts(emailNorm);
+
+    if (user.isTwoFAEnabled && user.totpSecret) {
+      tempTwoFAStorage.set(user.id, { totpSecret: user.totpSecret });
+
+      return {
+        success: true,
+        requiresTwoFa: true,
+        message: 'Veuillez entrer votre code 2FA',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isTwoFAEnabled: true,
+        },
+      };
+    }
+
+    return this.issueTokens(user, metadata);
   }
 
   async loginWithEmail(email: string, password: string, ip?: string, userAgent?: string) {
@@ -237,6 +289,369 @@ export class AuthService {
     return { token, user };
   }
 
+  async loginFace(
+    dto: { email: string; liveDescriptor: number[] },
+    metadata?: SessionMetadata,
+    req?: any,
+  ): Promise<SessionTokens> {
+    const emailNorm = dto.email.toLowerCase().trim();
+
+    const user = await this.userRepository.findOne({
+      where: { email: emailNorm },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Email incorrect.');
+    }
+
+    if (!user.faceDescriptor || user.faceDescriptor.length !== 128) {
+      throw new BadRequestException("Aucune empreinte visage enregistrée pour ce compte.");
+    }
+
+    const dist = euclideanDistance(user.faceDescriptor, dto.liveDescriptor);
+    const THRESHOLD = 0.75;
+
+    if (dist > THRESHOLD) {
+      throw new UnauthorizedException('Visage non reconnu.');
+    }
+
+    if (user.isTwoFAEnabled && user.totpSecret) {
+      tempTwoFAStorage.set(user.id, { totpSecret: user.totpSecret });
+
+      return {
+        success: true,
+        requiresTwoFa: true,
+        message: 'Veuillez entrer votre code 2FA',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isTwoFAEnabled: true,
+        },
+      };
+    }
+
+    return this.issueTokens(user, metadata);
+  }
+
+  /* ================= REGISTER METHODS ================= */
+
+  async register(
+    dto: RegisterDto,
+    metadata?: SessionMetadata,
+    req?: any,
+  ): Promise<SessionTokens> {
+    const emailNorm = dto.email.toLowerCase().trim();
+
+    const suspicious = this.emailSecurityService.isSuspicious(emailNorm);
+    if (suspicious.suspicious) {
+      throw new BadRequestException("Cet email n'est pas accepté pour l'inscription.");
+    }
+
+    const existing = await this.userRepository.findOne({
+      where: { email: emailNorm },
+    });
+    if (existing) {
+      throw new ConflictException('Un compte existe déjà avec cet email.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const faceDescriptor = (dto as any).faceDescriptor ?? null;
+
+    const user = this.userRepository.create({
+      email: emailNorm,
+      passwordHash,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      name: `${dto.firstName} ${dto.lastName}`,
+      role: 'USER',
+      isEmailVerified: false,
+      isPremium: false,
+      isTwoFAEnabled: false,
+      totpSecret: null,
+      faceDescriptor,
+      faceUpdatedAt: faceDescriptor ? new Date() : null,
+    });
+
+    await this.userRepository.save(user);
+
+    return this.issueTokens(user, metadata);
+  }
+
+  async signUp(signUpDto: SignUpDto) {
+    const existingUser = await this.userRepository.findOne({
+      where: { email: signUpDto.email }
+    });
+
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(signUpDto.password, salt);
+
+    const user = this.userRepository.create({
+      email: signUpDto.email,
+      name: signUpDto.name,
+      passwordHash: passwordHash,
+      aiScore: 0.5,
+    });
+
+    await this.userRepository.save(user);
+    return this.generateToken(user);
+  }
+
+  /* ================= PASSWORD RESET ================= */
+
+  async forgotPassword(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      return { message: 'If an account exists with this email, a reset link has been sent.' };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+
+    await this.userRepository.save(user);
+
+    const resetLink = `http://localhost:5173/auth/reset-password/${token}`;
+
+    try {
+      await this.transporter.sendMail({
+        from: '"DeepSkyn Support" <support@deepskyn.com>',
+        to: email,
+        subject: 'Password Reset Request',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0d9488;">Reset Your Password</h2>
+            <p>You requested a password reset for your DeepSkyn account.</p>
+            <p>Click the button below to set a new password. This link will expire in 1 hour.</p>
+            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #0d9488; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+            <p style="margin-top: 20px; color: #64748b; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('❌ Failed to send reset email:', error);
+    }
+
+    return { message: 'Reset link sent to your email.' };
+  }
+
+  async resetPassword(resetDto: { token: string; newPassword: string }) {
+    const user = await this.userRepository.findOne({
+      where: {
+        resetPasswordToken: resetDto.token,
+      },
+    });
+
+    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
+      throw new Error('Invalid or expired reset token');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(resetDto.newPassword, salt);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await this.userRepository.save(user);
+    return { message: 'Password has been reset successfully.' };
+  }
+
+  /* ================= MODULAR TOKEN METHODS ================= */
+
+  async refresh(
+    user: any,
+    refreshToken: string,
+    metadata?: SessionMetadata,
+    req?: any,
+  ): Promise<any> {
+    await this.refreshTokenService.validateRefreshToken(user.id, refreshToken);
+
+    const fullUser = await this.userRepository.findOne({
+      where: { id: user.id },
+    });
+
+    if (!fullUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const newVersion = (user.tokenVersion || 1) + 1;
+
+    const rotatedToken = await this.refreshTokenService.rotateRefreshToken(
+      fullUser,
+      refreshToken,
+      newVersion,
+      metadata?.ipAddress ?? undefined,
+      metadata?.userAgent ?? undefined,
+    );
+
+    const newAccessToken = this.jwtTokenService.generateAccessToken(fullUser, newVersion);
+    const newAccessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(
+      this.jwtTokenService.getAccessTokenTtl(),
+    );
+
+    return {
+      success: true,
+      accessToken: newAccessToken,
+      accessTokenExpiresAt: newAccessTokenExpiresAt,
+      newRefreshToken: (rotatedToken as any).refreshToken,
+      refreshTokenExpiresAt: rotatedToken.expiresAt,
+    };
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.refreshTokenService.revokeAllUserTokens(userId);
+  }
+
+  async verify2FA(userId: string, metadata?: SessionMetadata): Promise<SessionTokens> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.issueTokens(user, metadata);
+  }
+
+  /* ================= WEB AUTHN / FINGERPRINT ================= */
+
+  async generateFingerprintRegistrationOptions(email: string) {
+    const emailNorm = email.toLowerCase().trim();
+    const existingUser = await this.userRepository.findOne({ where: { email: emailNorm } });
+    if (existingUser) throw new BadRequestException('Cet email est déjà utilisé.');
+
+    const userId = randomUUID();
+    const options = await generateRegistrationOptions({
+      rpName: 'DeepSkyn',
+      rpID: 'localhost',
+      userID: new TextEncoder().encode(userId),
+      userName: emailNorm,
+      timeout: 60000,
+      attestationType: 'none',
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+      },
+    });
+
+    webauthnChallengeStore.set(emailNorm, options.challenge);
+    return options;
+  }
+
+  async verifyFingerprintRegistration(body: any) {
+    const { credential, email, password, firstName, lastName } = body;
+    const emailNorm = email.toLowerCase().trim();
+    const expectedChallenge = webauthnChallengeStore.get(emailNorm);
+    if (!expectedChallenge) throw new UnauthorizedException('Challenge expiré.');
+
+    const verification = await verifyRegistrationResponse({
+      response: credential,
+      expectedChallenge,
+      expectedOrigin: 'http://localhost:5173',
+      expectedRPID: 'localhost',
+    });
+
+    if (!verification.verified || !verification.registrationInfo) {
+      throw new UnauthorizedException('Échec vérification biométrique.');
+    }
+
+    const { credential: cred } = verification.registrationInfo;
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const newUser = this.userRepository.create({
+      email: emailNorm,
+      passwordHash,
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`,
+      role: 'USER',
+      webauthnCredentialID: cred.id,
+      webauthnPublicKey: Buffer.from(cred.publicKey).toString('base64'),
+      webauthnCounter: cred.counter,
+    });
+
+    await this.userRepository.save(newUser);
+    webauthnChallengeStore.delete(emailNorm);
+    return { success: true };
+  }
+
+  async generateFingerprintLoginOptions(email: string) {
+    const emailNorm = email.toLowerCase().trim();
+    const user = await this.userRepository.findOne({ where: { email: emailNorm } });
+    if (!user || !user.webauthnCredentialID) throw new UnauthorizedException('Aucune empreinte enregistrée.');
+
+    const options = await generateAuthenticationOptions({
+      timeout: 120000,
+      rpID: 'localhost',
+      userVerification: 'required',
+      allowCredentials: [{ id: user.webauthnCredentialID, transports: ['internal'] }],
+    });
+
+    user.webauthnChallenge = options.challenge;
+    await this.userRepository.save(user);
+    return options;
+  }
+
+  async verifyFingerprintLogin(body: any, metadata?: SessionMetadata) {
+    const { credential, email } = body;
+    const emailNorm = email.toLowerCase().trim();
+    const user = await this.userRepository.findOne({ where: { email: emailNorm } });
+
+    if (!user || !user.webauthnCredentialID || !user.webauthnPublicKey || !user.webauthnChallenge) {
+      throw new UnauthorizedException('Utilisateur invalide.');
+    }
+
+    const verification = await verifyAuthenticationResponse({
+      response: credential,
+      expectedChallenge: user.webauthnChallenge,
+      expectedOrigin: 'http://localhost:5173',
+      expectedRPID: 'localhost',
+      credential: {
+        id: user.webauthnCredentialID,
+        publicKey: Buffer.from(user.webauthnPublicKey, 'base64'),
+        counter: user.webauthnCounter ?? 0,
+        transports: ['internal'],
+      },
+    });
+
+    if (!verification.verified) throw new UnauthorizedException('Empreinte non valide.');
+
+    if (verification.authenticationInfo) user.webauthnCounter = verification.authenticationInfo.newCounter;
+    user.webauthnChallenge = null;
+    await this.userRepository.save(user);
+
+    return this.issueTokens(user, metadata);
+  }
+
+  /* ================= UTILITIES ================= */
+
+  private async issueTokens(user: User, metadata?: SessionMetadata): Promise<SessionTokens> {
+    const accessToken = this.jwtTokenService.generateAccessToken(user);
+    const accessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(this.jwtTokenService.getAccessTokenTtl());
+    const refreshTokenRecord = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken: (refreshTokenRecord as any).refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt: refreshTokenRecord.expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name,
+        isTwoFAEnabled: user.isTwoFAEnabled,
+      },
+    };
+  }
+
   private async logActivity(userId: string, type: ActivityType, ip?: string, deviceInfo?: string, metadata?: any) {
     try {
       await this.activityService.create({
@@ -253,14 +668,8 @@ export class AuthService {
   }
 
   async checkUser(checkUserDto: CheckUserDto) {
-    const user = await this.userRepository.findOne({
-      where: { email: checkUserDto.email }
-    });
-
-    if (!user) {
-      return { exists: false, user: null };
-    }
-
+    const user = await this.userRepository.findOne({ where: { email: checkUserDto.email } });
+    if (!user) return { exists: false, user: null };
     return {
       exists: true,
       user: {
@@ -278,47 +687,26 @@ export class AuthService {
   }
 
   async updateAIScore(updateAIScoreDto: UpdateAIScoreDto) {
-    const user = await this.userRepository.findOne({
-      where: { id: updateAIScoreDto.userId }
-    });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
+    const user = await this.userRepository.findOne({ where: { id: updateAIScoreDto.userId } });
+    if (!user) throw new Error('User not found');
 
     if (updateAIScoreDto.aiScore !== undefined) {
-      user.aiScore = typeof updateAIScoreDto.aiScore === 'string'
-        ? parseFloat(updateAIScoreDto.aiScore)
-        : updateAIScoreDto.aiScore;
+      user.aiScore = typeof updateAIScoreDto.aiScore === 'string' ? parseFloat(updateAIScoreDto.aiScore) : updateAIScoreDto.aiScore;
     }
-
-    if (updateAIScoreDto.photoAnalysis) {
-      user.photoAnalysis = updateAIScoreDto.photoAnalysis;
-    }
-
-    if (updateAIScoreDto.emailAnalysis) {
-      user.emailAnalysis = updateAIScoreDto.emailAnalysis;
-    }
+    if (updateAIScoreDto.photoAnalysis) user.photoAnalysis = updateAIScoreDto.photoAnalysis;
+    if (updateAIScoreDto.emailAnalysis) user.emailAnalysis = updateAIScoreDto.emailAnalysis;
 
     await this.userRepository.save(user);
     return user;
   }
+}
 
-  private generateToken(user: User) {
-    const payload = {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role || 'USER',
-    };
-    return this.jwtService.sign(payload);
+function euclideanDistance(a: number[], b: number[]) {
+  if (a.length !== b.length) return Number.POSITIVE_INFINITY;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
   }
-
-  async verifyToken(token: string) {
-    try {
-      return this.jwtService.verify(token);
-    } catch (error) {
-      throw new Error('Invalid token');
-    }
-  }
+  return Math.sqrt(sum);
 }

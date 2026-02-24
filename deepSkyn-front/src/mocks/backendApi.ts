@@ -95,7 +95,7 @@ export const mockApi = {
   },
 
   // Google OAuth callback
-  async googleCallback(code: string): Promise<MockAuthResponse> {
+  async googleCallback(): Promise<MockAuthResponse> {
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Mock Google token exchange

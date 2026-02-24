@@ -7,10 +7,13 @@ import {
   Get,
   Put,
   Req,
+  Res,
+  UseGuards,
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
@@ -20,11 +23,22 @@ import {
   CheckUserDto,
   UpdateAIScoreDto,
   ForgotPasswordDto,
-  ResetPasswordDto
+  ResetPasswordDto,
 } from './dto/auth.dto';
-import {  UseGuards } from '@nestjs/common';
+// These might be in different DTO files based on the code provided
+import { RegisterDto } from './dto/register.dto';
+import { LoginFaceDto } from './dto/login-face.dto';
+import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { JwtAccessGuard } from './guards/jwt-access.guard';
+import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { User } from '../user/user.entity';
+
+function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {
+  const ip = req.ip ?? req.socket?.remoteAddress ?? null;
+  const userAgent = (req.headers['user-agent'] as string) ?? null;
+  return { ipAddress: ip, userAgent };
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -34,9 +48,8 @@ export class AuthController {
   @Post('signup')
   @Public()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
+  @ApiOperation({ summary: 'Register a new user (Legacy)' })
   @ApiResponse({ status: 201, description: 'User created successfully' })
-  @ApiResponse({ status: 400, description: 'User already exists' })
   async signup(@Body() signUpDto: SignUpDto) {
     try {
       const token = await this.authService.signUp(signUpDto);
@@ -49,45 +62,107 @@ export class AuthController {
     }
   }
 
-  @Post('login')
   @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login with email and password' })
-  @ApiResponse({ status: 200, description: 'Login successful' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
-    try {
-      const { token, user } = await this.authService.loginWithEmail(
-        loginDto.email,
-        loginDto.password,
-        req.ip,
-        req.headers['user-agent'],
-      );
-      return {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          avatarUrl: user.avatarUrl,
-          authMethod: 'email',
-          aiScore: user.aiScore,
-          photoAnalysis: user.photoAnalysis,
-          emailAnalysis: user.emailAnalysis,
-          createdAt: user.createdAt,
-        }
-      };
-    } catch (error) {
-      throw new UnauthorizedException(error.message);
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Modern Register (JWT + Refresh Cookies)' })
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    const result = await this.authService.register(dto, metadata, req);
+
+    if (result.refreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { refreshToken, ...responseData } = result;
+      return res.json(responseData);
     }
+
+    return res.json(result);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Modern Login (JWT + Refresh Cookies)' })
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    // Note: The service might have two login methods now. I should check which one to use.
+    // Based on the merged code, I'll use the one returning SessionTokens for the new controller.
+    const result = await this.authService.login(dto, metadata, req);
+
+    if (result.requiresTwoFa) {
+      return res.json(result);
+    }
+
+    if (result.refreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { refreshToken, ...responseData } = result;
+      return res.json(responseData);
+    }
+
+    return res.json(result);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('login-face')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with face recognition' })
+  async loginFace(
+    @Body() dto: LoginFaceDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    const result = await this.authService.loginFace(dto, metadata, req);
+
+    if (result.requiresTwoFa) {
+      return res.json(result);
+    }
+
+    if (result.refreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { refreshToken, ...responseData } = result;
+      return res.json(responseData);
+    }
+
+    return res.json(result);
   }
 
   @Post('google')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login or register with Google' })
-  @ApiResponse({ status: 200, description: 'Google auth successful' })
-  @ApiResponse({ status: 401, description: 'Google auth failed' })
   async googleAuth(@Body() googleUser: GoogleAuthDto, @Req() req: Request) {
     try {
       const { token, user } = await this.authService.loginWithGoogle(
@@ -95,7 +170,6 @@ export class AuthController {
         req.ip,
         req.headers['user-agent'],
       );
-      console.log(`📡 Returning user to frontend: ID=${user.id}, Email=${user.email}`);
       return {
         token,
         user: {
@@ -112,7 +186,6 @@ export class AuthController {
         }
       };
     } catch (error) {
-      console.error('Google auth error:', error);
       throw new InternalServerErrorException(error.message);
     }
   }
@@ -120,49 +193,27 @@ export class AuthController {
   @Post('check-user')
   @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Check if user exists' })
-  @ApiResponse({ status: 200, description: 'User check completed' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
   async checkUser(@Body() checkUserDto: CheckUserDto) {
-    try {
-      const result = await this.authService.checkUser(checkUserDto);
-      return result;
-    } catch (error) {
-      console.error('Check user error:', error);
-      throw new InternalServerErrorException(error.message);
-    }
+    return this.authService.checkUser(checkUserDto);
   }
 
   @Put('update-ai-score')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update user AI score and analysis' })
-  @ApiResponse({ status: 200, description: 'AI score updated successfully' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
   async updateAIScore(@Body() updateAIScoreDto: UpdateAIScoreDto) {
-    try {
-      const user = await this.authService.updateAIScore(updateAIScoreDto);
-      return user;
-    } catch (error) {
-      console.error('Update AI score error:', error);
-      throw new InternalServerErrorException(error.message);
-    }
+    return this.authService.updateAIScore(updateAIScoreDto);
   }
 
   @Post('forgot-password')
   @Public()
   @UseGuards(ThrottlerGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request password reset link' })
-  @ApiResponse({ status: 200, description: 'Reset link sent' })
   async forgotPassword(@Body() forgotDto: ForgotPasswordDto, @Req() req: Request) {
-    // Analyze abuse before sending
     const analysis = await this.authService.analyzeAbuseBehavior(forgotDto.email, {
       ip: req.ip || 'unknown',
       userAgent: req.headers['user-agent'] || 'unknown',
     });
 
     if (analysis.riskScore > 0.8) {
-      console.warn(`🚨 High risk blocked: ${forgotDto.email} (Score: ${analysis.riskScore})`);
       return { message: 'If an account exists with this email, a reset link has been sent.' };
     }
 
@@ -172,8 +223,6 @@ export class AuthController {
   @Post('reset-password')
   @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset password with token' })
-  @ApiResponse({ status: 200, description: 'Password reset successful' })
   async resetPassword(@Body() resetDto: ResetPasswordDto) {
     try {
       return await this.authService.resetPassword(resetDto);
@@ -182,10 +231,98 @@ export class AuthController {
     }
   }
 
+  @UseGuards(JwtRefreshGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @CurrentUser() user: any,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    const refreshToken = req.cookies?.refreshToken;
+    const result = await this.authService.refresh(user, refreshToken, metadata, req);
+
+    if (result.newRefreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { newRefreshToken, refreshTokenExpiresAt, ...responseData } = result;
+      return res.json(responseData);
+    }
+
+    return res.json(result);
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  async me(@CurrentUser() user: User): Promise<any> {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    };
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ): Promise<any> {
+    await this.authService.logout(user.id);
+    res.clearCookie('refreshToken');
+    return res.json({
+      success: true,
+      message: 'Déconnexion réussie.',
+    });
+  }
+
+  @Public()
+  @Post('register-fingerprint/options')
+  async registerFingerprintOptions(@Body('email') email: string) {
+    return this.authService.generateFingerprintRegistrationOptions(email);
+  }
+
+  @Public()
+  @Post('register-fingerprint/verify')
+  async verifyFingerprint(@Body() body: any) {
+    return this.authService.verifyFingerprintRegistration(body);
+  }
+
+  @Public()
+  @Post('login-fingerprint/options')
+  async generateFingerprintLoginOptions(@Body('email') email: string) {
+    return this.authService.generateFingerprintLoginOptions(email);
+  }
+
+  @Public()
+  @Post('login-fingerprint/verify')
+  async verifyFingerprintLogin(@Body() body: any) {
+    return this.authService.verifyFingerprintLogin(body);
+  }
+
+  @Public()
+  @Get('csrf-token')
+  @HttpCode(HttpStatus.OK)
+  getCsrfToken(@Req() req: Request, @Res() res: Response): void {
+    const csrfToken = (res as any).locals?.csrfToken;
+    res.json({ csrfToken });
+  }
+
   @Get('health')
   @Public()
   @ApiOperation({ summary: 'Health check endpoint' })
-  @ApiResponse({ status: 200, description: 'Service is healthy' })
   async health() {
     return {
       status: 'OK',

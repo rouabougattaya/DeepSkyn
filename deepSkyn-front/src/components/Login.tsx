@@ -1,24 +1,79 @@
 "use client"
 
-import { useState } from "react"
-import { Link } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sparkles, Eye, EyeOff } from "lucide-react"
+import { setSession } from "@/lib/authSession"
+import { getCsrfToken } from "@/lib/csrf"
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
 
 export function Login() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [csrfToken, setCsrfToken] = useState("")
+
+  // Récupérer le token CSRF au chargement du composant
+  useEffect(() => {
+    getCsrfToken().then(token => {
+      setCsrfToken(token)
+    }).catch(error => {
+      console.error("Failed to get CSRF token:", error)
+    })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
     setIsLoading(true)
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Email ou mot de passe incorrect."))
+        return
+      }
+
+      // Si 2FA est requis, rediriger vers la page de vérification 2FA
+      if (data.requiresTwoFa) {
+        navigate("/auth/2fa", {
+          state: {
+            loginData: data,
+            from: location.state?.from || "/"
+          }
+        })
+        return
+      }
+
+      // Sinon, établir la session normalement
+      setSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        accessTokenExpiresAt: data.accessTokenExpiresAt,
+        refreshTokenExpiresAt: data.refreshTokenExpiresAt,
+        user: data.user,
+      })
+      navigate("/")
+    } catch {
+      setError("Impossible de joindre le serveur. Vérifiez que le backend est démarré.")
+    } finally {
       setIsLoading(false)
-      console.log("Login attempt:", { email, password })
-    }, 2000)
+    }
   }
 
   return (
@@ -87,25 +142,30 @@ export function Login() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                id="remember" 
+              <input
+                type="checkbox"
+                id="remember"
                 className="rounded border-slate-300 text-[#0d9488] focus:ring-[#0d9488]"
               />
               <label htmlFor="remember" className="text-sm text-slate-500">
                 Remember me
               </label>
             </div>
-            <Link 
-              to="/auth/forgot-password" 
+            <Link
+              to="/auth/forgot-password"
               className="text-sm font-medium text-[#0d9488] hover:underline"
             >
               Forgot password?
             </Link>
           </div>
 
-          <Button 
-            type="submit" 
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              {error}
+            </p>
+          )}
+          <Button
+            type="submit"
             className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-semibold rounded-lg transition-colors"
             disabled={isLoading}
           >
@@ -138,9 +198,10 @@ export function Login() {
           </Button>
           <Button variant="outline" className="h-12 border-slate-200 font-medium bg-white">
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.073 21.376c-1.447 0-2.626-1.18-2.626-2.626s1.18-2.627 2.626-2.627c1.448 0 2.627 1.181 2.627 2.627s-1.18 2.626-2.627 2.626zm-10.146 0c-1.448 0-2.627-1.18-2.627-2.626s1.18-2.627 2.627-2.627c1.447 0 2.626 1.181 2.626 2.627s-1.18 2.626-2.626 2.626zm1.586-15.402c2.31 0 4.182 1.873 4.182 4.182 0 2.31-1.873 4.182-4.182 4.182-2.31 0-4.182-1.872-4.182-4.182 0-2.309 1.872-4.182 4.182-4.182zm0-1.974c-3.4 0-6.156 2.756-6.156 6.156s2.756 6.156 6.156 6.156 6.156-2.756 6.156-6.156-2.756-6.156-6.156-6.156z" />
+              <path d="M17.073 21.376c-1.447 0-2.626-1.18-2.626-2.626s1.18-2.627 2.626-2.627c1.448 0 2.627 1.181 2.627 2.627s-1.18 2.626-2.627 2.626zm-10.146 0c-1.448 0-2.627-1.18-2.627-2.626s1.18-2.627 2.627-2.627c1.447 0 2.626 1.181 2.626 2.627s-1.18 2.626-2.627 2.626zm1.586-15.402c2.31 0 4.182 1.873 4.182 4.182 0 2.31-1.873 4.182-4.182 4.182-2.31 0-4.182-1.872-4.182-4.182 0-2.309 1.872-4.182 4.182-4.182zm0-1.974c-3.4 0-6.156 2.756-6.156 6.156s2.756 6.156 6.156 6.156 6.156-2.756 6.156-6.156-2.756-6.156-6.156-6.156z" />
               {/* Note: Simplified Apple Icon path for demo */}
               <path d="M18.71 14.45c-.05.1-.1.19-.15.29-.7.15-1.38.56-1.38 1.48 0 1.07.9 1.53 1.37 1.77-.11.35-.41.87-.9 1.58-.45.63-.92 1.25-1.63 1.26-.7 0-.91-.43-1.72-.43-.8 0-1.04.42-1.7.44-.7.01-1.2-.66-1.65-1.31-.92-1.33-1.62-3.75-.68-5.38.47-.81 1.3-1.32 2.21-1.33.69 0 1.34.48 1.76.48.42 0 1.21-.6 2.04-.51.35.01.66.13.91.33-.08.07-.4.32-.4.81 0 .6.49.88.58.93zM15.98 8.56c-.44 0-.84-.24-1.08-.6-.35-.55-.26-1.28.21-1.73.44-.43 1.11-.53 1.63-.2.35.22.56.59.56 1-.01.83-.8 1.53-1.32 1.53z"/>
+              <path d="M18.71 14.45c-.05.1-.1.19-.15.29-.7.15-1.38.56-1.38 1.48 0 1.07.9 1.53 1.37 1.77-.11.35-.41.87-.9 1.58-.45.63-.92 1.25-1.63 1.26-.7 0-.91-.43-1.72-.43-.8 0-1.04.42-1.7.44-.7.01-1.2-.66-1.65-1.31-.92-1.33-1.62-3.75-.68-5.38.47-.81 1.3-1.32 2.21-1.33.69 0 1.34.48 1.76.48.42 0 1.21-.6 2.04-.51.35.01.66.13.91.33-.08.07-.4.32-.4.81 0 .6.49.88.58.93zM15.98 8.56c-.44 0-.84-.24-1.08-.6-.35-.55-.26-1.28.21-1.73.44-.43 1.11-.53 1.63-.2.35.22.56.59.56 1-.01.83-.8 1.53-1.32 1.53z" />
             </svg>
             Apple
           </Button>
@@ -150,8 +211,8 @@ export function Login() {
         <div className="text-center mt-10">
           <p className="text-slate-500 text-sm">
             Don't have an account?{" "}
-            <Link 
-              to="/auth/register" 
+            <Link
+              to="/auth/register"
               className="text-[#0d9488] hover:underline font-semibold"
             >
               Sign up

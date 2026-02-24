@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Reflector } from '@nestjs/core';
+import { Reflector, APP_GUARD } from '@nestjs/core';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { ActivityController } from './activity.controller';
@@ -12,11 +12,21 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { User } from '../user/user.entity';
 import { Activity } from './activity.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { TwoFactorModule } from '../twofactor/twofactor.module';
+import { JwtTokenService } from './services/jwt-token.service';
+import { RefreshTokenService } from './services/refresh-token.service';
+import { LoginAttemptService } from './services/login-attempt.service';
+import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
+import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import { JwtAccessGuard } from './guards/jwt-access.guard';
+import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { EmailSecurityModule } from '../email-security/email-security.module';
 
 @Module({
   imports: [
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    TypeOrmModule.forFeature([User, Activity]),
+    PassportModule.register({ defaultStrategy: 'jwt-access' }),
+    TypeOrmModule.forFeature([User, Activity, RefreshToken]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -25,9 +35,28 @@ import { Activity } from './activity.entity';
       }),
       inject: [ConfigService],
     }),
+    TwoFactorModule,
+    EmailSecurityModule,
   ],
   controllers: [AuthController, ActivityController],
-  providers: [AuthService, ActivityService, JwtStrategy, JwtAuthGuard, Reflector],
-  exports: [AuthService, ActivityService],
+  providers: [
+    AuthService,
+    ActivityService,
+    JwtStrategy,
+    JwtAuthGuard,
+    Reflector,
+    JwtTokenService,
+    RefreshTokenService,
+    LoginAttemptService,
+    JwtAccessStrategy,
+    JwtRefreshStrategy,
+    JwtAccessGuard,
+    JwtRefreshGuard,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAccessGuard,
+    },
+  ],
+  exports: [AuthService, ActivityService, JwtTokenService, RefreshTokenService],
 })
 export class AuthModule { }

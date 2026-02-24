@@ -1,6 +1,13 @@
 // Google OAuth Configuration
-const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id-here';
-const GOOGLE_REDIRECT_URI = process.env.VITE_GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/callback/google';
+
+declare global {
+  interface Window {
+    gapi: any;
+  }
+}
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id-here';
+const GOOGLE_REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/callback/google';
 
 export interface GoogleUserInfo {
   id: string;
@@ -23,13 +30,13 @@ class GoogleAuthService {
   // Initialize Google OAuth
   initGoogleAuth(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (typeof gapi === 'undefined') {
+      if (typeof window.gapi === 'undefined') {
         // Load Google API script
         const script = document.createElement('script');
         script.src = 'https://apis.google.com/js/platform.js';
         script.onload = () => {
-          gapi.load('auth2', () => {
-            gapi.auth2.init({
+          window.gapi.load('auth2', () => {
+            window.gapi.auth2.init({
               client_id: this.clientId,
               redirect_uri: this.redirectUri,
               scope: 'profile email',
@@ -49,11 +56,10 @@ class GoogleAuthService {
     try {
       await this.initGoogleAuth();
       
-      const auth2 = gapi.auth2.getAuthInstance();
+      const auth2 = window.gapi.auth2.getAuthInstance();
       const googleUser = await auth2.signIn();
       
       const profile = googleUser.getBasicProfile();
-      const authResponse = googleUser.getAuthResponse(true);
 
       return {
         id: profile.getId(),
@@ -72,7 +78,7 @@ class GoogleAuthService {
   // Sign out
   async signOut(): Promise<void> {
     try {
-      const auth2 = gapi.auth2.getAuthInstance();
+      const auth2 = window.gapi.auth2.getAuthInstance();
       await auth2.signOut();
     } catch (error) {
       console.error('Google sign-out error:', error);
@@ -82,7 +88,7 @@ class GoogleAuthService {
   // Get current user
   getCurrentUser(): GoogleUserInfo | null {
     try {
-      const auth2 = gapi.auth2.getAuthInstance();
+      const auth2 = window.gapi.auth2.getAuthInstance();
       const currentUser = auth2.currentUser.get();
       
       if (currentUser.isSignedIn()) {

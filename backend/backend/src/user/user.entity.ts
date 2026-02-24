@@ -47,11 +47,11 @@ export class User {
   @Column({ default: false })
   isPremium: boolean;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column({ type: 'varchar', nullable: true })
+  totpSecret: string | null;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({ default: false })
+  isTwoFAEnabled: boolean;
 
   @Column({ type: 'varchar', nullable: true })
   resetPasswordToken: string | null;
@@ -61,6 +61,35 @@ export class User {
 
   @Column({ type: 'jsonb', nullable: true, default: [] })
   authHistory: any[];
+
+  @Column({ type: 'text', nullable: true })
+  bio: string | null;
+
+  // ✅ Face embedding (128 floats) stocké en JSON
+  @Column({ type: 'simple-json', nullable: true })
+  faceDescriptor: number[] | null;
+
+  // Optionnel: dernière mise à jour de l'empreinte
+  @Column({ type: 'timestamptz', nullable: true })
+  faceUpdatedAt: Date | null;
+
+  @Column({ nullable: true })
+  webauthnCredentialID?: string;
+
+  @Column({ type: 'text', nullable: true })
+  webauthnPublicKey?: string;
+
+  @Column({ nullable: true })
+  webauthnCounter?: number;
+
+  @Column({ type: 'text', nullable: true })
+  webauthnChallenge: string | null;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Relations (to be implemented)
   // @OneToMany(() => Session, session => session.user)

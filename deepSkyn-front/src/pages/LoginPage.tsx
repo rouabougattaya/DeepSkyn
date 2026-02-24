@@ -1,39 +1,82 @@
 "use client"
 
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sparkles, Eye, EyeOff } from "lucide-react"
 import { useGoogleAuth } from "@/hooks/useGoogleAuth"
-import { simpleAuthService } from '@/services/authService-simple';
+import { setSession } from "@/lib/authSession"
+import { saveTwoFASession } from "@/lib/twoFASession"
+import { loginSchema } from "@/lib/schemas/auth"
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
 
 export default function LoginPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
-  
-  const { signInWithGoogle, isLoading: googleLoading, error: googleError } = useGoogleAuth()
+  const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const { isLoading: googleLoading } = useGoogleAuth()
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
+    setFieldErrors({})
+
+    const parsed = loginSchema.safeParse({ email, password })
+    if (!parsed.success) {
+      const flattened = parsed.error.flatten().fieldErrors
+      setFieldErrors({
+        email: flattened.email?.[0] ?? "",
+        password: flattened.password?.[0] ?? "",
+      })
+      return
+    }
+
     setIsLoading(true)
-    
     try {
-      const authData = await simpleAuthService.loginWithEmail(email, password)
-      
-      // Show AI verification result
-      if (authData.aiVerification) {
-        const aiStatus = authData.aiVerification.verified ? '✅' : '⚠️';
-        console.log(`${aiStatus} ${authData.aiVerification.message}`);
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(parsed.data),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setError(Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Email ou mot de passe incorrect."))
+        return
       }
-      
-      navigate('/')
-    } catch (error) {
-      console.error('Login failed:', error)
-      // Handle login error (show message to user)
+
+      if (data.requiresTwoFa) {
+        saveTwoFASession(data);
+        navigate("/auth/2fa", {
+          state: {
+            loginData: data,
+            from: location.state?.from || "/"
+          }
+        })
+        return
+      }
+
+      setSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        accessTokenExpiresAt: data.accessTokenExpiresAt,
+        refreshTokenExpiresAt: data.refreshTokenExpiresAt,
+        user: data.user,
+      })
+
+      navigate("/", { replace: true })
+    } catch {
+      setError("Impossible de joindre le serveur. Vérifiez que le backend est démarré.")
     } finally {
       setIsLoading(false)
     }
@@ -41,12 +84,10 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     try {
-      // Use redirect method to avoid popup blockers
       const { signInWithGoogleRedirect } = await import('@/hooks/useGoogleAuth');
       signInWithGoogleRedirect();
     } catch (error) {
       console.error('Google sign-in failed:', error);
-      // Handle Google sign-in error
     }
   }
 
@@ -74,7 +115,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleEmailLogin} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium text-slate-900">
               Email Address
@@ -84,10 +125,12 @@ export default function LoginPage() {
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-12 bg-white border-slate-200 focus:ring-[#0d9488]"
-              required
+              onChange={(e) => { setEmail(e.target.value); setFieldErrors((prev) => ({ ...prev, email: "" })) }}
+              className={`h-12 bg-white border-slate-200 focus:ring-[#0d9488] ${fieldErrors.email ? "border-red-500" : ""}`}
             />
+            {fieldErrors.email && (
+              <p className="text-sm text-red-600">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -100,9 +143,8 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 bg-white border-slate-200 pr-10 focus:ring-[#0d9488]"
-                required
+                onChange={(e) => { setPassword(e.target.value); setFieldErrors((prev) => ({ ...prev, password: "" })) }}
+                className={`h-12 bg-white border-slate-200 pr-10 focus:ring-[#0d9488] ${fieldErrors.password ? "border-red-500" : ""}`}
               />
               <button
                 type="button"
@@ -112,29 +154,38 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="text-sm text-red-600">{fieldErrors.password}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                id="remember" 
+              <input
+                type="checkbox"
+                id="remember"
                 className="rounded border-slate-300 text-[#0d9488] focus:ring-[#0d9488]"
               />
               <label htmlFor="remember" className="text-sm text-slate-500">
                 Remember me
               </label>
             </div>
-            <Link 
-              to="/auth/forgot-password" 
+            <Link
+              to="/auth/forgot-password"
               className="text-sm font-medium text-[#0d9488] hover:underline"
             >
               Forgot password?
             </Link>
           </div>
 
-          <Button 
-            type="submit" 
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
             className="w-full h-12 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-semibold rounded-lg transition-colors"
             disabled={isLoading}
           >
@@ -167,9 +218,8 @@ export default function LoginPage() {
           </Button>
           <Button variant="outline" className="h-12 border-slate-200 font-medium bg-white">
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.073 21.376c-1.447 0-2.626-1.18-2.626-2.626s1.18-2.627 2.626-2.627c1.448 0 2.627 1.181 2.627 2.627s-1.18 2.626-2.627 2.626zm-10.146 0c-1.448 0-2.627-1.18-2.627-2.626s1.18-2.627 2.627-2.627c1.447 0 2.626 1.181 2.626 2.627s-1.18 2.626-2.626 2.626zm1.586-15.402c2.31 0 4.182 1.873 4.182 4.182 0 2.31-1.873 4.182-4.182 4.182-2.31 0-4.182-1.872-4.182-4.182 0-2.309 1.872-4.182 4.182-4.182zm0-1.974c-3.4 0-6.156 2.756-6.156 6.156s2.756 6.156 6.156 6.156 6.156-2.756 6.156-6.156-2.756-6.156-6.156-6.156z" />
-              {/* Note: Simplified Apple Icon path for demo */}
-              <path d="M18.71 14.45c-.05.1-.1.19-.15.29-.7.15-1.38.56-1.38 1.48 0 1.07.9 1.53 1.37 1.77-.11.35-.41.87-.9 1.58-.45.63-.92 1.25-1.63 1.26-.7 0-.91-.43-1.72-.43-.8 0-1.04.42-1.7.44-.7.01-1.2-.66-1.65-1.31-.92-1.33-1.62-3.75-.68-5.38.47-.81 1.3-1.32 2.21-1.33.69 0 1.34.48 1.76.48.42 0 1.21-.6 2.04-.51.35.01.66.13.91.33-.08.07-.4.32-.4.81 0 .6.49.88.58.93zM15.98 8.56c-.44 0-.84-.24-1.08-.6-.35-.55-.26-1.28.21-1.73.44-.43 1.11-.53 1.63-.2.35.22.56.59.56 1-.01.83-.8 1.53-1.32 1.53z"/>
+              <path d="M17.073 21.376c-1.447 0-2.626-1.18-2.626-2.626s1.18-2.627 2.626-2.627c1.448 0 2.627 1.181 2.627 2.627s-1.18 2.626-2.627 2.626zm-10.146 0c-1.448 0-2.627-1.18-2.627-2.626s1.18-2.627 2.627-2.627c1.447 0 2.626 1.181 2.626 2.627s-1.18 2.626-2.626 2.626zm1.586-15.402c2.31 0 4.182 1.873 4.182 4.182 0 2.31-1.873 4.182-4.182 4.182-2.31 0-4.182-1.872-4.182-4.182 0-2.309 1.872-4.182 4.182-4.182zm0-1.974c-3.4 0-6.156 2.756-6.156 6.156s2.756 6.156 6.156 6.156 6.156-2.756 6.156-6.156 6.156-2.756 6.156-6.156-2.756-6.156-6.156-6.156z" />
+              <path d="M18.71 14.45c-.05.1-.1.19-.15.29-.7.15-1.38.56-1.38 1.48 0 1.07.9 1.53 1.37 1.77-.11.35-.41.87-.9 1.58-.45.63-.92 1.25-1.63 1.26-.7 0-.91-.43-1.72-.43-.8 0-1.04.42-1.7.44-.7.01-1.2-.66-1.65-1.31-.92-1.33-1.62-3.75-.68-5.38.47-.81 1.3-1.32 2.21-1.33.69 0 1.34.48 1.76.48.42 0 1.21-.6 2.04-.51.35.01.66.13.91.33-.08.07-.4.32-.4.81 0 .6.49.88.58.93zM15.98 8.56c-.44 0-.84-.24-1.08-.6-.35-.55-.26-1.28.21-1.73.44-.43 1.11-.53 1.63-.2.35.22.56.59.56 1-.01.83-.8 1.53-1.32 1.53z" />
             </svg>
             Apple
           </Button>
@@ -179,8 +229,8 @@ export default function LoginPage() {
         <div className="text-center mt-10">
           <p className="text-slate-500 text-sm">
             Don't have an account?{" "}
-            <Link 
-              to="/auth/register" 
+            <Link
+              to="/auth/register"
               className="text-[#0d9488] hover:underline font-semibold"
             >
               Sign up

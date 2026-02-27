@@ -17,6 +17,8 @@ import { TwoFactorSetupPage } from './pages/TwoFactorSettingsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import ProfilePage from "./pages/ProfilePage"
 import ActivityHistoryPage from './pages/ActivityHistoryPage'
+import AnalysisPage from './pages/AnalysisPage'
+import AiDemoPage from './pages/AiDemoPage'
 import './App.css'
 
 function Home() {
@@ -62,7 +64,8 @@ function App() {
           <Route path="/security-history" element={<ActivityHistoryPage />} />
           <Route path="/home" element={<Home />} />
 
-          <Route path="/analysis" element={<HomePage />} />
+          <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/ai-demo" element={<AiDemoPage />} />
           <Route path="/pricing" element={<HomePage />} />
         </Route>
 

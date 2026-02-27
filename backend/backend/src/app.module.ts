@@ -10,6 +10,14 @@ import { AuthModule } from './auth/auth.module';
 import { EmailSecurityModule } from './email-security/email-security.module';
 import { UsersModule } from './user/users.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { AnalysisController } from './analysis.controller';
+import { ScoringService } from './scoring.service';
+import { SkinAnalysis } from './skinAnalysis/skin-analysis.entity';
+import { SkinMetric } from './skinMetric/skin-metric.entity';
+import { SkinMetricService } from './skinMetric/skin-metric.service';
+import { TypeOrmModule as AnalysisTypeOrmModule } from '@nestjs/typeorm';
+import { MetricsModule } from './metrics/metrics.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -38,10 +46,15 @@ import { ModerationModule } from './moderation/moderation.module';
     AuthModule,
     UsersModule,
     ModerationModule,
+    MetricsModule,
+    AiModule,
+    AnalysisTypeOrmModule.forFeature([SkinAnalysis, SkinMetric]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, AnalysisController],
   providers: [
     AppService,
+    ScoringService,
+    SkinMetricService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

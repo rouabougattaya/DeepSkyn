@@ -1,204 +1,435 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUser } from '@/lib/authSession';
-import { Brain, Camera, BarChart3, Shield, History, Sparkles, RefreshCw, LogOut } from 'lucide-react';
-import AIStatusBadge from '@/components/AIStatusBadge';
+import {
+  Brain, Camera, Shield, History, Sparkles, RefreshCw, LogOut,
+  TrendingUp, TrendingDown, Minus, BarChart2, Activity,
+  Star, AlertTriangle, CheckCircle, Zap, ArrowRight, LayoutDashboard,
+  Settings, Bell, Search, User as UserIcon
+} from 'lucide-react';
 import { simpleAuthService } from '@/services/authService-simple';
+import AIStatusBadge from '@/components/AIStatusBadge';
+import { dashboardService } from '@/services/dashboardService';
+import type { DashboardMetrics, TrendData, MonthlyData } from '@/types/dashboard';
 
-export default function DashboardPage() {
+/* ─────────────────────── DESIGN SYSTEM ────────────────── */
+const THEME = {
+  primary: '#0d9488',
+  primaryHover: '#0f766e',
+  surface: '#ffffff',
+  background: '#f8fafc',
+  textPrimary: '#0f172a',
+  textSecondary: '#64748b',
+  border: '#e2e8f0',
+  greenSoft: '#f0fdfa',
+};
+
+/* ─────────────────────── REUSABLE COMPONENTS ────────────────── */
+
+function SparkLine({ data, color = '#0d9488' }: { data: number[]; color?: string }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 80, h = 32;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  }).join(' ');
+  const fillPoints = `0,${h} ${points} ${w},${h}`;
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPoints} fill={`url(#grad-${color.replace('#', '')})`} />
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {data.length > 0 && (
+        <circle
+          cx={w}
+          cy={h - ((data[data.length - 1] - min) / range) * h}
+          r="3" fill={color}
+          style={{ filter: `drop-shadow(0 0 4px ${color})` }}
+        />
+      )}
+    </svg>
+  );
+}
+
+function KPIMetricCard({
+  title, value, unit = '', trend, icon, color, sparkData, subtitle
+}: {
+  title: string;
+  value: number | string;
+  unit?: string;
+  trend?: { direction: 'up' | 'down' | 'stable'; percentage: number };
+  icon: React.ReactNode;
+  color: string;
+  sparkData?: number[];
+  subtitle?: string;
+}) {
+  const trendColor = trend?.direction === 'up' ? '#10b981' : trend?.direction === 'down' ? '#ef4444' : '#64748b';
+  const TrendIcon = trend?.direction === 'up' ? TrendingUp : trend?.direction === 'down' ? TrendingDown : Minus;
+
+  return (
+    <div style={{
+      background: '#ffffff',
+      border: `1px solid ${THEME.border}`,
+      borderRadius: 20,
+      padding: '24px',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      cursor: 'default',
+      position: 'relative',
+      overflow: 'hidden',
+    }} className="kpi-card">
+      <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, background: color, borderRadius: '50%', opacity: 0.05, filter: 'blur(24px)' }} />
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 14, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
+          {icon}
+        </div>
+        {trend && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: `${trendColor}10`, padding: '4px 8px', borderRadius: 20 }}>
+            <TrendIcon size={12} style={{ color: trendColor }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: trendColor }}>
+              {trend.direction === 'up' ? '+' : ''}{trend.percentage.toFixed(1)}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ fontSize: 32, fontWeight: 800, color: THEME.textPrimary, lineHeight: 1, marginBottom: 4 }}>
+        {typeof value === 'number' ? value.toFixed(1) : value}
+        <span style={{ fontSize: 16, color: THEME.textSecondary, marginLeft: 4, fontWeight: 500 }}>{unit}</span>
+      </div>
+
+      <div style={{ fontSize: 13, color: THEME.textSecondary, fontWeight: 500 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>}
+
+      {sparkData && sparkData.length > 1 && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${THEME.border}`, paddingTop: 16 }}>
+          <SparkLine data={sparkData} color={color} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendPill({ trend }: { trend: TrendData }) {
+  const isUp = trend.direction === 'up';
+  const isDown = trend.direction === 'down';
+  const color = isUp ? '#10b981' : isDown ? '#ef4444' : '#64748b';
+  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
+
+  return (
+    <div style={{ background: '#ffffff', border: `1px solid ${THEME.border}`, borderRadius: 16, padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{trend.period}</span>
+        <Icon size={14} style={{ color }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 22, fontWeight: 800, color }}>{trend.current.toFixed(1)}</span>
+        <span style={{ fontSize: 12, color: '#94a3b8' }}>vs {trend.previous.toFixed(1)}</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniBarChart({ data }: { data: MonthlyData[] }) {
+  const filtered = data.filter(d => d.analysisCount > 0).slice(-8);
+  if (filtered.length === 0) return <div style={{ textAlign: 'center', padding: 32, color: THEME.textSecondary, fontSize: 13 }}>Pas assez de données</div>;
+  const maxScore = Math.max(...filtered.map(d => d.averageScore), 1);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 120 }}>
+      {filtered.map((d, i) => {
+        const heightPct = (d.averageScore / maxScore) * 100;
+        const color = d.averageScore >= 75 ? '#10b981' : d.averageScore >= 50 ? '#f59e0b' : '#ef4444';
+        return (
+          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 10, color: THEME.textSecondary, fontWeight: 600 }}>{Math.round(d.averageScore)}</div>
+            <div style={{
+              width: '100%', height: `${heightPct}%`,
+              background: `linear-gradient(180deg, ${color}, ${color}40)`,
+              borderRadius: '6px 6px 0 0', minHeight: 4,
+              transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionDelay: `${i * 0.1}s`
+            }} />
+            <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>{new Date(d.month + '-01').toLocaleDateString('fr-FR', { month: 'short' })}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ──────────────────────── MAIN COMPONENT ──────────────────── */
+
+export default function ProfessionalDashboard() {
   const [user, setUser] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [trends, setTrends] = useState<TrendData[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyData[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUserData = async () => {
-      try {
-        const currentUser = getUser();
-        if (!currentUser) {
-          navigate('/auth/login');
-          return;
-        }
-        setUser(currentUser);
-        setAiStatus({
-          verified: currentUser.aiVerified || false,
-          score: currentUser.aiScore || 0
-        });
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading user data:', error);
-        if (!user) navigate('/auth/login');
-      }
+      const currentUser = getUser();
+      if (!currentUser) { navigate('/auth/login'); return; }
+      setUser(currentUser);
+      setAiStatus({ verified: currentUser.aiVerified || false, score: currentUser.aiScore || 0 });
+      setLoading(false);
     };
     loadUserData();
   }, [navigate]);
 
-  const handleRefreshAI = async () => {
+  const loadSkinMetrics = async () => {
+    setMetricsLoading(true);
+    setMetricsError(null);
     try {
-      setLoading(true);
-      const result = await simpleAuthService.refreshAIVerification();
-      setAiStatus({ verified: result.verified, score: result.score });
-      const updatedUser = getUser();
-      setUser(updatedUser);
-    } catch (error) {
-      console.error('Error refreshing AI verification:', error);
+      const [m, t, mon] = await Promise.all([
+        dashboardService.getMetrics(),
+        dashboardService.getTrends(),
+        dashboardService.getMonthlyData(6),
+      ]);
+      setMetrics(m);
+      setTrends(t);
+      setMonthly(mon);
+    } catch {
+      setMetricsError('Données indisponibles (Backend déconnecté)');
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading) loadSkinMetrics();
+  }, [loading]);
+
+  const handleRefreshAI = async () => {
+    setLoading(true);
+    try {
+      const res = await simpleAuthService.refreshAIVerification();
+      setAiStatus({ verified: res.verified, score: res.score });
+      setUser(getUser());
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      // TODO: Implement logout with authSession
-      // await simpleAuthService.logout();
-      navigate('/auth/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0d9488] rounded-full animate-spin"></div>
-        </div>
-        <p className="mt-4 text-slate-500 font-medium animate-pulse">Analyzing your profile...</p>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: THEME.background }}>
+      <RefreshCw size={40} className="animate-spin" style={{ color: THEME.primary }} />
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div style={{ display: 'flex', minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <style>{`
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .sidebar-item:hover { background: ${THEME.greenSoft}; color: ${THEME.primary}; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+      `}</style>
 
-      {/* --- NAVIGATION --- */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-[#0d9488] flex items-center justify-center shadow-lg shadow-teal-500/20">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-slate-900">DeepSkyn</span>
-            </Link>
+      {/* ── SIDEBAR ── */}
+      <aside style={{ width: '240px', background: THEME.surface, borderRight: `1px solid ${THEME.border}`, position: 'fixed', top: '64px', height: 'calc(100vh - 64px)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '24px 16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '24px' }}>Menu Principal</div>
+          <SidebarItem icon={LayoutDashboard} label="Vue d'ensemble" active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
+          <SidebarItem icon={Camera} label="Analyse IA" onClick={() => navigate('/ai-demo')} />
+          <SidebarItem icon={History} label="Archives médicales" onClick={() => navigate('/analysis')} />
+          <SidebarItem icon={Shield} label="Sécurité & IPs" onClick={() => navigate('/security')} />
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleRefreshAI}
-                className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-[#0d9488] transition-colors"
-              >
-                <RefreshCw size={16} />
-                Refresh AI
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all"
-              >
-                <LogOut size={16} />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '32px 0 24px' }}>Système</div>
+          <SidebarItem icon={UserIcon} label="Mon Profil" onClick={() => navigate('/profile')} />
+          <SidebarItem icon={Shield} label="Sécurité" onClick={() => navigate('/security-history')} />
+          <SidebarItem icon={Settings} label="Paramètres" onClick={() => navigate('/settings')} />
+        </div>
+
+        <div style={{ marginTop: 'auto', padding: '24px', borderTop: `1px solid ${THEME.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: THEME.greenSoft, display: 'grid', placeItems: 'center', fontWeight: 700, color: THEME.primary, border: `1px solid ${THEME.primary}20` }}>
+              {user?.firstName?.charAt(0) || user?.name?.charAt(0) || 'U'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.firstName || user?.name || 'Utilisateur'}</div>
+              <div style={{ fontSize: 12, color: THEME.textSecondary }}>Plan Premium</div>
             </div>
           </div>
+          <button onClick={async () => { await simpleAuthService.logout(); navigate('/auth/login'); }} style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1px solid ${THEME.border}`, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>
+            <LogOut size={16} /> Déconnexion
+          </button>
         </div>
-      </nav>
+      </aside>
 
-      {/* --- MAIN CONTENT --- */}
-      <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      {/* ── MAIN CONTENT ── */}
+      <main style={{ marginLeft: '240px', flex: 1, marginTop: '64px', padding: '40px' }}>
 
-        {/* Header Section */}
-        <div className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
-            Welcome back, <span className="text-[#0d9488]">{user?.name?.split(' ')[0] || user?.name}</span>! 👋
-          </h1>
-          <p className="text-slate-500 font-medium">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • AI Health Summary
-          </p>
+        {/* Header Hero */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
+          <div>
+            <h1 style={{ fontSize: 32, fontWeight: 800, color: THEME.textPrimary, letterSpacing: '-0.02em', marginBottom: 8 }}>
+              Bonjour, <span style={{ color: THEME.primary }}>{user?.firstName || user?.name?.split(' ')[0]}</span> 👋
+            </h1>
+            <p style={{ color: THEME.textSecondary, fontSize: 16 }}>Voici l'état actuel de votre santé cutanée.</p>
+          </div>
+          <button onClick={handleRefreshAI} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, background: THEME.surface, border: `1px solid ${THEME.border}`, fontWeight: 600, fontSize: 14, color: THEME.textPrimary, cursor: 'pointer', transition: 'all 0.2s' }}>
+            <RefreshCw size={16} /> Actualiser les données IA
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
 
-          {/* Left Column: AI Status & User Info */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-bold text-slate-900">Verification Status</h2>
-                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-[#0d9488]" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {/* KPI ROW */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
+              <KPIMetricCard
+                title="Score moyen"
+                value={metrics?.averageScore ?? '—'}
+                unit="/100"
+                trend={metrics ? { direction: metrics.trendDirection, percentage: metrics.trendPercentage } : undefined}
+                icon={<BarChart2 size={24} />}
+                color="#0d9488"
+                sparkData={monthly.filter(m => m.analysisCount > 0).map(m => m.averageScore).slice(-5)}
+                subtitle={metrics ? (metrics.averageScore >= 75 ? 'Optimal' : 'À surveiller') : 'Prêt pour analyse'}
+              />
+              <KPIMetricCard
+                title="Analyses totales"
+                value={metrics?.totalAnalyses ?? '0'}
+                icon={<Activity size={24} />}
+                color="#8b5cf6"
+                subtitle="Derniers 30 jours"
+              />
+            </div>
+
+            {/* CHART SECTION */}
+            <div style={{ background: THEME.surface, borderRadius: 24, border: `1px solid ${THEME.border}`, padding: 32 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: THEME.textPrimary }}>Évolution Mensuelle</h3>
+                  <p style={{ fontSize: 13, color: THEME.textSecondary }}>Moyenne des scores par mois</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: THEME.textSecondary }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: THEME.primary }} /> Score
+                  </div>
                 </div>
               </div>
-
-              <div className="mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <AIStatusBadge verified={aiStatus?.verified || false} score={aiStatus?.score || 0} compact={false} />
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  {
-                    label: 'Auth Method',
-                    value: (user?.authMethod === 'google' || user?.googleId) ? 'Google Account' : 'Email & Password',
-                    icon: Shield
-                  },
-                  {
-                    label: 'Member Since',
-                    value: user?.createdAt
-                      ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                      : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-                    icon: History
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 transition-colors">
-                      <item.icon size={16} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{item.label}</p>
-                      <p className="text-sm font-bold text-slate-700">{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <MiniBarChart data={monthly} />
             </div>
 
-            {/* Email Quick Card */}
-            <div className="bg-[#0d9488] p-6 rounded-3xl shadow-xl shadow-teal-500/20 text-white relative overflow-hidden group">
-              <Sparkles className="absolute -right-4 -top-4 w-24 h-24 opacity-10 group-hover:rotate-12 transition-transform" />
-              <p className="text-teal-100 text-xs font-bold uppercase tracking-widest mb-1">Account Email</p>
-              <p className="text-lg font-bold truncate">{user?.email}</p>
+            {/* SINGLE PROMINENT ACTION */}
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16, letterSpacing: '0.05em' }}>Action Principale</h3>
+              <Link to="/ai-demo" style={{
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                padding: '14px 24px',
+                background: `linear-gradient(135deg, ${THEME.primary}, #0f766e)`,
+                borderRadius: 14,
+                boxShadow: `0 4px 12px ${THEME.primary}40`,
+                transition: 'all 0.3s ease',
+                color: 'white'
+              }} className="kpi-card">
+                <Zap size={18} fill="white" />
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Lancer l'Analyse IA</span>
+                <ArrowRight size={18} />
+              </Link>
             </div>
           </div>
 
-          {/* Right Column: Actions Grid */}
-          <div className="lg:col-span-2">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-2">Quick Actions</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { to: '/analysis', icon: Camera, label: 'Skin Analysis', desc: 'Scan and analyze your skin health with AI.', color: 'text-teal-600', bg: 'bg-teal-50' },
-                { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
-                { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
-              ].map((action) => (
-                <Link
-                  key={action.to}
-                  to={action.to}
-                  className="group bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all"
-                >
-                  <div className={`w-12 h-12 rounded-2xl ${action.bg} ${action.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                    <action.icon size={24} />
-                  </div>
-                  <h4 className="text-lg font-bold text-slate-900 mb-1">{action.label}</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed">{action.desc}</p>
-                </Link>
-              ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* STATUS WIDGET */}
+            <div style={{ background: THEME.surface, borderRadius: 24, padding: 24, border: `1px solid ${THEME.border}` }}>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>Vérification IA</h4>
+              <AIStatusBadge verified={aiStatus?.verified} score={aiStatus?.score} compact={false} />
+
+              <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <StatusRow label="Email" value={user?.email} icon={<Search size={14} />} />
+                <StatusRow label="Sécurité" value="Chiffrement AES-256" icon={<Shield size={14} />} />
+              </div>
+            </div>
+
+            {/* TRENDS */}
+            <div style={{ background: THEME.surface, borderRadius: 24, padding: 24, border: `1px solid ${THEME.border}` }}>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>Rapport de tendances</h4>
+              {trends.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {trends.map(t => <TrendPill key={t.period} trend={t} />)}
+                </div>
+              ) : (
+                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: 16, textAlign: 'center', fontSize: 12, color: THEME.textSecondary }}>
+                  Analyse insuffisante pour générer des tendances.
+                </div>
+              )}
+            </div>
+
+            {/* AD BANNER */}
+            <div style={{ background: `linear-gradient(135deg, ${THEME.primary}, #0d9488)`, borderRadius: 24, padding: 24, color: 'white', position: 'relative', overflow: 'hidden' }}>
+              <Brain size={120} style={{ position: 'absolute', right: -30, bottom: -30, opacity: 0.1 }} />
+              <h4 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>DeepSkyn Pro</h4>
+              <p style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.5, marginBottom: 20 }}>Accédez à des rapports cliniques détaillés et des conseils personnalisés.</p>
+              <button style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>En savoir plus</button>
             </div>
           </div>
 
-        </div>
-
-        {/* Footer info */}
-        <div className="mt-16 text-center">
-          <p className="text-slate-400 text-sm">© 2026 DeepSkyn · Precision AI Skincare Infrastructure</p>
         </div>
       </main>
+    </div>
+  );
+}
+
+/* ──────────────────────── SUB-COMPONENTS ──────────────────── */
+
+function SidebarItem({ icon: Icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className="sidebar-item" style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12,
+      cursor: 'pointer', marginBottom: 4, transition: 'all 0.2s',
+      background: active ? THEME.greenSoft : 'transparent',
+      color: active ? THEME.primary : THEME.textSecondary,
+      fontWeight: active ? 700 : 500,
+      fontSize: 14,
+    }}>
+      <Icon size={20} />
+      <span>{label}</span>
+      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: THEME.primary }} />}
+    </div>
+  );
+}
+
+function QuickAction({ icon, label, to, color }: any) {
+  return (
+    <Link to={to} style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 16, background: '#ffffff', borderRadius: 16, border: `1px solid ${THEME.border}`, transition: 'all 0.2s' }} className="kpi-card">
+      <div style={{ color }}>{icon}</div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: THEME.textPrimary }}>{label}</span>
+    </Link>
+  );
+}
+
+function StatusRow({ label, value, icon }: any) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f1f5f9', display: 'grid', placeItems: 'center', color: THEME.textSecondary }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+      </div>
     </div>
   );
 }

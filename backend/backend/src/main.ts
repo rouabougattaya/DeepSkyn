@@ -47,8 +47,16 @@ async function bootstrap() {
     '/api/auth/login-fingerprint/options',
     '/api/auth/login-fingerprint/verify',
     '/api/auth/check-user',
-    '/api/auth/forgot-password',
     '/api/auth/reset-password',
+    '/api/auth/check-user',
+    '/api/auth/csrf-token',
+    '/api/dashboard/metrics',
+    '/api/dashboard/trends',
+    '/api/dashboard/monthly',
+    '/api/ai/analyze',
+    '/api/ai/analyze/random',
+    '/api/ai/weights/default',
+    '/api/ai/test-cases',
   ];
 
   const csrfProtection = csrf({

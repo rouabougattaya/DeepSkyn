@@ -23,11 +23,20 @@ export class JwtAccessGuard extends AuthGuard('jwt-access') {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+    const isPublic = this.reflector.getAllAndOverride('isPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return user || null;
+    }
+
     if (err || !user) {
       throw err || new UnauthorizedException('Invalid or missing access token');
     }
     return user;
   }
-  
+
 }

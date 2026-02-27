@@ -2,13 +2,23 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUser } from '@/lib/authSession';
 import {
-  Brain, Camera, Shield, History, Sparkles, RefreshCw, LogOut,
   TrendingUp, TrendingDown, Minus, BarChart2, Activity,
   Star, AlertTriangle, CheckCircle, Zap, ArrowRight, LayoutDashboard,
   Settings, Bell, Search, User as UserIcon
 } from 'lucide-react';
-import { simpleAuthService } from '@/services/authService-simple';
+import { 
+  Brain, 
+  Camera, 
+  BarChart3, 
+  Shield, 
+  History, 
+  Sparkles, 
+  RefreshCw, 
+  LogOut,
+  Smartphone  // ← AJOUTE CET IMPORT
+} from 'lucide-react';
 import AIStatusBadge from '@/components/AIStatusBadge';
+import { simpleAuthService } from '@/services/authService-simple';
 import { dashboardService } from '@/services/dashboardService';
 import type { DashboardMetrics, TrendData, MonthlyData } from '@/types/dashboard';
 
@@ -168,6 +178,25 @@ function MiniBarChart({ data }: { data: MonthlyData[] }) {
   );
 }
 
+/* ──────────────────────── SUB-COMPONENTS ──────────────────── */
+
+function SidebarItem({ icon: Icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className="sidebar-item" style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12,
+      cursor: 'pointer', marginBottom: 4, transition: 'all 0.2s',
+      background: active ? THEME.greenSoft : 'transparent',
+      color: active ? THEME.primary : THEME.textSecondary,
+      fontWeight: active ? 700 : 500,
+      fontSize: 14,
+    }}>
+      <Icon size={20} />
+      <span>{label}</span>
+      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: THEME.primary }} />}
+    </div>
+  );
+}
+
 /* ──────────────────────── MAIN COMPONENT ──────────────────── */
 
 export default function ProfessionalDashboard() {
@@ -233,6 +262,28 @@ export default function ProfessionalDashboard() {
       <RefreshCw size={40} className="animate-spin" style={{ color: THEME.primary }} />
     </div>
   );
+  const handleLogout = async () => {
+    try {
+      localStorage.removeItem('token');
+  localStorage.removeItem('auth-session');
+      // TODO: Implement logout with authSession
+      // await simpleAuthService.logout();
+      navigate('/auth/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+        <div className="relative">
+          <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0d9488] rounded-full animate-spin"></div>
+        </div>
+        <p className="mt-4 text-slate-500 font-medium animate-pulse">Analyzing your profile...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -360,8 +411,37 @@ export default function ProfessionalDashboard() {
               <p style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.5, marginBottom: 20 }}>Accédez à des rapports cliniques détaillés et des conseils personnalisés.</p>
               <button style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>En savoir plus</button>
             </div>
-          </div>
+            {/* Right Column: Actions Grid */}
+            <div className="lg:col-span-2">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-2">Quick Actions</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { to: '/analysis', icon: Camera, label: 'Skin Analysis', desc: 'Scan and analyze your skin health with AI.', color: 'text-teal-600', bg: 'bg-teal-50' },
+                  { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                  { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
+                  { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
+                  // 👇 AJOUT DU BOUTON SESSIONS
+                  { to: '/sessions', icon: Smartphone, label: 'Mes Sessions', desc: 'Gérez vos appareils connectés', color: 'text-teal-600', bg: 'bg-teal-50' },
+                ].map((action) => (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className="group bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all"
+                  >
+                    <div className={`w-12 h-12 rounded-2xl ${action.bg} ${action.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                      <action.icon size={24} />
+                    </div>
+                    <h4 className="text-lg font-bold text-slate-900 mb-1">{action.label}</h4>
+                    <p className="text-sm text-slate-500 leading-relaxed">{action.desc}</p>
+                  </Link>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-4 ml-2">
+                ℹ️ 5 actions disponibles • Gérez vos sessions et appareils connectés
+              </p>
+            </div>
 
+          </div>
         </div>
       </main>
     </div>
@@ -369,23 +449,6 @@ export default function ProfessionalDashboard() {
 }
 
 /* ──────────────────────── SUB-COMPONENTS ──────────────────── */
-
-function SidebarItem({ icon: Icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className="sidebar-item" style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12,
-      cursor: 'pointer', marginBottom: 4, transition: 'all 0.2s',
-      background: active ? THEME.greenSoft : 'transparent',
-      color: active ? THEME.primary : THEME.textSecondary,
-      fontWeight: active ? 700 : 500,
-      fontSize: 14,
-    }}>
-      <Icon size={20} />
-      <span>{label}</span>
-      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: THEME.primary }} />}
-    </div>
-  );
-}
 
 function QuickAction({ icon, label, to, color }: any) {
   return (

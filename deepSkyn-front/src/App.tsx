@@ -19,6 +19,7 @@ import ProfilePage from "./pages/ProfilePage"
 import ActivityHistoryPage from './pages/ActivityHistoryPage'
 import AnalysisPage from './pages/AnalysisPage'
 import AiDemoPage from './pages/AiDemoPage'
+import { SessionsPage } from './pages/SessionsPage' // ← AJOUT : Import de ta page
 import './App.css'
 
 function Home() {
@@ -63,6 +64,9 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/security-history" element={<ActivityHistoryPage />} />
           <Route path="/home" element={<Home />} />
+          
+          {/* 👇 AJOUT : Ta nouvelle route pour les sessions */}
+          <Route path="/sessions" element={<SessionsPage />} />
 
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/ai-demo" element={<AiDemoPage />} />

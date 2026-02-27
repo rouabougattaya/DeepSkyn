@@ -7,10 +7,12 @@ import {
   Get,
   Put,
   Req,
-  Res,
+  Res,  Delete,
   UseGuards,
   UnauthorizedException,
   InternalServerErrorException,
+  Param,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -25,7 +27,6 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/auth.dto';
-// These might be in different DTO files based on the code provided
 import { RegisterDto } from './dto/register.dto';
 import { LoginFaceDto } from './dto/login-face.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -33,6 +34,8 @@ import { Public } from './decorators/public.decorator';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { User } from '../user/user.entity';
+import { SessionService } from '../sessions/session.service.simple';
+import { RecaptchaService } from './services/recaptcha.service'; // ← IMPORT AJOUTÉ
 
 function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {
   const ip = req.ip ?? req.socket?.remoteAddress ?? null;
@@ -43,7 +46,11 @@ function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
+    private readonly recaptchaService: RecaptchaService, // ← AJOUTÉ
+  ) { }
 
   @Post('signup')
   @Public()
@@ -97,13 +104,21 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Modern Login (JWT + Refresh Cookies)' })
   async login(
-    @Body() dto: LoginDto,
+    @Body() dto: LoginDto & { captchaToken?: string }, // ← AJOUTÉ captchaToken
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<any> {
+    // ✅ Validation captcha
+    if (!dto.captchaToken) {
+      throw new UnauthorizedException('Captcha requis');
+    }
+
+    const isValidCaptcha = await this.recaptchaService.validateToken(dto.captchaToken);
+    if (!isValidCaptcha) {
+      throw new UnauthorizedException('Validation captcha échouée');
+    }
+
     const metadata = getSessionMetadata(req);
-    // Note: The service might have two login methods now. I should check which one to use.
-    // Based on the merged code, I'll use the one returning SessionTokens for the new controller.
     const result = await this.authService.login(dto, metadata, req);
 
     if (result.requiresTwoFa) {
@@ -319,6 +334,71 @@ export class AuthController {
     const csrfToken = (res as any).locals?.csrfToken;
     res.json({ csrfToken });
   }
+
+  /* ===== ROUTES DE GESTION DES SESSIONS ===== */
+
+  @UseGuards(JwtAccessGuard)
+  @Get('sessions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all active sessions for current user' })
+  async getSessions(@CurrentUser() user: User, @Req() req: Request) {
+    const userId = user.id;
+    const sessions = await this.sessionService.getUserSessions(userId);
+    
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    return sessions.map(session => ({
+      id: session.id,
+      fingerprint: {
+        browser: session.fingerprint?.browser || 'Inconnu',
+        os: session.fingerprint?.os || 'Inconnu',
+        ip: session.fingerprint?.ip,
+        isMobile: session.fingerprint?.isMobile || false,
+      },
+      riskLevel: session.riskLevel,
+      riskAnalysis: session.riskAnalysis,
+      lastActivity: session.lastActivity,
+      isCurrent: currentSession?.id === session.id,
+    }));
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke a specific session' })
+  async revokeSession(
+    @Param('id') sessionId: string,
+    @CurrentUser() user: User,
+    @Req() req: Request
+  ) {
+    const userId = user.id;
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    if (currentSession?.id === sessionId) {
+      throw new BadRequestException('Impossible de révoquer votre session courante');
+    }
+    
+    await this.sessionService.revokeSession(sessionId, userId);
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Delete('sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke all other sessions' })
+  async revokeAllSessions(
+    @CurrentUser() user: User,
+    @Req() req: Request
+  ) {
+    const userId = user.id;
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    await this.sessionService.revokeAllUserSessions(userId, currentSession?.id);
+  }
+
+  /* ===== FIN ROUTES SESSIONS ===== */
 
   @Get('health')
   @Public()

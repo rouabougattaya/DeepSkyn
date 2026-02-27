@@ -25,6 +25,7 @@ import { tempTwoFAStorage } from '../twofactor/temp-2fa-storage';
 import { JwtTokenService } from './services/jwt-token.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { LoginAttemptService } from './services/login-attempt.service';
+import { SessionService } from '../sessions/session.service.simple';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -74,6 +75,7 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly loginAttemptService: LoginAttemptService,
+    private readonly sessionService: SessionService,
   ) {
     this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || '');
     this.transporter = nodemailer.createTransport({
@@ -225,7 +227,20 @@ export class AuthService {
       };
     }
 
-    return this.issueTokens(user, metadata);
+    // ✅ Créer la session avant d'émettre les tokens
+    const tokens = await this.issueTokens(user, metadata);
+    
+    // Créer la session avec le refresh token
+    const fakeReq = { 
+      ip: metadata?.ipAddress || null, 
+      headers: { 'user-agent': metadata?.userAgent || null } 
+    };
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la création de session (login).');
+    }
+    await this.sessionService.createSession(user.id, tokens.refreshToken, fakeReq);
+    
+    return tokens;
   }
 
   async loginWithEmail(email: string, password: string, ip?: string, userAgent?: string) {
@@ -238,6 +253,14 @@ export class AuthService {
     if (email === 'demo@example.com') {
       await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent);
       const token = await this.generateToken(user);
+      
+      // ✅ Créer la session
+      const req = { 
+        ip: ip || null, 
+        headers: { 'user-agent': userAgent || null } 
+      };
+      await this.sessionService.createSession(user.id, token, req);
+      
       return { token, user };
     }
 
@@ -249,6 +272,14 @@ export class AuthService {
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent);
     const token = await this.generateToken(user);
+    
+    // ✅ Créer la session
+    const req = { 
+      ip: ip || null, 
+      headers: { 'user-agent': userAgent || null } 
+    };
+    await this.sessionService.createSession(user.id, token, req);
+    
     return { token, user };
   }
 
@@ -286,6 +317,14 @@ export class AuthService {
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent, { method: 'google' });
     const token = await this.generateToken(user);
+    
+    // ✅ Créer la session
+    const req = { 
+      ip: ip || null, 
+      headers: { 'user-agent': userAgent || null } 
+    };
+    await this.sessionService.createSession(user.id, token, req);
+    
     return { token, user };
   }
 
@@ -339,7 +378,19 @@ export class AuthService {
       };
     }
 
-    return this.issueTokens(user, metadata);
+    // ✅ Créer la session avant d'émettre les tokens
+    const tokens = await this.issueTokens(user, metadata);
+    
+    const fakeReq = { 
+      ip: metadata?.ipAddress || null, 
+      headers: { 'user-agent': metadata?.userAgent || null } 
+    };
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la création de session (loginFace).');
+    }
+    await this.sessionService.createSession(user.id, tokens.refreshToken, fakeReq);
+    
+    return tokens;
   }
 
   /* ================= REGISTER METHODS ================= */
@@ -522,7 +573,19 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.issueTokens(user, metadata);
+    // ✅ Créer la session après validation 2FA
+    const tokens = await this.issueTokens(user, metadata);
+    
+    const fakeReq = { 
+      ip: metadata?.ipAddress || null, 
+      headers: { 'user-agent': metadata?.userAgent || null } 
+    };
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la création de session (verify2FA).');
+    }
+    await this.sessionService.createSession(user.id, tokens.refreshToken, fakeReq);
+    
+    return tokens;
   }
 
   /* ================= WEB AUTHN / FINGERPRINT ================= */
@@ -642,7 +705,7 @@ export class AuthService {
     const accessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(this.jwtTokenService.getAccessTokenTtl());
     const refreshTokenRecord = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
 
-    return {
+    const tokens: SessionTokens = {
       success: true,
       accessToken,
       refreshToken: (refreshTokenRecord as any).refreshToken,
@@ -657,6 +720,12 @@ export class AuthService {
         isTwoFAEnabled: user.isTwoFAEnabled,
       },
     };
+
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la génération des tokens.');
+    }
+
+    return tokens;
   }
 
   private async logActivity(userId: string, type: ActivityType, ip?: string, deviceInfo?: string, metadata?: any) {

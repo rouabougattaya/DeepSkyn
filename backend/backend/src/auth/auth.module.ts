@@ -22,7 +22,8 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { EmailSecurityModule } from '../email-security/email-security.module';
-
+import { SessionModule } from '../sessions/session.module'; // ← Garde cette ligne
+import { RecaptchaService } from './services/recaptcha.service';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt-access' }),
@@ -34,7 +35,8 @@ import { EmailSecurityModule } from '../email-security/email-security.module';
         signOptions: { expiresIn: '24h' },
       }),
       inject: [ConfigService],
-    }),
+    }), 
+    SessionModule, // ← SessionModule est importé
     TwoFactorModule,
     EmailSecurityModule,
   ],
@@ -52,11 +54,18 @@ import { EmailSecurityModule } from '../email-security/email-security.module';
     JwtRefreshStrategy,
     JwtAccessGuard,
     JwtRefreshGuard,
+     RecaptchaService,
     {
       provide: APP_GUARD,
       useClass: JwtAccessGuard,
     },
   ],
-  exports: [AuthService, ActivityService, JwtTokenService, RefreshTokenService],
+  exports: [
+    AuthService, 
+    ActivityService, 
+    JwtTokenService, 
+    RefreshTokenService,
+    // SessionService, // ← SUPPRIME cette ligne
+  ],
 })
 export class AuthModule { }

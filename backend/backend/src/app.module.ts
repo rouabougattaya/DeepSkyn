@@ -18,6 +18,7 @@ import { SkinMetricService } from './skinMetric/skin-metric.service';
 import { TypeOrmModule as AnalysisTypeOrmModule } from '@nestjs/typeorm';
 import { MetricsModule } from './metrics/metrics.module';
 import { AiModule } from './ai/ai.module';
+import { SessionModule } from './sessions/session.module'; // ← AJOUTE CET IMPORT
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AiModule } from './ai/ai.module';
     MetricsModule,
     AiModule,
     AnalysisTypeOrmModule.forFeature([SkinAnalysis, SkinMetric]),
+    SessionModule, // ← AJOUTE CETTE LIGNE (ne touche pas aux autres)
   ],
   controllers: [AppController, AnalysisController],
   providers: [
@@ -58,4 +60,4 @@ import { AiModule } from './ai/ai.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule { }
+export class AppModule {}

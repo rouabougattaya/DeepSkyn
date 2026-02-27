@@ -314,21 +314,7 @@ export default function ProfessionalDashboard() {
               />
             </div>
 
-            {/* CHART SECTION */}
-            <div style={{ background: THEME.surface, borderRadius: 24, border: `1px solid ${THEME.border}`, padding: 32 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-                <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, color: THEME.textPrimary }}>Évolution Mensuelle</h3>
-                  <p style={{ fontSize: 13, color: THEME.textSecondary }}>Moyenne des scores par mois</p>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: THEME.textSecondary }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: THEME.primary }} /> Score
-                  </div>
-                </div>
-              </div>
-              <MiniBarChart data={monthly} />
-            </div>
+
 
             {/* SINGLE PROMINENT ACTION */}
             <div>
@@ -365,19 +351,7 @@ export default function ProfessionalDashboard() {
               </div>
             </div>
 
-            {/* TRENDS */}
-            <div style={{ background: THEME.surface, borderRadius: 24, padding: 24, border: `1px solid ${THEME.border}` }}>
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>Rapport de tendances</h4>
-              {trends.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {trends.map(t => <TrendPill key={t.period} trend={t} />)}
-                </div>
-              ) : (
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: 16, textAlign: 'center', fontSize: 12, color: THEME.textSecondary }}>
-                  Analyse insuffisante pour générer des tendances.
-                </div>
-              )}
-            </div>
+
 
             {/* AD BANNER */}
             <div style={{ background: `linear-gradient(135deg, ${THEME.primary}, #0d9488)`, borderRadius: 24, padding: 24, color: 'white', position: 'relative', overflow: 'hidden' }}>

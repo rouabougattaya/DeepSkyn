@@ -1,0 +1,40 @@
+{
+  "name": "deepskyn-backend",
+  "version": "1.0.0",
+  "description": "Backend API for DeepSkyn application",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "init-db": "node src/database/init.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "typeorm": "^0.3.28"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["node", "express", "postgresql", "auth", "api"],
+  "author": "DeepSkyn Team",
+  "license": "MIT",
+  "name": "backend-root",
+  "private": true,
+  "scripts": {
+    "start": "npm run start --prefix backend",
+    "start:dev": "npm run start:dev --prefix backend",
+    "start:debug": "npm run start:debug --prefix backend",
+    "start:prod": "npm run start:prod --prefix backend",
+    "build": "npm run build --prefix backend"
+  },
+  "dependencies": {
+    "typeorm": "^0.3.28"
+  }
+}

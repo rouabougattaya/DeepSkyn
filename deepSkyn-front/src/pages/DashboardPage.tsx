@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUser } from '@/lib/authSession';
-import { Brain, Camera, BarChart3, Shield, History, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+import { 
+  Brain, 
+  Camera, 
+  BarChart3, 
+  Shield, 
+  History, 
+  Sparkles, 
+  RefreshCw, 
+  LogOut,
+  Smartphone  // ← AJOUTE CET IMPORT
+} from 'lucide-react';
 import AIStatusBadge from '@/components/AIStatusBadge';
 import { simpleAuthService } from '@/services/authService-simple';
 
@@ -49,6 +59,8 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('token');
+  localStorage.removeItem('auth-session');
       // TODO: Implement logout with authSession
       // await simpleAuthService.logout();
       navigate('/auth/login');
@@ -176,6 +188,8 @@ export default function DashboardPage() {
                 { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
                 { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
                 { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
+                // 👇 AJOUT DU BOUTON SESSIONS
+                { to: '/sessions', icon: Smartphone, label: 'Mes Sessions', desc: 'Gérez vos appareils connectés', color: 'text-teal-600', bg: 'bg-teal-50' },
               ].map((action) => (
                 <Link
                   key={action.to}
@@ -190,6 +204,9 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
+            <p className="text-xs text-slate-400 mt-4 ml-2">
+              ℹ️ 5 actions disponibles • Gérez vos sessions et appareils connectés
+            </p>
           </div>
 
         </div>

@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { EmailSecurityModule } from './email-security/email-security.module';
 import { UsersModule } from './user/users.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { SessionModule } from './sessions/session.module'; // ← AJOUTE CET IMPORT
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ModerationModule } from './moderation/moderation.module';
     AuthModule,
     UsersModule,
     ModerationModule,
+    SessionModule, // ← AJOUTE CETTE LIGNE (ne touche pas aux autres)
   ],
   controllers: [AppController],
   providers: [
@@ -45,4 +47,4 @@ import { ModerationModule } from './moderation/moderation.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule { }
+export class AppModule {}

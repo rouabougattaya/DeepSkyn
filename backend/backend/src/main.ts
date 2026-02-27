@@ -10,9 +10,18 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS - allow frontend to connect
+  // ✅ CORS - Multiple origins autorisés
+  const corsOrigins = [
+    process.env.CORS_ORIGIN,
+    process.env.FRONTEND_URL,
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175', // ← TON PORT ACTUEL
+    'http://localhost:3000',
+  ].filter(Boolean); // Enlève les valeurs null/undefined
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: corsOrigins,
     credentials: true,
     exposedHeaders: ['X-CSRF-Token'],
   });
@@ -96,9 +105,7 @@ async function bootstrap() {
   console.log(`✅ Server running on http://localhost:${port}`);
   console.log(`📚 Swagger docs at http://localhost:${port}/docs`);
   console.log(`🔐 CSRF Protection: Enabled (on protected routes)`);
-  console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`🌐 CORS Origins:`, corsOrigins);
 }
 
-// Fixed variable name error in final code: bootstrap()
-// Wait, I used appModule instead of AppModule in line 11. Fixing.
 bootstrap();

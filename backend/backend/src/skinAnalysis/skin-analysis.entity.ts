@@ -5,7 +5,7 @@ export class SkinAnalysis {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ nullable: false })
   userId: string;
 
   @Column({ type: 'enum', enum: ['PENDING', 'COMPLETED'], default: 'PENDING' })
@@ -19,6 +19,18 @@ export class SkinAnalysis {
 
   @Column({ type: 'int', nullable: true })
   realAge: number;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  hydration: number;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  oil: number;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  acne: number;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  wrinkles: number;
 
   @Column({ type: 'text', nullable: true })
   summary: string;

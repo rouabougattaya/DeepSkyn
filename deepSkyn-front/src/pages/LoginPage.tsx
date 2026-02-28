@@ -71,19 +71,19 @@ export default function LoginPage() {
       if (!res.ok) {
         const errorMessage = Array.isArray(data.message) ? data.message.join(", ") : (data.message || "Email ou mot de passe incorrect.")
         setError(errorMessage)
-
+        
         if (recaptchaRef.current) {
           recaptchaRef.current.reset()
         }
         setCaptchaToken(null)
-
+        
         await historyService.recordLoginAttempt({
           loginMethod: 'email',
           status: 'failed',
           failureReason: errorMessage,
           used2FA: false,
         })
-
+        
         return
       }
 
@@ -99,12 +99,12 @@ export default function LoginPage() {
       }
 
       console.log('Login session set:', data)
-
+      
       if (!data.refreshToken) {
         console.warn('Refresh token missing from login response')
         setError('Login successful but session may not persist properly')
       }
-
+      
       setSession({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken || '',
@@ -126,12 +126,12 @@ export default function LoginPage() {
       navigate("/", { replace: true })
     } catch {
       setError("Impossible de joindre le serveur. Vérifiez que le backend est démarré.")
-
+      
       if (recaptchaRef.current) {
         recaptchaRef.current.reset()
       }
       setCaptchaToken(null)
-
+      
       await historyService.recordLoginAttempt({
         loginMethod: 'email',
         status: 'failed',
@@ -280,9 +280,9 @@ export default function LoginPage() {
         <div className="space-y-4">
           {/* Google + Apple */}
           <div className="grid grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              className="h-12 border-slate-200 font-medium bg-white"
+            <Button 
+              variant="outline" 
+              className="h-12 border-slate-200 font-medium bg-white" 
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
             >

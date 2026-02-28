@@ -1,8 +1,8 @@
 /**
- * Centralized API client with automatic JWT injection and CSRF token handling.
- * Uses the accessToken from localStorage (set after login).
+ * Client API centralisé : injection automatique du JWT et token CSRF.
+ * Le token (accessToken ou token) est lu depuis localStorage et ajouté à chaque requête
+ * dans buildHeaders() — toutes les requêtes passant par apiGet/apiPost sont authentifiées.
  */
-
 import { getAccessToken } from '../lib/authSession';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
@@ -22,13 +22,17 @@ async function fetchCsrfToken(): Promise<string | null> {
     }
 }
 
+/**
+ * Construit les en-têtes de chaque requête.
+ * Injecte automatiquement le JWT (accessToken ou token) pour l'authentification.
+ */
 function buildHeaders(extra: Record<string, string> = {}): Record<string, string> {
     const token = getAccessToken();
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...extra,
     };
-    if (token && token !== 'undefined' && !token.startsWith('google_')) {
+    if (token && String(token).trim() !== '' && token !== 'undefined' && !token.startsWith('google_')) {
         headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
@@ -37,6 +41,11 @@ function buildHeaders(extra: Record<string, string> = {}): Record<string, string
 export async function apiGet<T>(path: string): Promise<T> {
     const csrf = await fetchCsrfToken();
     const headers = buildHeaders(csrf ? { 'X-CSRF-Token': csrf } : {});
+
+    if (import.meta.env.DEV && path.includes('/analysis/user')) {
+        const hasAuth = Boolean(headers['Authorization']);
+        console.debug('[apiClient] GET /analysis/user — Authorization header:', hasAuth ? 'present' : 'missing');
+    }
 
     const res = await fetch(`${BASE_URL}${path}`, {
         method: 'GET',

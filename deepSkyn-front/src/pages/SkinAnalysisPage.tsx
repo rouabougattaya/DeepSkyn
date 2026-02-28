@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    Camera, Sparkles, ArrowLeft, Zap, AlertCircle,
+    Camera, Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
     CheckCircle, RefreshCw, ChevronRight, Activity,
     TrendingUp, TrendingDown, Minus, BarChart2, Info
 } from 'lucide-react';
@@ -253,11 +253,12 @@ export default function SkinAnalysisPage() {
         <div className="skin-analysis-root">
             <style>{`
         .skin-analysis-root {
-          min-height: 100vh;
-          background: #f8fafc;
-          color: #1e293b;
-          font-family: 'Inter', system-ui, sans-serif;
-          padding: 24px 16px 60px;
+               min-height: 100vh;
+        background: #f8fafc;
+        color: #1e293b;
+        font-family: 'Inter', system-ui, sans-serif;
+        padding: 80px 16px 60px;  /* ← 80px en haut au lieu de 24px */
+        margin-top: 0;
         }
         .glass-card {
           background: #ffffff;
@@ -372,25 +373,95 @@ export default function SkinAnalysisPage() {
             <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
                 {/* ── Header ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-                    <Link to="/dashboard" style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        color: '#64748b', textDecoration: 'none',
-                        fontSize: 14, fontWeight: 500,
-                        transition: 'color 0.2s'
-                    }}>
-                        <ArrowLeft size={16} /> Retour
-                    </Link>
+              {/* ── Header ── */}
+<div style={{ 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    gap: 16, 
+    marginBottom: 40 
+}}>
+    {/* Boutons côte à côte */}
+    <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        gap: 20, 
+        width: '100%',
+        flexWrap: 'wrap'
+    }}>
+        <Link 
+            to="/dashboard" 
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#f1f5f9',
+                color: '#334155',
+                padding: '10px 24px',
+                borderRadius: '30px',
+                fontSize: '15px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#e2e8f0';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f1f5f9';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            }}
+        >
+            <ArrowLeft size={18} /> Retour au dashboard
+        </Link>
 
-                    {result && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div className="pulse-dot" />
-                            <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>
-                                Analyses: {analysisCount}
-                            </span>
-                        </div>
-                    )}
-                </div>
+        <Link 
+            to="/analysis/compare" 
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#0d9488',
+                color: 'white',
+                padding: '10px 24px',
+                borderRadius: '30px',
+                fontSize: '15px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                boxShadow: '0 4px 12px rgba(13,148,136,0.4)',
+                border: '1px solid #0a7a70',
+                transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0a7a70';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(13,148,136,0.5)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0d9488';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,148,136,0.4)';
+            }}
+        >
+            <GitCompare size={18} /> Comparer deux analyses
+        </Link>
+    </div>
+
+    {/* Indicateur d'analyses (si résultat disponible) */}
+    {result && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <div className="pulse-dot" />
+            <span style={{ fontSize: 13, color: '#10b981', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '4px 12px', borderRadius: '30px' }}>
+                Analyses effectuées : {analysisCount}
+            </span>
+        </div>
+    )}
+</div>
 
                 {/* ── Page Title ── */}
                 <div style={{ marginBottom: 36, textAlign: 'center' }}>

@@ -18,6 +18,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import ProfilePage from "./pages/ProfilePage"
 import ActivityHistoryPage from './pages/ActivityHistoryPage'
 import AnalysisPage from './pages/AnalysisPage'
+import ComparisonPage from './pages/ComparisonPage'
 import AiDemoPage from './pages/AiDemoPage'
 import { SessionsPage } from './pages/SessionsPage' // ← AJOUT : Import de ta page
 import './App.css'
@@ -69,6 +70,7 @@ function App() {
           <Route path="/sessions" element={<SessionsPage />} />
 
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/analysis/compare" element={<ComparisonPage />} />
           <Route path="/ai-demo" element={<AiDemoPage />} />
           <Route path="/pricing" element={<HomePage />} />
         </Route>

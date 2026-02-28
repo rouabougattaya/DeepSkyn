@@ -1,15 +1,15 @@
-import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
-import { Public } from '../auth/decorators/public.decorator';
+import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiAnalysisService } from './ai-analysis.service';
 import { ConditionWeights } from './detection.interface';
 
-@Public()
 @Controller('ai')
 export class AiController {
   constructor(private readonly aiAnalysisService: AiAnalysisService) { }
 
   @Post('analyze')
+  @UseGuards(JwtAccessGuard)
   async analyzeImage(
     @Body() body: {
       imageId?: string;
@@ -19,11 +19,16 @@ export class AiController {
     @CurrentUser() user?: any
   ) {
     try {
+      const userId = user?.id || user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID is required for skin analysis', HttpStatus.UNAUTHORIZED);
+      }
+
       const result = await this.aiAnalysisService.analyzeImage(
         body.imageId,
         body.weights,
         body.testType,
-        user?.userId || user?.id
+        userId
       );
 
       return {
@@ -39,19 +44,25 @@ export class AiController {
   }
 
   @Get('analyze/random')
+  @UseGuards(JwtAccessGuard)
   async analyzeRandom(
     @Query('seed') seed?: string,
     @Query('weights') weights?: string,
     @CurrentUser() user?: any
   ) {
     try {
+      const userId = user?.id || user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID is required for skin analysis', HttpStatus.UNAUTHORIZED);
+      }
+
       const parsedWeights = weights ? JSON.parse(weights) : undefined;
       const seedNum = seed ? parseInt(seed, 10) : undefined;
 
       const result = await this.aiAnalysisService.analyzeWithRandomDetections(
         seedNum,
         parsedWeights,
-        user?.userId || user?.id
+        userId
       );
 
       return {
@@ -68,19 +79,25 @@ export class AiController {
   }
 
   @Get('analyze/test/:testType')
+  @UseGuards(JwtAccessGuard)
   async analyzeTestCase(
     @Param('testType') testType: 'severe' | 'mild' | 'mixed',
     @Query('weights') weights?: string,
     @CurrentUser() user?: any
   ) {
     try {
+      const userId = user?.id || user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID is required for skin analysis', HttpStatus.UNAUTHORIZED);
+      }
+
       const parsedWeights = weights ? JSON.parse(weights) : undefined;
 
       const result = await this.aiAnalysisService.analyzeImage(
         undefined,
         parsedWeights,
         testType,
-        user?.userId || user?.id
+        userId
       );
 
       return {

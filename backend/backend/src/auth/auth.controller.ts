@@ -34,7 +34,7 @@ import { Public } from './decorators/public.decorator';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { User } from '../user/user.entity';
-import { SessionService } from '../sessions/session.service.simple';
+import { SessionService } from '../sessions/session.service';
 import { RecaptchaService } from './services/recaptcha.service'; // ← IMPORT AJOUTÉ
 
 function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {

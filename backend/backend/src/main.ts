@@ -16,9 +16,9 @@ async function bootstrap() {
     process.env.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:5174',
-    'http://localhost:5175', // ← TON PORT ACTUEL
+    'http://localhost:5175',
     'http://localhost:3000',
-  ].filter(Boolean); // Enlève les valeurs null/undefined
+  ].filter(Boolean);
 
   app.enableCors({
     origin: corsOrigins,
@@ -41,7 +41,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  // CSRF Protection configuration
+  // ✅ Routes publiques (sans protection CSRF)
   const publicRoutes = [
     '/api/auth/login',
     '/api/auth/register',
@@ -57,7 +57,6 @@ async function bootstrap() {
     '/api/auth/login-fingerprint/verify',
     '/api/auth/check-user',
     '/api/auth/reset-password',
-    '/api/auth/check-user',
     '/api/auth/csrf-token',
     '/api/dashboard/metrics',
     '/api/dashboard/trends',
@@ -66,8 +65,13 @@ async function bootstrap() {
     '/api/dashboard/seed',
     '/api/ai/analyze',
     '/api/ai/analyze/random',
+    '/api/ai/analyze/test/severe',
+    '/api/ai/analyze/test/mild',
+    '/api/ai/analyze/test/mixed',
     '/api/ai/weights/default',
+    '/api/ai/weights/validate',
     '/api/ai/test-cases',
+    '/api/ai/debug',
   ];
 
   const csrfProtection = csrf({
@@ -78,26 +82,26 @@ async function bootstrap() {
     },
   });
 
-  // CSRF Middleware
-  app.use((req: any, res: any, next: any) => {
-    if (req.path === '/api/auth/csrf-token') {
-      return csrfProtection(req, res, () => {
-        const token = req.csrfToken();
-        res.setHeader('X-CSRF-Token', token);
-        return res.status(200).json({ csrfToken: token });
-      });
-    }
+  // ✅ CSRF Middleware corrigé (utilise req.originalUrl)
+ // CSRF Middleware corrigé (utilise req.baseUrl + req.path)
+app.use((req: any, res: any, next: any) => {
+  const fullPath = req.baseUrl + req.path; // ← maintenant /api/ai/analyze
+  console.log(`🔍 fullPath = ${fullPath}, method = ${req.method}, isPublic = ${publicRoutes.includes(fullPath)}`);
 
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !publicRoutes.includes(req.path)) {
-      return csrfProtection(req, res, next);
-    }
+  if (fullPath === '/api/auth/csrf-token') {
+    return csrfProtection(req, res, () => {
+      const token = req.csrfToken();
+      res.setHeader('X-CSRF-Token', token);
+      return res.status(200).json({ csrfToken: token });
+    });
+  }
 
-    if (req.method === 'GET' && !publicRoutes.includes(req.path)) {
-      return csrfProtection(req, res, next);
-    }
+  if (!publicRoutes.includes(fullPath) && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return csrfProtection(req, res, next);
+  }
 
-    return next();
-  });
+  return next();
+});
 
   // Global pipes and filters
   app.useGlobalPipes(

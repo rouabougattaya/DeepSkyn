@@ -1,287 +1,66 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { getUser } from '@/lib/authSession';
-import {
-  TrendingUp, TrendingDown, Minus, BarChart2, Activity,
-  Star, AlertTriangle, CheckCircle, Zap, ArrowRight, LayoutDashboard,
-  Settings, Bell, Search, User as UserIcon
-} from 'lucide-react';
-import {
-  Brain,
-  Camera,
-  BarChart3,
-  Shield,
-  History,
-  Sparkles,
-  RefreshCw,
+import { 
+  Brain, 
+  Camera, 
+  BarChart3, 
+  Shield, 
+  History, 
+  Sparkles, 
+  RefreshCw, 
   LogOut,
-  Smartphone
+  Smartphone  // ← AJOUTE CET IMPORT
 } from 'lucide-react';
 import AIStatusBadge from '@/components/AIStatusBadge';
 import { simpleAuthService } from '@/services/authService-simple';
-import { dashboardService } from '@/services/dashboardService';
-import type { DashboardMetrics, TrendData, MonthlyData } from '@/types/dashboard';
 
-/* ─── Chart.js — Dev 1 (Roua) ─── */
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-/* ─────────────────────── DESIGN SYSTEM ────────────────── */
-const THEME = {
-  primary: '#0d9488',
-  primaryHover: '#0f766e',
-  surface: '#ffffff',
-  background: '#f8fafc',
-  textPrimary: '#0f172a',
-  textSecondary: '#64748b',
-  border: '#e2e8f0',
-  greenSoft: '#f0fdfa',
-};
-
-/* ─────────────────────── REUSABLE COMPONENTS ────────────────── */
-
-function SparkLine({ data, color = '#0d9488' }: { data: number[]; color?: string }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const w = 80, h = 32;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
-  }).join(' ');
-  const fillPoints = `0,${h} ${points} ${w},${h}`;
-
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={fillPoints} fill={`url(#grad-${color.replace('#', '')})`} />
-      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {data.length > 0 && (
-        <circle
-          cx={w}
-          cy={h - ((data[data.length - 1] - min) / range) * h}
-          r="3" fill={color}
-          style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-        />
-      )}
-    </svg>
-  );
-}
-
-function KPIMetricCard({
-  title, value, unit = '', trend, icon, color, sparkData, subtitle
-}: {
-  title: string;
-  value: number | string;
-  unit?: string;
-  trend?: { direction: 'up' | 'down' | 'stable'; percentage: number };
-  icon: React.ReactNode;
-  color: string;
-  sparkData?: number[];
-  subtitle?: string;
-}) {
-  const trendColor = trend?.direction === 'up' ? '#10b981' : trend?.direction === 'down' ? '#ef4444' : '#64748b';
-  const TrendIcon = trend?.direction === 'up' ? TrendingUp : trend?.direction === 'down' ? TrendingDown : Minus;
-
-  return (
-    <div style={{
-      background: '#ffffff',
-      border: `1px solid ${THEME.border}`,
-      borderRadius: 20,
-      padding: '24px',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: 'default',
-      position: 'relative',
-      overflow: 'hidden',
-    }} className="kpi-card">
-      <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, background: color, borderRadius: '50%', opacity: 0.05, filter: 'blur(24px)' }} />
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 14, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
-          {icon}
-        </div>
-        {trend && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: `${trendColor}10`, padding: '4px 8px', borderRadius: 20 }}>
-            <TrendIcon size={12} style={{ color: trendColor }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: trendColor }}>
-              {trend.direction === 'up' ? '+' : ''}{trend.percentage.toFixed(1)}%
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div style={{ fontSize: 32, fontWeight: 800, color: THEME.textPrimary, lineHeight: 1, marginBottom: 4 }}>
-        {typeof value === 'number' ? value.toFixed(1) : value}
-        <span style={{ fontSize: 16, color: THEME.textSecondary, marginLeft: 4, fontWeight: 500 }}>{unit}</span>
-      </div>
-
-      <div style={{ fontSize: 13, color: THEME.textSecondary, fontWeight: 500 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>}
-
-      {sparkData && sparkData.length > 1 && (
-        <div style={{ marginTop: 16, borderTop: `1px solid ${THEME.border}`, paddingTop: 16 }}>
-          <SparkLine data={sparkData} color={color} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TrendPill({ trend }: { trend: TrendData }) {
-  const isUp = trend.direction === 'up';
-  const isDown = trend.direction === 'down';
-  const color = isUp ? '#10b981' : isDown ? '#ef4444' : '#64748b';
-  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-
-  return (
-    <div style={{ background: '#ffffff', border: `1px solid ${THEME.border}`, borderRadius: 16, padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{trend.period}</span>
-        <Icon size={14} style={{ color }} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: 22, fontWeight: 800, color }}>{trend.current.toFixed(1)}</span>
-        <span style={{ fontSize: 12, color: '#94a3b8' }}>vs {trend.previous.toFixed(1)}</span>
-      </div>
-    </div>
-  );
-}
-
-function MiniBarChart({ data }: { data: MonthlyData[] }) {
-  const filtered = data.filter(d => d.analysisCount > 0).slice(-8);
-  if (filtered.length === 0) return <div style={{ textAlign: 'center', padding: 32, color: THEME.textSecondary, fontSize: 13 }}>Pas assez de données</div>;
-  const maxScore = Math.max(...filtered.map(d => d.averageScore), 1);
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 120 }}>
-      {filtered.map((d, i) => {
-        const heightPct = (d.averageScore / maxScore) * 100;
-        const color = d.averageScore >= 75 ? '#10b981' : d.averageScore >= 50 ? '#f59e0b' : '#ef4444';
-        return (
-          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 10, color: THEME.textSecondary, fontWeight: 600 }}>{Math.round(d.averageScore)}</div>
-            <div style={{
-              width: '100%', height: `${heightPct}%`,
-              background: `linear-gradient(180deg, ${color}, ${color}40)`,
-              borderRadius: '6px 6px 0 0', minHeight: 4,
-              transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)',
-              transitionDelay: `${i * 0.1}s`
-            }} />
-            <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>{new Date(d.month + '-01').toLocaleDateString('fr-FR', { month: 'short' })}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ──────────────────────── SUB-COMPONENTS ──────────────────── */
-
-function SidebarItem({ icon: Icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className="sidebar-item" style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12,
-      cursor: 'pointer', marginBottom: 4, transition: 'all 0.2s',
-      background: active ? THEME.greenSoft : 'transparent',
-      color: active ? THEME.primary : THEME.textSecondary,
-      fontWeight: active ? 700 : 500,
-      fontSize: 14,
-    }}>
-      <Icon size={20} />
-      <span>{label}</span>
-      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: THEME.primary }} />}
-    </div>
-  );
-}
-
-/* ──────────────────────── MAIN COMPONENT ──────────────────── */
-
-export default function ProfessionalDashboard() {
+export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [trends, setTrends] = useState<TrendData[]>([]);
-  const [monthly, setMonthly] = useState<MonthlyData[]>([]);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [metricsError, setMetricsError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUserData = async () => {
-      const currentUser = getUser();
-      if (!currentUser) { navigate('/auth/login'); return; }
-      setUser(currentUser);
-      setAiStatus({ verified: currentUser.aiVerified || false, score: currentUser.aiScore || 0 });
-      setLoading(false);
+      try {
+        const currentUser = getUser();
+        if (!currentUser) {
+          navigate('/auth/login');
+          return;
+        }
+        setUser(currentUser);
+        setAiStatus({
+          verified: currentUser.aiVerified || false,
+          score: currentUser.aiScore || 0
+        });
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        if (!user) navigate('/auth/login');
+      }
     };
     loadUserData();
   }, [navigate]);
 
-  const loadSkinMetrics = async () => {
-    setMetricsLoading(true);
-    setMetricsError(null);
-    try {
-      const [m, t, mon] = await Promise.all([
-        dashboardService.getMetrics(),
-        dashboardService.getTrends(),
-        dashboardService.getMonthlyData(6),
-      ]);
-      setMetrics(m);
-      setTrends(t);
-      setMonthly(mon);
-    } catch {
-      setMetricsError('Données indisponibles (Backend déconnecté)');
-    } finally {
-      setMetricsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!loading) loadSkinMetrics();
-  }, [loading]);
-
   const handleRefreshAI = async () => {
-    setLoading(true);
     try {
-      const res = await simpleAuthService.refreshAIVerification();
-      setAiStatus({ verified: res.verified, score: res.score });
-      setUser(getUser());
+      setLoading(true);
+      const result = await simpleAuthService.refreshAIVerification();
+      setAiStatus({ verified: result.verified, score: result.score });
+      const updatedUser = getUser();
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Error refreshing AI verification:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: THEME.background }}>
-      <RefreshCw size={40} className="animate-spin" style={{ color: THEME.primary }} />
-    </div>
-  );
   const handleLogout = async () => {
     try {
       localStorage.removeItem('token');
-      localStorage.removeItem('auth-session');
+  localStorage.removeItem('auth-session');
       // TODO: Implement logout with authSession
       // await simpleAuthService.logout();
       navigate('/auth/login');
@@ -302,555 +81,141 @@ export default function ProfessionalDashboard() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <style>{`
-        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
-        .sidebar-item:hover { background: ${THEME.greenSoft}; color: ${THEME.primary}; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-      `}</style>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
 
-      {/* ── SIDEBAR ── */}
-      <aside style={{ width: '240px', background: THEME.surface, borderRight: `1px solid ${THEME.border}`, position: 'fixed', top: '64px', height: 'calc(100vh - 64px)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '24px 16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '24px' }}>Menu Principal</div>
-          <SidebarItem icon={LayoutDashboard} label="Vue d'ensemble" active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
-          <SidebarItem icon={Camera} label="Analyse IA" onClick={() => navigate('/ai-demo')} />
-          <SidebarItem icon={History} label="Archives médicales" onClick={() => navigate('/analysis')} />
-          <SidebarItem icon={Shield} label="Sécurité & IPs" onClick={() => navigate('/security')} />
+      {/* --- NAVIGATION --- */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-[#0d9488] flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-slate-900">DeepSkyn</span>
+            </Link>
 
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '32px 0 24px' }}>Système</div>
-          <SidebarItem icon={UserIcon} label="Mon Profil" onClick={() => navigate('/profile')} />
-          <SidebarItem icon={Shield} label="Sécurité" onClick={() => navigate('/security-history')} />
-          <SidebarItem icon={Settings} label="Paramètres" onClick={() => navigate('/settings')} />
-        </div>
-
-        <div style={{ marginTop: 'auto', padding: '24px', borderTop: `1px solid ${THEME.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: THEME.greenSoft, display: 'grid', placeItems: 'center', fontWeight: 700, color: THEME.primary, border: `1px solid ${THEME.primary}20` }}>
-              {user?.firstName?.charAt(0) || user?.name?.charAt(0) || 'U'}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.firstName || user?.name || 'Utilisateur'}</div>
-              <div style={{ fontSize: 12, color: THEME.textSecondary }}>Plan Premium</div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRefreshAI}
+                className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-[#0d9488] transition-colors"
+              >
+                <RefreshCw size={16} />
+                Refresh AI
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </div>
-          <button onClick={async () => { await simpleAuthService.logout(); navigate('/auth/login'); }} style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1px solid ${THEME.border}`, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>
-            <LogOut size={16} /> Déconnexion
-          </button>
         </div>
-      </aside>
+      </nav>
 
-      {/* ── MAIN CONTENT ── */}
-      <main style={{ marginLeft: '240px', flex: 1, marginTop: '64px', padding: '40px' }}>
+      {/* --- MAIN CONTENT --- */}
+      <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
 
-        {/* Header Hero */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
-          <div>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: THEME.textPrimary, letterSpacing: '-0.02em', marginBottom: 8 }}>
-              Bonjour, <span style={{ color: THEME.primary }}>{user?.firstName || user?.name?.split(' ')[0]}</span> 👋
-            </h1>
-            <p style={{ color: THEME.textSecondary, fontSize: 16 }}>Voici l'état actuel de votre santé cutanée.</p>
-          </div>
-          <button onClick={handleRefreshAI} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, background: THEME.surface, border: `1px solid ${THEME.border}`, fontWeight: 600, fontSize: 14, color: THEME.textPrimary, cursor: 'pointer', transition: 'all 0.2s' }}>
-            <RefreshCw size={16} /> Actualiser les données IA
-          </button>
+        {/* Header Section */}
+        <div className="mb-10">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+            Welcome back, <span className="text-[#0d9488]">{user?.name?.split(' ')[0] || user?.name}</span>! 👋
+          </h1>
+          <p className="text-slate-500 font-medium">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • AI Health Summary
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            {/* KPI ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
-              <KPIMetricCard
-                title="Score moyen"
-                value={metrics?.averageScore ?? '—'}
-                unit="/100"
-                trend={metrics ? { direction: metrics.trendDirection, percentage: metrics.trendPercentage } : undefined}
-                icon={<BarChart2 size={24} />}
-                color="#0d9488"
-                sparkData={monthly.filter(m => m.analysisCount > 0).map(m => m.averageScore).slice(-5)}
-                subtitle={metrics ? (metrics.averageScore >= 75 ? 'Optimal' : 'À surveiller') : 'Prêt pour analyse'}
-              />
-              <KPIMetricCard
-                title="Analyses totales"
-                value={metrics?.totalAnalyses ?? '0'}
-                icon={<Activity size={24} />}
-                color="#8b5cf6"
-                subtitle="Derniers 30 jours"
-              />
-            </div>
-
-            {/* ════════════════════════════════════════════════════════════
-             *  📊 METRICS AGGREGATION ENGINE — Dev 1 (Roua)
-             *  Professional Statistical Dashboard
-             * ════════════════════════════════════════════════════════════ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-              {/* Section Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, letterSpacing: '-0.02em', margin: 0 }}>
-                     Moteur d'Agrégation Statistique
-                  </h3>
-                  <p style={{ fontSize: 12, color: THEME.textSecondary, marginTop: 4 }}>
-                    Analyse avancée • Moyenne dynamique • Tendances • Dispersion
-                  </p>
+          {/* Left Column: AI Status & User Info */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-bold text-slate-900">Verification Status</h2>
+                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-[#0d9488]" />
                 </div>
-            
               </div>
 
-              {/* ── GRADIENT KPI CARDS ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div className="mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <AIStatusBadge verified={aiStatus?.verified || false} score={aiStatus?.score || 0} compact={false} />
+              </div>
+
+              <div className="space-y-4">
                 {[
-                  { label: 'Score Moyen', value: metrics?.averageScore ?? 0, sub: 'Moyenne dynamique (reduce)', gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', icon: <BarChart2 size={22} /> },
-                  { label: 'Meilleur Score', value: metrics?.bestScore ?? 0, sub: 'Math.max() sur tous les scores', gradient: 'linear-gradient(135deg, #10b981, #059669)', icon: <TrendingUp size={22} /> },
-                  { label: 'Pire Score', value: metrics?.worstScore ?? 0, sub: 'Math.min() sur tous les scores', gradient: 'linear-gradient(135deg, #f43f5e, #e11d48)', icon: <TrendingDown size={22} /> },
-                  { label: 'Total Analyses', value: metrics?.totalAnalyses ?? 0, sub: 'Nombre total en base', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', icon: <Activity size={22} /> },
-                ].map(kpi => (
-                  <div key={kpi.label} style={{
-                    background: kpi.gradient, borderRadius: 20, padding: 22,
-                    position: 'relative', overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                  }} className="kpi-card">
-                    <div style={{ position: 'absolute', top: -15, right: -15, opacity: 0.15 }}>
-                      <div style={{ width: 80, height: 80, borderRadius: '50%', border: '3px solid white' }} />
+                  {
+                    label: 'Auth Method',
+                    value: (user?.authMethod === 'google' || user?.googleId) ? 'Google Account' : 'Email & Password',
+                    icon: Shield
+                  },
+                  {
+                    label: 'Member Since',
+                    value: user?.createdAt
+                      ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                    icon: History
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 transition-colors">
+                      <item.icon size={16} />
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 12 }}>{kpi.icon}</div>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: 'white', lineHeight: 1 }}>
-                      {typeof kpi.value === 'number' && kpi.label !== 'Total Analyses'
-                        ? kpi.value.toFixed(1)
-                        : kpi.value}
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{item.label}</p>
+                      <p className="text-sm font-bold text-slate-700">{item.value}</p>
                     </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', marginTop: 6, fontWeight: 700 }}>{kpi.label}</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 4, fontWeight: 500 }}>{kpi.sub}</div>
                   </div>
                 ))}
               </div>
-
-              {/* ── STATISTICAL DISTRIBUTION PANEL ── */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: `1px solid ${THEME.border}`, borderRadius: 20, padding: 24,
-                display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 20,
-              }}>
-                <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Écart-type (σ)</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{(metrics?.standardDeviation ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Dispersion des scores</div>
-                </div>
-                <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Médiane</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{(metrics?.medianScore ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Valeur centrale</div>
-                </div>
-                <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q1 (25e %ile)</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#ef4444' }}>{(metrics?.percentile25 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>25% en dessous</div>
-                </div>
-                <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q3 (75e %ile)</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>{(metrics?.percentile75 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>75% en dessous</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Moy. Mobile (5)</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#8b5cf6' }}>{(metrics?.movingAverage5 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Dernières 5 analyses</div>
-                </div>
-              </div>
-
-              {/* ── TREND INDICATOR BAR ── */}
-              <div style={{
-                background: '#ffffff', border: `1px solid ${THEME.border}`, borderRadius: 16,
-                padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 12,
-                    background: metrics?.trendDirection === 'up' ? '#f0fdf4' : metrics?.trendDirection === 'down' ? '#fef2f2' : '#f8fafc',
-                    display: 'grid', placeItems: 'center',
-                  }}>
-                    {metrics?.trendDirection === 'up' && <TrendingUp size={20} style={{ color: '#16a34a' }} />}
-                    {metrics?.trendDirection === 'down' && <TrendingDown size={20} style={{ color: '#dc2626' }} />}
-                    {(!metrics || metrics?.trendDirection === 'stable') && <Minus size={20} style={{ color: '#64748b' }} />}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary }}>Tendance Globale</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                      {metrics?.trendPercentage?.toFixed(1) ?? '0.0'}% {metrics?.trendDirection === 'up' ? 'd\'amélioration' : metrics?.trendDirection === 'down' ? 'de baisse' : '— zone stable'}
-                    </div>
-                  </div>
-                </div>
-                <div style={{
-                  padding: '8px 20px', borderRadius: 24,
-                  background: metrics?.trendDirection === 'up' ? 'linear-gradient(135deg, #10b981, #059669)' : metrics?.trendDirection === 'down' ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'linear-gradient(135deg, #94a3b8, #64748b)',
-                  color: 'white', fontSize: 13, fontWeight: 800, letterSpacing: '0.02em',
-                  boxShadow: metrics?.trendDirection === 'up' ? '0 4px 12px rgba(16,185,129,0.3)' : metrics?.trendDirection === 'down' ? '0 4px 12px rgba(244,63,94,0.3)' : '0 4px 12px rgba(148,163,184,0.3)',
-                }}>
-                  {metrics?.trendDirection === 'up' ? '↑ EN HAUSSE' :
-                   metrics?.trendDirection === 'down' ? '↓ EN BAISSE' : '― STABLE'}
-                </div>
-              </div>
-
-              {/* ── TREND COMPARISON WIDGETS ── */}
-              {trends.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(trends.length, 4)}, 1fr)`, gap: 14 }}>
-                  {trends.map(t => {
-                    const isUp = t.direction === 'up';
-                    const isDown = t.direction === 'down';
-                    const tColor = isUp ? '#10b981' : isDown ? '#ef4444' : '#64748b';
-                    const TIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-                    const bgGrad = isUp ? 'linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%)' : isDown ? 'linear-gradient(180deg, #fef2f2 0%, #ffffff 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)';
-                    return (
-                      <div key={t.period} style={{
-                        background: bgGrad, border: `1px solid ${THEME.border}`, borderRadius: 18,
-                        padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: tColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.label}</span>
-                          <TIcon size={16} style={{ color: tColor }} />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                          <span style={{ fontSize: 28, fontWeight: 900, color: tColor, lineHeight: 1 }}>{t.current.toFixed(1)}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>vs {t.previous.toFixed(1)}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                          <div style={{
-                            fontSize: 11, fontWeight: 800, color: tColor,
-                            padding: '3px 10px', borderRadius: 6,
-                            background: isUp ? '#dcfce7' : isDown ? '#fee2e2' : '#f1f5f9',
-                          }}>
-                            {isUp ? '+' : isDown ? '-' : ''}{t.percentage.toFixed(1)}%
-                          </div>
-                          <span style={{ fontSize: 9, color: '#94a3b8' }}>{t.sampleSize} analyse{t.sampleSize !== 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ── MONTHLY LINE CHART (Chart.js) — Always Visible ── */}
-              <div style={{
-                background: '#ffffff', border: `1px solid ${THEME.border}`, borderRadius: 24,
-                padding: 28, boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-                position: 'relative', overflow: 'hidden',
-              }}>
-                {/* Decorative gradient bar at top */}
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 4,
-                  background: 'linear-gradient(90deg, #0d9488, #10b981, #8b5cf6, #f43f5e)',
-                }} />
-
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 14,
-                      background: 'linear-gradient(135deg, #0d9488, #10b981)',
-                      display: 'grid', placeItems: 'center',
-                      boxShadow: '0 4px 12px rgba(13,148,136,0.3)',
-                    }}>
-                      <BarChart3 size={22} style={{ color: 'white' }} />
-                    </div>
-                      <h4 style={{ fontSize: 15, fontWeight: 800, color: THEME.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>
-                        Évolution Mensuelle des Scores
-                      </h4>
-                      <p style={{ fontSize: 11, color: THEME.textSecondary, marginTop: 2 }}>
-                        Analyse historique de la santé de votre peau • Progression sur les 6 derniers mois
-                      </p>
-                    </div>
-                  <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#64748b', fontWeight: 600 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#0d9488' }} /> Score moyen
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#8b5cf6', backgroundImage: 'repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 6px, transparent 6px, transparent 10px)' }} /> Meilleur
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#f43f5e', backgroundImage: 'repeating-linear-gradient(90deg, #f43f5e 0, #f43f5e 3px, transparent 3px, transparent 6px)' }} /> Pire
-                    </span>
-                  </div>
-                </div>
-
-                {/* Chart or Empty State */}
-                {monthly.filter(m => m.analysisCount > 0).length > 0 ? (
-                  <div>
-                    <Line
-                      data={{
-                        labels: monthly.filter(m => m.analysisCount > 0).map(m => {
-                          const [y, mo] = m.month.split('-');
-                          return new Date(+y, +mo - 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-                        }),
-                        datasets: [
-                          {
-                            label: 'Score moyen',
-                            data: monthly.filter(m => m.analysisCount > 0).map(m => m.averageScore),
-                            borderColor: '#0d9488',
-                            backgroundColor: 'rgba(13,148,136,0.08)',
-                            fill: true,
-                            tension: 0.4,
-                            pointBackgroundColor: '#0d9488',
-                            pointBorderColor: '#ffffff',
-                            pointBorderWidth: 2,
-                            pointRadius: 6,
-                            pointHoverRadius: 9,
-                            borderWidth: 3,
-                          },
-                          {
-                            label: 'Meilleur score',
-                            data: monthly.filter(m => m.analysisCount > 0).map(m => m.bestScore),
-                            borderColor: '#8b5cf6',
-                            backgroundColor: 'transparent',
-                            fill: false,
-                            tension: 0.4,
-                            pointBackgroundColor: '#8b5cf6',
-                            pointBorderColor: '#ffffff',
-                            pointBorderWidth: 2,
-                            pointRadius: 4,
-                            pointHoverRadius: 7,
-                            borderWidth: 2,
-                            borderDash: [6, 4],
-                          },
-                          {
-                            label: 'Pire score',
-                            data: monthly.filter(m => m.analysisCount > 0).map(m => m.worstScore),
-                            borderColor: '#f43f5e',
-                            backgroundColor: 'transparent',
-                            fill: false,
-                            tension: 0.4,
-                            pointBackgroundColor: '#f43f5e',
-                            pointBorderColor: '#ffffff',
-                            pointBorderWidth: 2,
-                            pointRadius: 3,
-                            pointHoverRadius: 6,
-                            borderWidth: 1.5,
-                            borderDash: [3, 3],
-                          },
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2.2,
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            backgroundColor: '#0f172a',
-                            titleFont: { weight: 'bold', size: 13 },
-                            bodyFont: { size: 12 },
-                            padding: 16,
-                            cornerRadius: 12,
-                            displayColors: true,
-                            usePointStyle: true,
-                            callbacks: {
-                              title: (items) => `📅 ${items[0]?.label || ''}`,
-                              label: (ctx) => ` ${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toFixed(1)}/100`,
-                              afterBody: () => {
-                                const filtered = monthly.filter(m => m.analysisCount > 0);
-                                if (filtered.length === 0) return '';
-                                return `\n📊 Total: ${filtered.reduce((s, m) => s + m.analysisCount, 0)} analyses`;
-                              },
-                            },
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            max: 100,
-                            grid: { color: 'rgba(226,232,240,0.6)', lineWidth: 1 },
-                            ticks: {
-                              color: '#94a3b8',
-                              font: { size: 11, weight: 'bold' },
-                              stepSize: 20,
-                              callback: (v) => `${v}`,
-                            },
-                            title: {
-                              display: true,
-                              text: 'Score /100',
-                              color: '#64748b',
-                              font: { size: 11, weight: 'bold' },
-                              padding: { bottom: 8 },
-                            },
-                          },
-                          x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b', font: { size: 11, weight: 'bold' } },
-                            title: {
-                              display: true,
-                              text: 'Période (Mois)',
-                              color: '#64748b',
-                              font: { size: 11, weight: 'bold' },
-                              padding: { top: 8 },
-                            },
-                          },
-                        },
-                      }}
-                    />
-
-                    {/* Monthly Summary Bar */}
-                    <div style={{
-                      display: 'flex', gap: 20, marginTop: 20, padding: '14px 20px',
-                      background: 'linear-gradient(135deg, #f8fafc,  #f1f5f9)', borderRadius: 14,
-                    }}>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>
-                        <strong style={{ color: THEME.textPrimary }}>{monthly.filter(m => m.analysisCount > 0).length}</strong> mois avec données
-                      </div>
-                      <div style={{ width: 1, background: '#e2e8f0' }} />
-                      <div style={{ fontSize: 11, color: '#64748b' }}>
-                        <strong style={{ color: THEME.textPrimary }}>{monthly.reduce((s, m) => s + m.analysisCount, 0)}</strong> analyses totales
-                      </div>
-                      <div style={{ width: 1, background: '#e2e8f0' }} />
-                      <div style={{ fontSize: 11, color: '#64748b' }}>
-                        Variation: <strong style={{ color: monthly[monthly.length - 1]?.changePercent && monthly[monthly.length - 1].changePercent! > 0 ? '#10b981' : '#ef4444' }}>
-                          {monthly[monthly.length - 1]?.changePercent != null ? `${monthly[monthly.length - 1].changePercent! > 0 ? '+' : ''}${monthly[monthly.length - 1].changePercent!.toFixed(1)}%` : '—'}
-                        </strong> (dernier mois)
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* ── Empty State ── */
-                  <div style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '48px 24px',
-                    background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
-                    borderRadius: 16, border: '2px dashed #e2e8f0',
-                  }}>
-                    <div style={{
-                      width: 72, height: 72, borderRadius: 20,
-                      background: 'linear-gradient(135deg, #f0fdfa, #e0f2fe)',
-                      display: 'grid', placeItems: 'center', marginBottom: 20,
-                      boxShadow: '0 4px 12px rgba(13,148,136,0.15)',
-                    }}>
-                      <BarChart3 size={32} style={{ color: '#0d9488' }} />
-                    </div>
-                    <h5 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, margin: 0, marginBottom: 8 }}>
-                      Aucune donnée mensuelle
-                    </h5>
-                    <p style={{ fontSize: 12, color: THEME.textSecondary, textAlign: 'center', maxWidth: 360, lineHeight: 1.6 }}>
-                      Le graphique d'évolution apparaîtra ici après vos premières analyses IA.
-                      Lancez une analyse depuis la page <strong>AI Demo</strong> pour commencer.
-                    </p>
-                    <Link to="/ai-demo" style={{
-                      marginTop: 20, padding: '10px 24px', borderRadius: 12,
-                      background: 'linear-gradient(135deg, #0d9488, #10b981)',
-                      color: 'white', fontWeight: 700, fontSize: 13,
-                      textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8,
-                      boxShadow: '0 4px 12px rgba(13,148,136,0.3)',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                    }}>
-                      <Sparkles size={16} /> Lancer une analyse IA
-                    </Link>
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* SINGLE PROMINENT ACTION */}
-            <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16, letterSpacing: '0.05em' }}>Action Principale</h3>
-              <Link to="/ai-demo" style={{
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                padding: '14px 24px',
-                background: `linear-gradient(135deg, ${THEME.primary}, #0f766e)`,
-                borderRadius: 14,
-                boxShadow: `0 4px 12px ${THEME.primary}40`,
-                transition: 'all 0.3s ease',
-                color: 'white'
-              }} className="kpi-card">
-                <Zap size={18} fill="white" />
-                <span style={{ fontSize: 15, fontWeight: 600 }}>Lancer l'Analyse IA</span>
-                <ArrowRight size={18} />
-              </Link>
+            {/* Email Quick Card */}
+            <div className="bg-[#0d9488] p-6 rounded-3xl shadow-xl shadow-teal-500/20 text-white relative overflow-hidden group">
+              <Sparkles className="absolute -right-4 -top-4 w-24 h-24 opacity-10 group-hover:rotate-12 transition-transform" />
+              <p className="text-teal-100 text-xs font-bold uppercase tracking-widest mb-1">Account Email</p>
+              <p className="text-lg font-bold truncate">{user?.email}</p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {/* STATUS WIDGET */}
-            <div style={{ background: THEME.surface, borderRadius: 24, padding: 24, border: `1px solid ${THEME.border}` }}>
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>Vérification IA</h4>
-              <AIStatusBadge verified={aiStatus?.verified} score={aiStatus?.score} compact={false} />
-
-              <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <StatusRow label="Email" value={user?.email} icon={<Search size={14} />} />
-                <StatusRow label="Sécurité" value="Chiffrement AES-256" icon={<Shield size={14} />} />
-              </div>
+          {/* Right Column: Actions Grid */}
+          <div className="lg:col-span-2">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-2">Quick Actions</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { to: '/analysis', icon: Camera, label: 'Skin Analysis', desc: 'Scan and analyze your skin health with AI.', color: 'text-teal-600', bg: 'bg-teal-50' },
+                { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
+                { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
+                // 👇 AJOUT DU BOUTON SESSIONS
+                { to: '/sessions', icon: Smartphone, label: 'Mes Sessions', desc: 'Gérez vos appareils connectés', color: 'text-teal-600', bg: 'bg-teal-50' },
+              ].map((action) => (
+                <Link
+                  key={action.to}
+                  to={action.to}
+                  className="group bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all"
+                >
+                  <div className={`w-12 h-12 rounded-2xl ${action.bg} ${action.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                    <action.icon size={24} />
+                  </div>
+                  <h4 className="text-lg font-bold text-slate-900 mb-1">{action.label}</h4>
+                  <p className="text-sm text-slate-500 leading-relaxed">{action.desc}</p>
+                </Link>
+              ))}
             </div>
-
-
-
-            {/* AD BANNER */}
-            <div style={{ background: `linear-gradient(135deg, ${THEME.primary}, #0d9488)`, borderRadius: 24, padding: 24, color: 'white', position: 'relative', overflow: 'hidden' }}>
-              <Brain size={120} style={{ position: 'absolute', right: -30, bottom: -30, opacity: 0.1 }} />
-              <h4 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>DeepSkyn Pro</h4>
-              <p style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.5, marginBottom: 20 }}>Accédez à des rapports cliniques détaillés et des conseils personnalisés.</p>
-              <button style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>En savoir plus</button>
-            </div>
-            {/* Right Column: Actions Grid */}
-            <div className="lg:col-span-2">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-2">Quick Actions</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { to: '/analysis', icon: Camera, label: 'Skin Analysis', desc: 'Scan and analyze your skin health with AI.', color: 'text-teal-600', bg: 'bg-teal-50' },
-                  { to: '/routines', icon: BarChart3, label: 'My Routines', desc: 'View your personalized AM/PM skincare plan.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                  { to: '/security-history', icon: History, label: 'Activity History', desc: 'Monitor login history and security events.', color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { to: '/profile', icon: Shield, label: 'Profile Settings', desc: 'Update your personal info and preferences.', color: 'text-sky-600', bg: 'bg-sky-50' },
-                  // 👇 AJOUT DU BOUTON SESSIONS
-                  { to: '/sessions', icon: Smartphone, label: 'Mes Sessions', desc: 'Gérez vos appareils connectés', color: 'text-teal-600', bg: 'bg-teal-50' },
-                ].map((action) => (
-                  <Link
-                    key={action.to}
-                    to={action.to}
-                    className="group bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all"
-                  >
-                    <div className={`w-12 h-12 rounded-2xl ${action.bg} ${action.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                      <action.icon size={24} />
-                    </div>
-                    <h4 className="text-lg font-bold text-slate-900 mb-1">{action.label}</h4>
-                    <p className="text-sm text-slate-500 leading-relaxed">{action.desc}</p>
-                  </Link>
-                ))}
-              </div>
-              <p className="text-xs text-slate-400 mt-4 ml-2">
-                ℹ️ 5 actions disponibles • Gérez vos sessions et appareils connectés
-              </p>
-            </div>
-
+            <p className="text-xs text-slate-400 mt-4 ml-2">
+              ℹ️ 5 actions disponibles • Gérez vos sessions et appareils connectés
+            </p>
           </div>
+
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-16 text-center">
+          <p className="text-slate-400 text-sm">© 2026 DeepSkyn · Precision AI Skincare Infrastructure</p>
         </div>
       </main>
-    </div>
-  );
-}
-
-/* ──────────────────────── SUB-COMPONENTS ──────────────────── */
-
-function QuickAction({ icon, label, to, color }: any) {
-  return (
-    <Link to={to} style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 16, background: '#ffffff', borderRadius: 16, border: `1px solid ${THEME.border}`, transition: 'all 0.2s' }} className="kpi-card">
-      <div style={{ color }}>{icon}</div>
-      <span style={{ fontSize: 12, fontWeight: 600, color: THEME.textPrimary }}>{label}</span>
-    </Link>
-  );
-}
-
-function StatusRow({ label, value, icon }: any) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f1f5f9', display: 'grid', placeItems: 'center', color: THEME.textSecondary }}>{icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-      </div>
     </div>
   );
 }

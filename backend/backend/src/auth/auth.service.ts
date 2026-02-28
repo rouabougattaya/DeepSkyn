@@ -25,7 +25,7 @@ import { tempTwoFAStorage } from '../twofactor/temp-2fa-storage';
 import { JwtTokenService } from './services/jwt-token.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { LoginAttemptService } from './services/login-attempt.service';
-import { SessionService } from '../sessions/session.service.simple';
+import { SessionService } from '../sessions/session.service';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,

@@ -31,8 +31,15 @@ export interface SessionTokens {
   user: SessionUser
 }
 
+/** Clé alternative utilisée par certains flux de login (ex. LoginPage) */
+const KEY_TOKEN_LEGACY = "token"
+
+/**
+ * Récupère le JWT d'accès pour les requêtes API.
+ * Vérifie d'abord "accessToken" (session standard), puis "token" (fallback).
+ */
 export function getAccessToken(): string | null {
-  return localStorage.getItem(KEY_ACCESS)
+  return localStorage.getItem(KEY_ACCESS) ?? localStorage.getItem(KEY_TOKEN_LEGACY)
 }
 
 export function getRefreshToken(): string | null {

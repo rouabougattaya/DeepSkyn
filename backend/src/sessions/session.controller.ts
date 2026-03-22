@@ -3,29 +3,22 @@ import { AuthGuard } from '@nestjs/passport';
 import { SessionService } from './session.service';
 
 @Controller('auth/sessions')
-@UseGuards(AuthGuard('jwt-access')) // ← Utilise la stratégie correcte (jwt-access)
+@UseGuards(AuthGuard('jwt')) // ← Ça devrait maintenant fonctionner
 export class SessionController {
-  constructor(private sessionService: SessionService) { }
+  constructor(private sessionService: SessionService) {}
 
   @Get()
   async getSessions(@Req() req) {
-    console.log('[SessionController] GET /sessions | User:', req.user ? JSON.stringify(req.user) : 'UNDEFINED');
-    const userId = req.user.id || req.user.userId; // ← Support both as a safety measure
-    console.log('[SessionController] Using userId:', userId);
+    const userId = req.user.userId; // ← req.user est maintenant peuplé par JwtStrategy
     const sessions = await this.sessionService.getUserSessions(userId);
-
-    const refreshToken = req.cookies?.refreshToken ||
-      req.headers['x-refresh-token'];
+    
+    const refreshToken = req.cookies?.refreshToken || 
+                        req.headers['x-refresh-token'];
     const currentSession = await this.sessionService.getCurrentSession(refreshToken);
-
+    
     return sessions.map(session => ({
       id: session.id,
-      fingerprint: {
-        browser: session.fingerprint?.browser || 'Unknown',
-        os: session.fingerprint?.os || 'Unknown',
-        ip: session.fingerprint?.ip || '0.0.0.0',
-        isMobile: session.fingerprint?.isMobile || false,
-      },
+      fingerprint: session.fingerprint,
       riskLevel: session.riskLevel,
       riskAnalysis: session.riskAnalysis,
       lastActivity: session.lastActivity,
@@ -36,7 +29,7 @@ export class SessionController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeSession(@Param('id') sessionId: string, @Req() req) {
-    const userId = req.user.id || req.user.userId;
+    const userId = req.user.userId;
     if (!sessionId) {
       throw new BadRequestException('Session ID manquant');
     }
@@ -47,7 +40,7 @@ export class SessionController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeAllOtherSessions(@Req() req) {
-    const userId = req.user.id || req.user.userId;
+    const userId = req.user.userId;
 
     const refreshToken =
       req.cookies?.refreshToken || req.headers['x-refresh-token'];

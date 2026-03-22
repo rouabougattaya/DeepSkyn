@@ -16,6 +16,7 @@ import { AiModule } from './ai/ai.module';
 import { SessionModule } from './sessions/session.module'; // ← AJOUTE CET IMPORT
 import { InsightsModule } from './insights/insights.module';
 import { SkinMetricModule } from './skinMetric/skin-metric.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { SkinMetricModule } from './skinMetric/skin-metric.module';
     SkinMetricModule,
     SessionModule, // ← AJOUTE CETTE LIGNE (ne touche pas aux autres)
     InsightsModule,
+    AdminModule,
   ],
   controllers: [AppController, AnalysisController],
   providers: [

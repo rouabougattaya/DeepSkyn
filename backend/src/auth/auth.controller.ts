@@ -7,7 +7,7 @@ import {
   Get,
   Put,
   Req,
-  Res, Delete,
+  Res,  Delete,
   UseGuards,
   UnauthorizedException,
   InternalServerErrorException,
@@ -34,6 +34,7 @@ import { Public } from './decorators/public.decorator';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { User } from '../user/user.entity';
+import { SessionService } from '../sessions/session.service';
 import { RecaptchaService } from './services/recaptcha.service'; // ← IMPORT AJOUTÉ
 
 function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {
@@ -47,6 +48,7 @@ function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
     private readonly recaptchaService: RecaptchaService, // ← AJOUTÉ
   ) { }
 
@@ -200,7 +202,6 @@ export class AuthController {
 
       return res.json(result);
     } catch (error) {
-      console.error('❌ Google Auth backend error:', error);
       throw new InternalServerErrorException(error.message);
     }
   }
@@ -305,30 +306,6 @@ export class AuthController {
   }
 
   @Public()
-  @Post('register-fingerprint/options')
-  async registerFingerprintOptions(@Body('email') email: string) {
-    return this.authService.generateFingerprintRegistrationOptions(email);
-  }
-
-  @Public()
-  @Post('register-fingerprint/verify')
-  async verifyFingerprint(@Body() body: any) {
-    return this.authService.verifyFingerprintRegistration(body);
-  }
-
-  @Public()
-  @Post('login-fingerprint/options')
-  async generateFingerprintLoginOptions(@Body('email') email: string) {
-    return this.authService.generateFingerprintLoginOptions(email);
-  }
-
-  @Public()
-  @Post('login-fingerprint/verify')
-  async verifyFingerprintLogin(@Body() body: any) {
-    return this.authService.verifyFingerprintLogin(body);
-  }
-
-  @Public()
   @Get('csrf-token')
   @HttpCode(HttpStatus.OK)
   getCsrfToken(@Req() req: Request, @Res() res: Response): void {
@@ -336,7 +313,70 @@ export class AuthController {
     res.json({ csrfToken });
   }
 
+  /* ===== ROUTES DE GESTION DES SESSIONS ===== */
 
+  @UseGuards(JwtAccessGuard)
+  @Get('sessions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all active sessions for current user' })
+  async getSessions(@CurrentUser() user: User, @Req() req: Request) {
+    const userId = user.id;
+    const sessions = await this.sessionService.getUserSessions(userId);
+    
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    return sessions.map(session => ({
+      id: session.id,
+      fingerprint: {
+        browser: session.fingerprint?.browser || 'Inconnu',
+        os: session.fingerprint?.os || 'Inconnu',
+        ip: session.fingerprint?.ip,
+        isMobile: session.fingerprint?.isMobile || false,
+      },
+      riskLevel: session.riskLevel,
+      riskAnalysis: session.riskAnalysis,
+      lastActivity: session.lastActivity,
+      isCurrent: currentSession?.id === session.id,
+    }));
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke a specific session' })
+  async revokeSession(
+    @Param('id') sessionId: string,
+    @CurrentUser() user: User,
+    @Req() req: Request
+  ) {
+    const userId = user.id;
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    if (currentSession?.id === sessionId) {
+      throw new BadRequestException('Impossible de révoquer votre session courante');
+    }
+    
+    await this.sessionService.revokeSession(sessionId, userId);
+  }
+
+  @UseGuards(JwtAccessGuard)
+  @Delete('sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke all other sessions' })
+  async revokeAllSessions(
+    @CurrentUser() user: User,
+    @Req() req: Request
+  ) {
+    const userId = user.id;
+    const refreshToken = req.cookies?.refreshToken;
+    const currentSession = await this.sessionService.getCurrentSession(refreshToken);
+    
+    await this.sessionService.revokeAllUserSessions(userId, currentSession?.id);
+  }
+
+  /* ===== FIN ROUTES SESSIONS ===== */
 
   @Get('health')
   @Public()
@@ -347,5 +387,53 @@ export class AuthController {
       timestamp: new Date().toISOString(),
       service: 'DeepSkyn Auth API'
     };
+  }
+
+  /* ===== ADMIN BIOMETRIC LOGIN (DISCOVERABLE CREDENTIALS) ===== */
+
+  /**
+   * POST /login-fingerprint/options - Generate WebAuthn options for admin login
+   * Takes email, finds admin, and returns allowCredentials filtered to that user
+   */
+  @Public()
+  @Post('login-fingerprint/options')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate WebAuthn options for admin biometric login' })
+  async loginFingerprintOptions(@Body() body: { email: string }): Promise<any> {
+    return this.authService.generateAdminBiometricLoginOptions(body.email);
+  }
+
+  /**
+   * POST /login-fingerprint/verify - Verify admin biometric credential and issue tokens
+   * Takes the credential from navigator.credentials.get() and verifies it
+   * Admin is identified by the credential ID stored during registration
+   */
+  @Public()
+  @Post('login-fingerprint/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify admin biometric credential and issue login tokens' })
+  async loginFingerprintVerify(
+    @Body() body: { credential: any; tempId?: string },
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<any> {
+    const metadata = getSessionMetadata(req);
+    const tempId = body.tempId || '';
+    const result = await this.authService.verifyAdminBiometricLogin(body.credential, tempId);
+
+    if (result.refreshToken && result.refreshTokenExpiresAt) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/auth/refresh',
+        maxAge: new Date(result.refreshTokenExpiresAt).getTime() - Date.now(),
+      });
+
+      const { refreshToken, ...responseData } = result;
+      return res.json(responseData);
+    }
+
+    return res.json(result);
   }
 }

@@ -35,9 +35,13 @@ export class UsersService {
       console.log("Moderation result:", moderation);
 
       if (moderation.flagged) {
-        throw new BadRequestException(
-          `Bio inappropriée détectée (score: ${moderation.score})`
-        );
+        throw new BadRequestException({
+          message: `Bio inappropriée détectée (score: ${moderation.score})`,
+          code: 'BIO_MODERATION_REJECTED',
+          field: 'bio',
+          score: moderation.score,
+          flagged: true,
+        });
       }
     }
 

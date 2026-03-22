@@ -73,14 +73,14 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   faceUpdatedAt: Date | null;
 
-  @Column({ nullable: true })
-  webauthnCredentialID?: string;
+  @Column({ type: 'text', nullable: true })
+  webauthnCredentialID: string | null;
 
   @Column({ type: 'text', nullable: true })
-  webauthnPublicKey?: string;
+  webauthnPublicKey: string | null;
 
-  @Column({ nullable: true })
-  webauthnCounter?: number;
+  @Column({ type: 'integer', nullable: true })
+  webauthnCounter: number | null;
 
   @Column({ type: 'text', nullable: true })
   webauthnChallenge: string | null;

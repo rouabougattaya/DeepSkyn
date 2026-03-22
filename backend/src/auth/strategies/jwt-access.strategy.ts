@@ -17,20 +17,16 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
     if (!secret) {
       throw new Error('JWT_ACCESS_SECRET is not defined');
     }
-
+    
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
     });
-    console.log('[JwtAccessStrategy] Initialized with secret length:', secret.length);
   }
 
   async validate(payload: any) {
-    console.log('[JwtAccessStrategy] Payload received:', JSON.stringify(payload));
-
     if (payload.tokenType !== 'access') {
-      console.warn('[JwtAccessStrategy] Invalid token type:', payload.tokenType);
       throw new UnauthorizedException('Invalid token type');
     }
 
@@ -39,11 +35,8 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
     });
 
     if (!user) {
-      console.warn('[JwtAccessStrategy] User not found for sub:', payload.sub);
       throw new UnauthorizedException('User not found');
     }
-
-    console.log('[JwtAccessStrategy] User validated:', user.email);
 
     return {
       id: user.id,

@@ -28,12 +28,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let message: string;
     let error: string;
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
 
     if (isHttpException) {
       const res = exception.getResponse();
       const msg = typeof res === 'string' ? res : (res as { message?: string | string[] }).message;
       message = Array.isArray(msg) ? msg.join(', ') : (msg ?? exception.message);
       error = exception.name;
+
+      if (typeof res !== 'string') {
+        const responseObject = res as Record<string, unknown>;
+        if (typeof responseObject.code === 'string') {
+          code = responseObject.code;
+        }
+
+        const { statusCode: _statusCode, message: _message, error: _error, code: _code, ...rest } = responseObject;
+        if (Object.keys(rest).length > 0) {
+          details = rest;
+        }
+      }
     } else {
       this.logger.error(exception);
       message =
@@ -47,6 +61,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       error,
       message,
+      ...(code ? { code } : {}),
+      ...(details ? { details } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
     };

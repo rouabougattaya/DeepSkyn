@@ -33,7 +33,6 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import { randomUUID } from 'crypto';
 
 const webauthnChallengeStore = new Map<string, string>();
 const SALT_ROUNDS = 12;
@@ -53,6 +52,7 @@ export interface SessionTokens {
     lastName: string;
     isTwoFAEnabled?: boolean;
     name?: string;
+    role?: 'USER' | 'ADMIN';
   };
 }
 
@@ -225,6 +225,7 @@ export class AuthService {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role || 'USER',
           isTwoFAEnabled: true,
         },
       };
@@ -343,8 +344,6 @@ export class AuthService {
       ]
     });
 
-    console.log(`[GoogleAuth] ${existingUser ? 'Existing' : 'New'} user: ${googleUser.email}`);
-
     let user;
     if (!existingUser) {
       user = this.userRepository.create({
@@ -374,14 +373,8 @@ export class AuthService {
     // Utiliser la méthode issueTokens existante
     const tokens = await this.issueTokens(user, metadata);
 
-    if (!tokens.refreshToken) {
-      console.error(`[GoogleAuth] Failed to issue refresh token for ${user.email}`);
-      throw new Error('Refresh token generation failed');
-    }
-
     // Créer la session
-    console.log(`[GoogleAuth] Creating session for user ${user.id}`);
-    await this.sessionService.createSession(user.id, tokens.refreshToken, req);
+    await this.sessionService.createSession(user.id, tokens.accessToken || '', req);
 
     return tokens;
   }
@@ -411,11 +404,12 @@ export class AuthService {
     }
 
     const dist = euclideanDistance(user.faceDescriptor, dto.liveDescriptor);
-    const THRESHOLD = 0.75;
+    const THRESHOLD = 0.45; // Seuil strict : < 0.45 = même personne, > 0.45 = visage différent
 
     console.log(`[FaceLogin] Distance: ${dist.toFixed(4)} (Threshold: ${THRESHOLD})`);
 
     if (dist > THRESHOLD) {
+      console.warn(`[FaceLogin] Face mismatch for ${emailNorm}. Distance: ${dist.toFixed(4)} > ${THRESHOLD}`);
       throw new UnauthorizedException('Visage non reconnu.');
     }
 
@@ -431,6 +425,7 @@ export class AuthService {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role || 'USER',
           isTwoFAEnabled: true,
         },
       };
@@ -654,42 +649,58 @@ export class AuthService {
     return tokens;
   }
 
-  /* ================= WEB AUTHN / FINGERPRINT ================= */
+  /* ================= ADMIN BIOMETRIC (WebAuthn) ================= */
 
-  async generateFingerprintRegistrationOptions(email: string) {
-    const emailNorm = email.toLowerCase().trim();
-    const existingUser = await this.userRepository.findOne({ where: { email: emailNorm } });
-    if (existingUser) throw new BadRequestException('Cet email est déjà utilisé.');
+  /**
+   * Enregistrer l'empreinte pour un admin déjà connecté
+   * Génère les options WebAuthn avec discoverable credentials (residentKey: required)
+   */
+  async generateAdminBiometricRegistrationOptions(adminUser: User) {
+    if (adminUser.role !== 'ADMIN') {
+      throw new UnauthorizedException('Seuls les administrateurs peuvent enregistrer une empreinte.');
+    }
 
-    const userId = randomUUID();
+    const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
+    const rpOrigin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
+
     const options = await generateRegistrationOptions({
       rpName: 'DeepSkyn',
-      rpID: 'localhost',
-      userID: new TextEncoder().encode(userId),
-      userName: emailNorm,
+      rpID,
+      userID: new TextEncoder().encode(adminUser.id),
+      userName: adminUser.email,
       timeout: 60000,
       attestationType: 'none',
       authenticatorSelection: {
         authenticatorAttachment: 'platform',
         userVerification: 'required',
+        residentKey: 'required',  // Clé résidente obligatoire pour login sans email
       },
     });
 
-    webauthnChallengeStore.set(emailNorm, options.challenge);
+    webauthnChallengeStore.set(adminUser.id, options.challenge);
     return options;
   }
 
-  async verifyFingerprintRegistration(body: any) {
-    const { credential, email, password, firstName, lastName } = body;
-    const emailNorm = email.toLowerCase().trim();
-    const expectedChallenge = webauthnChallengeStore.get(emailNorm);
+  /**
+   * Vérifier et sauvegarder l'empreinte admin
+   */
+  async verifyAdminBiometricRegistration(adminUser: User, credential: any) {
+    if (adminUser.role !== 'ADMIN') {
+      throw new UnauthorizedException('Seuls les administrateurs peuvent enregistrer une empreinte.');
+    }
+
+    const expectedChallenge = webauthnChallengeStore.get(adminUser.id);
     if (!expectedChallenge) throw new UnauthorizedException('Challenge expiré.');
+
+    const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
+    const rpOrigin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
 
     const verification = await verifyRegistrationResponse({
       response: credential,
       expectedChallenge,
-      expectedOrigin: 'http://localhost:5173',
-      expectedRPID: 'localhost',
+      expectedOrigin: rpOrigin,
+      expectedRPID: rpID,
+      requireUserVerification: true,
     });
 
     if (!verification.verified || !verification.registrationInfo) {
@@ -697,71 +708,30 @@ export class AuthService {
     }
 
     const { credential: cred } = verification.registrationInfo;
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const newUser = this.userRepository.create({
-      email: emailNorm,
-      passwordHash,
-      firstName,
-      lastName,
-      name: `${firstName} ${lastName}`,
-      role: 'USER',
-      webauthnCredentialID: cred.id,
-      webauthnPublicKey: Buffer.from(cred.publicKey).toString('base64'),
-      webauthnCounter: cred.counter,
-    });
+    adminUser.webauthnCredentialID = cred.id;
+    adminUser.webauthnPublicKey = Buffer.from(cred.publicKey).toString('base64');
+    adminUser.webauthnCounter = cred.counter;
+    await this.userRepository.save(adminUser);
 
-    await this.userRepository.save(newUser);
-    webauthnChallengeStore.delete(emailNorm);
-    return { success: true };
+    webauthnChallengeStore.delete(adminUser.id);
+    return { success: true, message: 'Empreinte enregistrée avec succès.' };
   }
 
-  async generateFingerprintLoginOptions(email: string) {
-    const emailNorm = email.toLowerCase().trim();
-    const user = await this.userRepository.findOne({ where: { email: emailNorm } });
-    if (!user || !user.webauthnCredentialID) throw new UnauthorizedException('Aucune empreinte enregistrée.');
-
-    const options = await generateAuthenticationOptions({
-      timeout: 120000,
-      rpID: 'localhost',
-      userVerification: 'required',
-      allowCredentials: [{ id: user.webauthnCredentialID, transports: ['internal'] }],
-    });
-
-    user.webauthnChallenge = options.challenge;
-    await this.userRepository.save(user);
-    return options;
-  }
-
-  async verifyFingerprintLogin(body: any, metadata?: SessionMetadata) {
-    const { credential, email } = body;
-    const emailNorm = email.toLowerCase().trim();
-    const user = await this.userRepository.findOne({ where: { email: emailNorm } });
-
-    if (!user || !user.webauthnCredentialID || !user.webauthnPublicKey || !user.webauthnChallenge) {
-      throw new UnauthorizedException('Utilisateur invalide.');
+  /**
+   * Supprimer l'empreinte d'un admin
+   */
+  async removeAdminBiometric(adminUser: User) {
+    if (adminUser.role !== 'ADMIN') {
+      throw new UnauthorizedException('Seuls les administrateurs peuvent supprimer une empreinte.');
     }
 
-    const verification = await verifyAuthenticationResponse({
-      response: credential,
-      expectedChallenge: user.webauthnChallenge,
-      expectedOrigin: 'http://localhost:5173',
-      expectedRPID: 'localhost',
-      credential: {
-        id: user.webauthnCredentialID,
-        publicKey: Buffer.from(user.webauthnPublicKey, 'base64'),
-        counter: user.webauthnCounter ?? 0,
-        transports: ['internal'],
-      },
-    });
-
-    if (!verification.verified) throw new UnauthorizedException('Empreinte non valide.');
-
-    if (verification.authenticationInfo) user.webauthnCounter = verification.authenticationInfo.newCounter;
-    user.webauthnChallenge = null;
-    await this.userRepository.save(user);
-
-    return this.issueTokens(user, metadata);
+    adminUser.webauthnCredentialID = null;
+    adminUser.webauthnPublicKey = null;
+    adminUser.webauthnCounter = null;
+    adminUser.webauthnChallenge = null;
+    await this.userRepository.save(adminUser);
+    return { success: true, message: 'Empreinte supprimée.' };
   }
 
   /* ================= UTILITIES ================= */
@@ -783,6 +753,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         name: user.name,
+        role: user.role || 'USER',
         isTwoFAEnabled: user.isTwoFAEnabled,
       },
     };
@@ -840,6 +811,118 @@ export class AuthService {
 
     await this.userRepository.save(user);
     return user;
+  }
+
+  /**
+   * Generate options for admin biometric LOGIN (discoverable credentials)
+   */
+  async generateAdminBiometricLoginOptions(email: string) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+
+    // Find the admin by email
+    const admin = await this.userRepository.findOne({
+      where: { email, role: 'ADMIN' },
+    });
+
+    if (!admin || !admin.webauthnCredentialID) {
+      throw new BadRequestException('Admin not found or has no biometric registered');
+    }
+
+    const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
+    const tempId = crypto.randomUUID();
+
+    // Generate options WITH challenge and filter to this user's credentials
+    const loginOptions = await generateAuthenticationOptions({
+      rpID,
+      timeout: 60000,
+      userVerification: 'required',
+      // allowCredentials: Filter to ONLY this admin's credential
+      allowCredentials: [
+        {
+          id: admin.webauthnCredentialID,
+          transports: ['internal'],
+        },
+      ],
+    });
+
+    // Store the challenge
+    webauthnChallengeStore.set(tempId, loginOptions.challenge);
+
+    return { ...loginOptions, tempId };
+  }
+
+  /**
+   * Verify admin biometric LOGIN credential (discoverable credentials)
+   */
+  async verifyAdminBiometricLogin(credential: any, tempId: string) {
+    const challenge = webauthnChallengeStore.get(tempId);
+    if (!challenge) {
+      throw new BadRequestException('No login challenge found. Generate options first.');
+    }
+
+    try {
+      // Find the user by credentialID
+      const user = await this.userRepository.findOne({
+        where: { webauthnCredentialID: credential.id },
+      });
+
+      if (!user || user.role !== 'ADMIN') {
+        throw new UnauthorizedException('Admin not found or invalid credentials');
+      }
+
+      if (!user.webauthnPublicKey) {
+        throw new BadRequestException('Admin has no registered biometric');
+      }
+
+      const publicKeyBuffer = Buffer.from(user.webauthnPublicKey, 'base64');
+      const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
+      const rpOrigin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
+
+      const verification = await verifyAuthenticationResponse({
+        response: credential,
+        expectedChallenge: challenge,
+        expectedOrigin: rpOrigin,
+        expectedRPID: rpID,
+        credential: {
+          id: credential.id,
+          publicKey: publicKeyBuffer,
+          counter: user.webauthnCounter || 0,
+          transports: credential.response?.transports || [],
+        },
+      });
+
+      if (!verification.verified) {
+        throw new BadRequestException('Biometric verification failed');
+      }
+
+      // Update counter
+      user.webauthnCounter = verification.authenticationInfo!.newCounter;
+      await this.userRepository.save(user);
+
+      webauthnChallengeStore.delete(tempId);
+
+      // Generate tokens
+      const tokens = await this.issueTokens(user, {});
+
+      return {
+        success: true,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+        refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+      };
+    } catch (err) {
+      throw new BadRequestException(err.message || 'Biometric login failed');
+    }
   }
 }
 

@@ -112,6 +112,10 @@ const signInWithGoogleAPI = (): Promise<GoogleUserInfo> => {
 // This avoids needing a backend to exchange authorization codes
 export const signInWithGoogleRedirect = (): void => {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    console.error('VITE_GOOGLE_CLIENT_ID is not set');
+    throw new Error('Google sign-in is not configured (missing client ID)');
+  }
   const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/callback/google';
   
   // Generate a cryptographically random nonce for id_token verification

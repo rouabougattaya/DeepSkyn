@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { AdminUser, UserRole } from '@/types/admin'
 
@@ -115,10 +115,13 @@ export function EditUserModal({
           {/* Avertissement si changement */}
           {selectedRole !== user.role && (
             <div className="rounded-lg bg-amber-50 p-3">
-              <p className="text-xs text-amber-700">
-                ⚠️ Cet utilisateur passera de{' '}
-                <span className="font-semibold">{user.role}</span> à{' '}
-                <span className="font-semibold">{selectedRole}</span>
+              <p className="text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" aria-hidden />
+                <span>
+                  Cet utilisateur passera de{' '}
+                  <span className="font-semibold">{user.role}</span> à{' '}
+                  <span className="font-semibold">{selectedRole}</span>
+                </span>
               </p>
             </div>
           )}

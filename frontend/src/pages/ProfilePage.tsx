@@ -200,7 +200,7 @@ export default function ProfilePage() {
     )
 
     setMe(updatedUser)
-    setSuccess("Profil mis à jour ✅")
+    setSuccess("Profil mis à jour.")
 
     if (
       me?.googleName &&
@@ -220,7 +220,7 @@ export default function ProfilePage() {
   const handleDelete = async () => {
     setError("")
     setSuccess("")
-    const ok = window.confirm("⚠️ Supprimer votre compte définitivement ?")
+    const ok = window.confirm("Supprimer votre compte définitivement ?")
     if (!ok) return
 
     setDeleting(true)

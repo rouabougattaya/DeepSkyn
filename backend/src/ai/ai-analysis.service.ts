@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { FakeAiService } from './fake-ai.service';
 import { DetectionAdapterService } from './detection-adapter.service';
 import { ScoringEngineService } from './scoring-engine.service';
-import { RawDetection, GlobalScoreResult, ConditionWeights } from './detection.interface';
+import { OpenRouterService } from './openrouter.service';
+import { RawDetection, GlobalScoreResult, ConditionWeights, UserSkinProfile } from './detection.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
@@ -14,6 +15,7 @@ export class AiAnalysisService {
     private readonly fakeAiService: FakeAiService,
     private readonly detectionAdapter: DetectionAdapterService,
     private readonly scoringEngine: ScoringEngineService,
+    private readonly openRouterService: OpenRouterService,
     @InjectRepository(SkinAnalysis)
     private readonly analysisRepo: Repository<SkinAnalysis>,
     @InjectRepository(SkinMetric)
@@ -85,6 +87,26 @@ export class AiAnalysisService {
     }
 
     return result;
+  }
+
+  /**
+   * Analyse unifiée utilisant le LLM
+   */
+  async analyzeSkinWithLLM(
+    profile: UserSkinProfile,
+    userId: string = ''
+  ): Promise<GlobalScoreResult> {
+    try {
+      const result = await this.openRouterService.analyzeSkin(profile);
+
+      if (userId && result.globalScore > 0) {
+        await this.persistResult(result, 'unified_llm', userId);
+      }
+
+      return result;
+    } catch (error) {
+      throw new Error(`LLM Analysis failed: ${error.message}`);
+    }
   }
 
   /**

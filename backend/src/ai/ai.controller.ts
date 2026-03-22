@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus, UseGuards, Logger } from '@nestjs/common';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { AiAnalysisService } from './ai-analysis.service';
-import { ConditionWeights } from './detection.interface';
+import { ConditionWeights, UserSkinProfile } from './detection.interface';
+import { Req } from '@nestjs/common';
 
 @Controller('ai')
 export class AiController {
@@ -38,6 +40,31 @@ export class AiController {
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Public()
+  @Post('analyze/unified')
+  async analyzeUnified(
+    @Body() profile: UserSkinProfile,
+    @CurrentUser() user?: any
+  ) {
+    try {
+      const userId = user?.id || user?.userId;
+      console.log(`[AiController] analyzeUnified called | userId: ${userId}`);
+
+      const result = await this.aiAnalysisService.analyzeSkinWithLLM(profile, userId);
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      console.error('[AiController] Error in analyzeUnified:', error.message, error.stack);
+      throw new HttpException(
+        { success: false, error: error.message, stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined },
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

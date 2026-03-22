@@ -68,8 +68,9 @@ export function DeleteUserModal({
         <div className="space-y-4 px-6 py-4">
           {/* Avertissement */}
           <div className="rounded-lg bg-red-50 p-4 border border-red-200">
-            <p className="text-sm font-semibold text-red-900">
-              ⚠️ Cette action est irréversible
+            <p className="text-sm font-semibold text-red-900 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-hidden />
+              Cette action est irréversible
             </p>
             <p className="text-sm text-red-700 mt-2">
               Tous les données de cet utilisateur seront supprimées définitivement.

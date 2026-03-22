@@ -65,6 +65,7 @@ async function bootstrap() {
     '/api/dashboard/ping',
     '/api/dashboard/seed',
     '/api/ai/analyze',
+    '/api/ai/analyze/unified',
     '/api/ai/analyze/random',
     '/api/ai/analyze/test/severe',
     '/api/ai/analyze/test/mild',

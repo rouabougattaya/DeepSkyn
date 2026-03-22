@@ -1,18 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import {
     Camera, Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
-    CheckCircle, RefreshCw, ChevronRight, Activity,
-    BarChart2, Info
+    CheckCircle, RefreshCw, Activity,
+    BarChart2, Info, Waves, Flame, Microscope,
+    Bandage, CircleDot, HeartPulse, Sprout, Leaf, Dice5,
+    CircleCheck, AlertTriangle, BarChart3,
 } from 'lucide-react';
 import { aiAnalysisService } from '../services/aiAnalysisService';
-import type { GlobalScoreResult, ConditionWeights, ConditionScore } from '../types/aiAnalysis';
+import type { GlobalScoreResult, ConditionScore, UserSkinProfile } from '../types/aiAnalysis';
+import { SkinProfileForm } from '../components/analysis/SkinProfileForm';
 
 /* ─────────────────────────── Constants ─────────────────────────── */
 
 const CONDITION_META: Record<string, {
     label: string;
-    emoji: string;
+    icon: any;
     color: string;
     bg: string;
     border: string;
@@ -20,54 +24,60 @@ const CONDITION_META: Record<string, {
     description: string;
 }> = {
     'Acne': {
-        label: 'Acne', emoji: '🔴', color: '#ef4444',
-        bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)',
-        gradient: 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
-        description: 'Follicular inflammation with sebum production'
+        label: 'Acné', icon: Flame, color: '#f43f5e',
+        bg: 'rgba(244,63,94,0.05)', border: 'rgba(244,63,94,0.15)',
+        gradient: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+        description: 'Inflammation folliculaire et sébum'
     },
     'Enlarged-Pores': {
-        label: 'Enlarged pores', emoji: '⚪', color: '#8b5cf6',
-        bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.25)',
-        gradient: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-        description: 'Visible pores with sebum accumulation'
+        label: 'Pores dilatés', icon: Waves, color: '#8b5cf6',
+        bg: 'rgba(139,92,246,0.05)', border: 'rgba(139,92,246,0.15)',
+        gradient: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+        description: 'Pores visibles et accumulation de sébum'
     },
     'Atrophic Scars': {
-        label: 'Atrophic scars', emoji: '🟤', color: '#d97706',
-        bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.25)',
-        gradient: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-        description: 'Post-inflammatory skin depressions'
+        label: 'Cicatrices', icon: Bandage, color: '#64748b',
+        bg: 'rgba(100,116,139,0.05)', border: 'rgba(100,116,139,0.15)',
+        gradient: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        description: 'Dépressions cutanées post-inflammatoires'
     },
     'Skin Redness': {
-        label: 'Redness', emoji: '🌹', color: '#f43f5e',
-        bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.25)',
-        gradient: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-        description: 'Erythema and diffuse skin irritation'
+        label: 'Rougeurs', icon: HeartPulse, color: '#ef4444',
+        bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.15)',
+        gradient: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+        description: 'Érythème et irritation diffuse'
     },
     'Blackheads': {
-        label: 'Blackheads', emoji: '⚫', color: '#374151',
-        bg: 'rgba(55,65,81,0.08)', border: 'rgba(55,65,81,0.25)',
-        gradient: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-        description: 'Open comedones with sebum oxidation'
+        label: 'Points noirs', icon: CircleDot, color: '#1e293b',
+        bg: 'rgba(30,41,59,0.05)', border: 'rgba(30,41,59,0.15)',
+        gradient: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+        description: 'Comédons ouverts avec oxydation'
     },
     'Dark-Spots': {
-        label: 'Dark spots', emoji: '🟡', color: '#ca8a04',
-        bg: 'rgba(202,138,4,0.08)', border: 'rgba(202,138,4,0.25)',
-        gradient: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-        description: 'Post-inflammatory or solar hyperpigmentation'
+        label: 'Taches brunes', icon: Sparkles, color: '#d97706',
+        bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
+        gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+        description: 'Hyperpigmentation post-inflammatoire'
     },
     'black_dots': {
-        label: 'Black dots', emoji: '🔵', color: '#0891b2',
-        bg: 'rgba(8,145,178,0.08)', border: 'rgba(8,145,178,0.25)',
-        gradient: 'linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)',
-        description: 'Forming microcomedones'
+        label: 'Micro-imperfections', icon: Microscope, color: '#0d9488',
+        bg: 'rgba(13,148,136,0.05)', border: 'rgba(13,148,136,0.15)',
+        gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+        description: 'Formation de microcomédons'
     },
 };
 
-const TEST_SCENARIOS = [
-    { id: 'mild', label: 'Mild', icon: '🌱', desc: 'A few minor imperfections', color: '#10b981' },
-    { id: 'mixed', label: 'Mixed', icon: '🌿', desc: 'Combination of various conditions', color: '#f59e0b' },
-    { id: 'severe', label: 'Severe', icon: '🔥', desc: 'Multiple and intense conditions', color: '#ef4444' },
-    { id: 'random', label: 'Random', icon: '🎲', desc: 'Realistic random simulation', color: '#8b5cf6' },
+const TEST_SCENARIOS: {
+    id: 'mild' | 'mixed' | 'severe' | 'random';
+    label: string;
+    Icon: LucideIcon;
+    desc: string;
+    color: string;
+}[] = [
+    { id: 'mild', label: 'Mild', Icon: Sprout, desc: 'A few minor imperfections', color: '#10b981' },
+    { id: 'mixed', label: 'Mixed', Icon: Leaf, desc: 'Combination of various conditions', color: '#f59e0b' },
+    { id: 'severe', label: 'Severe', Icon: Flame, desc: 'Multiple and intense conditions', color: '#ef4444' },
+    { id: 'random', label: 'Random', Icon: Dice5, desc: 'Realistic random simulation', color: '#8b5cf6' },
 ];
 
 /* ─────────────────────── Helper Components ────────────────────── */
@@ -115,12 +125,13 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 
 function ConditionBar({ condition }: { condition: ConditionScore }) {
     const meta = CONDITION_META[condition.type] || {
-        label: condition.type, emoji: '🔹', color: '#6b7280',
+        label: condition.type, icon: Info, color: '#6b7280',
         bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)',
         gradient: '', description: ''
     };
 
     const scoreColor = condition.score >= 75 ? '#10b981' : condition.score >= 50 ? '#f59e0b' : '#ef4444';
+    const Icon = meta.icon;
 
     return (
         <div className="skin-condition-bar" style={{
@@ -129,12 +140,18 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
             transition: 'transform 0.2s, box-shadow 0.2s'
         }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20 }}>{meta.emoji}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: 'white', border: `1px solid ${meta.border}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <Icon size={18} style={{ color: meta.color }} />
+                    </div>
                     <div>
                         <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{meta.label}</div>
                         <div style={{ color: '#64748b', fontSize: 11 }}>
-                            {condition.count} detection{condition.count > 1 ? 's' : ''} · severity {(condition.severity * 100).toFixed(0)}%
+                            {condition.count} détection{condition.count > 1 ? 's' : ''} · sévérité {(condition.severity * 100).toFixed(0)}%
                         </div>
                     </div>
                 </div>
@@ -170,31 +187,21 @@ export default function SkinAnalysisPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedScenario, setSelectedScenario] = useState<'mild' | 'mixed' | 'severe' | 'random'>('mixed');
-    const [weights, setWeights] = useState<Partial<ConditionWeights>>({});
-    const [defaultWeights, setDefaultWeights] = useState<ConditionWeights | null>(null);
-    const [showWeights, setShowWeights] = useState(false);
     const [analysisCount, setAnalysisCount] = useState(0);
     const [scanPhase, setScanPhase] = useState<'idle' | 'capturing' | 'processing' | 'scoring' | 'done'>('idle');
+    const [useLLM, setUseLLM] = useState(true);
+    const [profile, setProfile] = useState<UserSkinProfile>({
+        skinType: 'Combination',
+        age: 25,
+        gender: 'Female',
+        concerns: []
+    });
 
     useEffect(() => {
-        loadDefaultWeights();
+        // weights logic removed as per user request
     }, []);
 
-    const loadDefaultWeights = async () => {
-        try {
-            const w = await aiAnalysisService.getDefaultWeights();
-            setDefaultWeights(w);
-            setWeights(w);
-        } catch {
-            // Fallback weights if backend not available — use demo mode
-            const fallback: ConditionWeights = {
-                acne: 25, pores: 15, scars: 20,
-                redness: 15, blackheads: 10, darkSpots: 10, blackDots: 5
-            };
-            setDefaultWeights(fallback);
-            setWeights(fallback);
-        }
-    };
+
 
     const runAnalysis = useCallback(async () => {
         setLoading(true);
@@ -210,14 +217,15 @@ export default function SkinAnalysisPage() {
 
             let analysisResult: GlobalScoreResult;
 
-            if (selectedScenario === 'random') {
+            if (useLLM) {
+                analysisResult = await aiAnalysisService.analyzeUnified(profile);
+            } else if (selectedScenario === 'random') {
                 const randomResult = await aiAnalysisService.analyzeRandom(
-                    Date.now() % 9999,
-                    weights
+                    Date.now() % 9999
                 );
                 analysisResult = randomResult.result;
             } else {
-                analysisResult = await aiAnalysisService.analyzeTestCase(selectedScenario, weights);
+                analysisResult = await aiAnalysisService.analyzeTestCase(selectedScenario);
             }
 
             await new Promise(r => setTimeout(r, 400));
@@ -225,27 +233,25 @@ export default function SkinAnalysisPage() {
             setResult(analysisResult);
             setAnalysisCount(c => c + 1);
         } catch (err: any) {
-            setError('Unable to connect to the AI backend. Check if the server is running on port 3001.');
+            console.error('Analysis error:', err);
+            setError(`Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur (port 3001).'}`);
             setScanPhase('idle');
         } finally {
             setLoading(false);
         }
-    }, [selectedScenario, weights]);
+    }, [selectedScenario, useLLM, profile]);
 
-    const handleWeightChange = (key: keyof ConditionWeights, value: string) => {
-        const num = Math.max(0, Math.min(100, parseFloat(value) || 0));
-        setWeights(prev => ({ ...prev, [key]: num }));
-    };
+
 
     const globalScoreColor = result
         ? result.globalScore >= 75 ? '#10b981' : result.globalScore >= 50 ? '#f59e0b' : '#ef4444'
         : '#0d9488';
 
     const scanLabels: Record<string, string> = {
-        capturing: 'Capturing image...',
-        processing: 'AI multi-conditional analysis...',
-        scoring: 'Calculating composite score...',
-        done: 'Analysis completed',
+        capturing: 'Capture de l\'image...',
+        processing: 'Analyse multi-conditions par l\'IA...',
+        scoring: 'Calcul du score composite expert...',
+        done: 'Analyse terminée',
         idle: '',
     };
 
@@ -417,7 +423,7 @@ export default function SkinAnalysisPage() {
                                 e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
                             }}
                         >
-                            <ArrowLeft size={18} /> Back to dashboard
+                            <ArrowLeft size={18} /> Retour au tableau de bord
                         </Link>
 
                         <Link
@@ -448,7 +454,7 @@ export default function SkinAnalysisPage() {
                                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,148,136,0.4)';
                             }}
                         >
-                            <GitCompare size={18} /> Compare two analyses
+                            <GitCompare size={18} /> Comparer deux analyses
                         </Link>
                     </div>
 
@@ -457,7 +463,7 @@ export default function SkinAnalysisPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                             <div className="pulse-dot" />
                             <span style={{ fontSize: 13, color: '#10b981', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '4px 12px', borderRadius: '30px' }}>
-                                Analyses performed: {analysisCount}
+                                Analyses effectuées : {analysisCount}
                             </span>
                         </div>
                     )}
@@ -472,7 +478,7 @@ export default function SkinAnalysisPage() {
                     }}>
                         <Sparkles size={14} style={{ color: '#0d9488' }} />
                         <span style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            Multi-Condition AI Engine
+                            Moteur IA Multi-Conditions
                         </span>
                     </div>
 
@@ -481,10 +487,10 @@ export default function SkinAnalysisPage() {
                         color: '#0f172a',
                         marginBottom: 10, lineHeight: 1.1
                     }}>
-                        Skin Analysis
+                        Analyse de Peau
                     </h1>
                     <p style={{ color: '#64748b', fontSize: 15, maxWidth: 480, margin: '0 auto' }}>
-                        7 conditions analyzed simultaneously · Intelligent composite score · SaaS Architecture
+                        7 conditions analysées · Score composite intelligent · Expertise Dermatologique
                     </p>
                 </div>
 
@@ -498,25 +504,59 @@ export default function SkinAnalysisPage() {
                     {/* ── LEFT: Controls ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                        {/* Scenario Selection */}
-                        <div className="glass-card" style={{ padding: 24 }}>
-                            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                Test scenario
-                            </h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                {TEST_SCENARIOS.map(s => (
-                                    <button
-                                        key={s.id}
-                                        className={`scenario-btn ${selectedScenario === s.id ? 'active' : ''}`}
-                                        onClick={() => setSelectedScenario(s.id as any)}
-                                    >
-                                        <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-                                        <div style={{ fontWeight: 700, fontSize: 14 }}>{s.label}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{s.desc}</div>
-                                    </button>
-                                ))}
+                        {/* LLM Toggle */}
+                        <div className="glass-card" style={{ padding: '4px' }}>
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setUseLLM(true)}
+                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${useLLM ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500'
+                                        }`}
+                                >
+                                    Analyse Réelle (LLM)
+                                </button>
+                                <button
+                                    onClick={() => setUseLLM(false)}
+                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!useLLM ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500'
+                                        }`}
+                                >
+                                    Scénarios de Test
+                                </button>
                             </div>
                         </div>
+
+                        {/* Skin Profile Form (LLM Mode) */}
+                        {useLLM && (
+                            <div className="glass-card fade-in" style={{ padding: 24 }}>
+                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+                                    Profil de Peau
+                                </h2>
+                                <SkinProfileForm profile={profile} setProfile={setProfile} disabled={loading} />
+                            </div>
+                        )}
+
+                        {/* Scenario Selection (Test Mode) */}
+                        {!useLLM && (
+                            <div className="glass-card fade-in" style={{ padding: 24 }}>
+                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+                                    Scénario de test
+                                </h2>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                    {TEST_SCENARIOS.map(({ id, Icon, label, desc, color }) => (
+                                        <button
+                                            key={id}
+                                            className={`scenario-btn ${selectedScenario === id ? 'active' : ''}`}
+                                            onClick={() => setSelectedScenario(id as any)}
+                                        >
+                                            <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
+                                                <Icon size={22} strokeWidth={2} style={{ color }} />
+                                            </div>
+                                            <div style={{ fontWeight: 700, fontSize: 14 }}>{label}</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{desc}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Camera Simulation */}
                         <div className="glass-card" style={{ padding: 24 }}>
@@ -563,68 +603,13 @@ export default function SkinAnalysisPage() {
                                 ) : (
                                     <div style={{ textAlign: 'center', color: '#94a3b8' }}>
                                         <Camera size={32} style={{ margin: '0 auto 8px' }} />
-                                        <div style={{ fontSize: 12 }}>Ready to analyze</div>
+                                        <div style={{ fontSize: 12 }}>Prêt pour l'analyse</div>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Weights Panel */}
-                        <div className="glass-card" style={{ padding: 24 }}>
-                            <button
-                                onClick={() => setShowWeights(!showWeights)}
-                                style={{
-                                    width: '100%', background: 'none', border: 'none',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    cursor: 'pointer', marginBottom: showWeights ? 16 : 0
-                                }}
-                            >
-                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                    Weighting
-                                </h2>
-                                <ChevronRight size={16} style={{
-                                    color: '#94a3b8',
-                                    transform: showWeights ? 'rotate(90deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.2s'
-                                }} />
-                            </button>
 
-                            {showWeights && defaultWeights && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {Object.entries(defaultWeights).map(([key]) => {
-                                        const conditionKey = {
-                                            acne: 'Acne', pores: 'Enlarged-Pores', scars: 'Atrophic Scars',
-                                            redness: 'Skin Redness', blackheads: 'Blackheads',
-                                            darkSpots: 'Dark-Spots', blackDots: 'black_dots'
-                                        }[key];
-                                        const meta = conditionKey ? CONDITION_META[conditionKey] : null;
-                                        const val = weights[key as keyof ConditionWeights] || 0;
-
-                                        return (
-                                            <div key={key}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                    <span style={{ fontSize: 12, color: 'rgba(241,245,249,0.6)', fontWeight: 600 }}>
-                                                        {meta?.label || key}
-                                                    </span>
-                                                    <span style={{ fontSize: 12, color: meta?.color || '#0d9488', fontWeight: 700 }}>
-                                                        {val}%
-                                                    </span>
-                                                </div>
-                                                <input
-                                                    type="range" min="0" max="50"
-                                                    value={val}
-                                                    onChange={e => handleWeightChange(key as keyof ConditionWeights, e.target.value)}
-                                                    className="weight-slider"
-                                                    style={{
-                                                        background: `linear-gradient(90deg, ${meta?.color || '#0d9488'} 0%, ${meta?.color || '#0d9488'} ${val * 2}%, rgba(255,255,255,0.1) ${val * 2}%, rgba(255,255,255,0.1) 100%)`
-                                                    }}
-                                                />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
 
                         {/* Analyze Button */}
                         <button
@@ -640,7 +625,7 @@ export default function SkinAnalysisPage() {
                             ) : (
                                 <>
                                     <Zap size={18} />
-                                    Launch AI analysis
+                                    Lancer l'analyse IA
                                 </>
                             )}
                         </button>
@@ -677,10 +662,10 @@ export default function SkinAnalysisPage() {
                                 </div>
                                 <div>
                                     <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 8, color: '#1e293b' }}>
-                                        No analysis performed
+                                        Aucune analyse effectuée
                                     </h3>
                                     <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6 }}>
-                                        Select a scenario and start the analysis<br />to see multi-condition results.
+                                        Lancez l'analyse réelle pour obtenir<br />votre score de santé cutanée.
                                     </p>
                                 </div>
 
@@ -689,10 +674,10 @@ export default function SkinAnalysisPage() {
                                     background: 'rgba(13,148,136,0.05)', border: '1px solid rgba(13,148,136,0.1)',
                                     borderRadius: 12, padding: 16, width: '100%'
                                 }}>
-                                    <div style={{ fontSize: 11, color: 'rgba(241,245,249,0.4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                                        Pipeline Engine
+                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                                        Pipeline d'Analyse
                                     </div>
-                                    {['AI Model (YOLO)', 'Detection Adapter', 'Metric Aggregation', 'Scoring Engine (7 conditions)'].map((step, i) => (
+                                    {['Modèle IA Vision', 'Adapteur de détection', 'Agrégation des métriques', 'Calcul expert (7 conditions)'].map((step, i) => (
                                         <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                             <div style={{
                                                 width: 20, height: 20, borderRadius: '50%',
@@ -719,7 +704,7 @@ export default function SkinAnalysisPage() {
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                                         <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                            Global skin health score
+                                            Score de santé cutanée
                                         </h2>
                                         <CheckCircle size={16} style={{ color: '#10b981' }} />
                                     </div>
@@ -730,20 +715,21 @@ export default function SkinAnalysisPage() {
                                         <div style={{ flex: 1 }}>
                                             {/* Best / Worst / Dominant */}
                                             {[
-                                                { label: 'Best', value: result.analysis.bestCondition, color: '#10b981', icon: '✅' },
-                                                { label: 'Worst', value: result.analysis.worstCondition, color: '#ef4444', icon: '⚠️' },
-                                                { label: 'Dominant', value: result.analysis.dominantCondition, color: '#f59e0b', icon: '📊' },
-                                            ].map(item => (
-                                                <div key={item.label} style={{
+                                                { label: 'Meilleur', value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
+                                                { label: 'Point critique', value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
+                                                { label: 'Dominant', value: result.analysis.dominantCondition, color: '#f59e0b', Icon: BarChart3 },
+                                            ].map(({ label, value, color, Icon }) => (
+                                                <div key={label} style={{
                                                     display: 'flex', alignItems: 'center',
                                                     justifyContent: 'space-between', marginBottom: 10
                                                 }}>
-                                                    <span style={{ fontSize: 12, color: '#64748b' }}>
-                                                        {item.icon} {item.label}
+                                                    <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <Icon size={14} style={{ color, flexShrink: 0 }} />
+                                                        {label}
                                                     </span>
-                                                    <span style={{ fontSize: 12, fontWeight: 700, color: item.color }}>
-                                                        {item.value
-                                                            ? (CONDITION_META[item.value]?.label || item.value)
+                                                    <span style={{ fontSize: 12, fontWeight: 700, color }}>
+                                                        {value
+                                                            ? (CONDITION_META[value]?.label || value)
                                                             : 'N/A'}
                                                     </span>
                                                 </div>
@@ -756,7 +742,7 @@ export default function SkinAnalysisPage() {
                                             }}>
                                                 <BarChart2 size={12} style={{ color: '#94a3b8' }} />
                                                 <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                    {result.totalDetections} detections analyzed
+                                                    {result.totalDetections} détections analysées
                                                 </span>
                                             </div>
                                         </div>
@@ -766,7 +752,7 @@ export default function SkinAnalysisPage() {
                                 {/* Condition Scores */}
                                 <div className="glass-card" style={{ padding: 24 }}>
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                        Scores by condition
+                                        Scores par condition
                                     </h2>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {result.conditionScores
@@ -781,14 +767,15 @@ export default function SkinAnalysisPage() {
                                 {/* Skin Conditions Legend */}
                                 <div className="glass-card" style={{ padding: 24 }}>
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                        Clinical interpretation
+                                        Interprétation clinique
                                     </h2>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                         {result.conditionScores.map(condition => {
                                             const meta = CONDITION_META[condition.type];
                                             if (!meta) return null;
-                                            const severity = condition.score < 50 ? 'Severe' : condition.score < 75 ? 'Moderate' : 'Controlled';
+                                            const severity = condition.score < 50 ? 'Sévère' : condition.score < 75 ? 'Modéré' : 'Contrôlé';
                                             const sevColor = condition.score < 50 ? '#ef4444' : condition.score < 75 ? '#f59e0b' : '#10b981';
+                                            const Icon = meta.icon;
 
                                             return (
                                                 <div key={condition.type} style={{
@@ -797,14 +784,20 @@ export default function SkinAnalysisPage() {
                                                     background: '#f8fafc',
                                                     border: '1px solid #e2e8f0'
                                                 }}>
-                                                    <span style={{ fontSize: 16 }}>{meta.emoji}</span>
+                                                    <div style={{
+                                                        width: 28, height: 28, borderRadius: 8,
+                                                        background: 'white', border: '1px solid #e2e8f0',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}>
+                                                        <Icon size={14} style={{ color: meta.color }} />
+                                                    </div>
                                                     <div style={{ flex: 1 }}>
                                                         <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{meta.label}</div>
                                                         <div style={{ fontSize: 11, color: '#64748b' }}>{meta.description}</div>
                                                     </div>
                                                     <span className="tag" style={{
-                                                        background: `${sevColor}18`, color: sevColor,
-                                                        border: `1px solid ${sevColor}30`
+                                                        background: `${sevColor}10`, color: sevColor,
+                                                        border: `1px solid ${sevColor}20`
                                                     }}>
                                                         {severity}
                                                     </span>
@@ -822,8 +815,8 @@ export default function SkinAnalysisPage() {
                                     }}>
                                         <Info size={14} style={{ color: '#0d9488', flexShrink: 0, marginTop: 1 }} />
                                         <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>
-                                            Score 0–100 : the <strong style={{ color: '#10b981' }}>higher</strong> the score, the better the condition.
-                                            The global score is a <strong style={{ color: '#1e293b' }}>weighted</strong> average of all conditions.
+                                            Score 0–100 : plus le score est <strong style={{ color: '#10b981' }}>élevé</strong>, meilleure est la condition.
+                                            L'IA analyse vos préoccupations pour pondérer le score global.
                                         </p>
                                     </div>
                                 </div>
@@ -831,7 +824,7 @@ export default function SkinAnalysisPage() {
                                 {/* Raw Metrics Summary */}
                                 <div className="glass-card" style={{ padding: 24 }}>
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                        Metrics summary
+                                        Résumé des métriques
                                     </h2>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                                         {[

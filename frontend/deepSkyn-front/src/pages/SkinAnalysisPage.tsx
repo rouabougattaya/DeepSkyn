@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import {
     Camera, Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
     CheckCircle, RefreshCw, ChevronRight, Activity,
-    BarChart2, Info
+    BarChart2, Info, Waves, Flame, Microscope,
+    Bandage, CircleDot, HeartPulse, Sprout, Leaf, Dice5,
+    CircleCheck, AlertTriangle, BarChart3,
 } from 'lucide-react';
 import { aiAnalysisService } from '../services/aiAnalysisService';
 import type { GlobalScoreResult, ConditionWeights, ConditionScore } from '../types/aiAnalysis';
@@ -12,7 +15,7 @@ import type { GlobalScoreResult, ConditionWeights, ConditionScore } from '../typ
 
 const CONDITION_META: Record<string, {
     label: string;
-    emoji: string;
+    icon: LucideIcon;
     color: string;
     bg: string;
     border: string;
@@ -20,54 +23,60 @@ const CONDITION_META: Record<string, {
     description: string;
 }> = {
     'Acne': {
-        label: 'Acne', emoji: '🔴', color: '#ef4444',
+        label: 'Acne', icon: Flame, color: '#ef4444',
         bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)',
         gradient: 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
         description: 'Follicular inflammation with sebum production'
     },
     'Enlarged-Pores': {
-        label: 'Enlarged pores', emoji: '⚪', color: '#8b5cf6',
+        label: 'Enlarged pores', icon: Waves, color: '#8b5cf6',
         bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.25)',
         gradient: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
         description: 'Visible pores with sebum accumulation'
     },
     'Atrophic Scars': {
-        label: 'Atrophic scars', emoji: '🟤', color: '#d97706',
+        label: 'Atrophic scars', icon: Bandage, color: '#d97706',
         bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.25)',
         gradient: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
         description: 'Post-inflammatory skin depressions'
     },
     'Skin Redness': {
-        label: 'Redness', emoji: '🌹', color: '#f43f5e',
+        label: 'Redness', icon: HeartPulse, color: '#f43f5e',
         bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.25)',
         gradient: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
         description: 'Erythema and diffuse skin irritation'
     },
     'Blackheads': {
-        label: 'Blackheads', emoji: '⚫', color: '#374151',
+        label: 'Blackheads', icon: CircleDot, color: '#374151',
         bg: 'rgba(55,65,81,0.08)', border: 'rgba(55,65,81,0.25)',
         gradient: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
         description: 'Open comedones with sebum oxidation'
     },
     'Dark-Spots': {
-        label: 'Dark spots', emoji: '🟡', color: '#ca8a04',
+        label: 'Dark spots', icon: Sparkles, color: '#ca8a04',
         bg: 'rgba(202,138,4,0.08)', border: 'rgba(202,138,4,0.25)',
         gradient: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
         description: 'Post-inflammatory or solar hyperpigmentation'
     },
     'black_dots': {
-        label: 'Black dots', emoji: '🔵', color: '#0891b2',
+        label: 'Black dots', icon: Microscope, color: '#0891b2',
         bg: 'rgba(8,145,178,0.08)', border: 'rgba(8,145,178,0.25)',
         gradient: 'linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)',
         description: 'Forming microcomedones'
     },
 };
 
-const TEST_SCENARIOS = [
-    { id: 'mild', label: 'Mild', icon: '🌱', desc: 'A few minor imperfections', color: '#10b981' },
-    { id: 'mixed', label: 'Mixed', icon: '🌿', desc: 'Combination of various conditions', color: '#f59e0b' },
-    { id: 'severe', label: 'Severe', icon: '🔥', desc: 'Multiple and intense conditions', color: '#ef4444' },
-    { id: 'random', label: 'Random', icon: '🎲', desc: 'Realistic random simulation', color: '#8b5cf6' },
+const TEST_SCENARIOS: {
+    id: 'mild' | 'mixed' | 'severe' | 'random';
+    label: string;
+    Icon: LucideIcon;
+    desc: string;
+    color: string;
+}[] = [
+    { id: 'mild', label: 'Mild', Icon: Sprout, desc: 'A few minor imperfections', color: '#10b981' },
+    { id: 'mixed', label: 'Mixed', Icon: Leaf, desc: 'Combination of various conditions', color: '#f59e0b' },
+    { id: 'severe', label: 'Severe', Icon: Flame, desc: 'Multiple and intense conditions', color: '#ef4444' },
+    { id: 'random', label: 'Random', Icon: Dice5, desc: 'Realistic random simulation', color: '#8b5cf6' },
 ];
 
 /* ─────────────────────── Helper Components ────────────────────── */
@@ -115,12 +124,13 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 
 function ConditionBar({ condition }: { condition: ConditionScore }) {
     const meta = CONDITION_META[condition.type] || {
-        label: condition.type, emoji: '🔹', color: '#6b7280',
+        label: condition.type, icon: Info, color: '#6b7280',
         bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)',
         gradient: '', description: ''
     };
 
     const scoreColor = condition.score >= 75 ? '#10b981' : condition.score >= 50 ? '#f59e0b' : '#ef4444';
+    const Icon = meta.icon;
 
     return (
         <div className="skin-condition-bar" style={{
@@ -130,7 +140,13 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
         }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20 }}>{meta.emoji}</span>
+                    <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: 'white', border: `1px solid ${meta.border}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <Icon size={18} style={{ color: meta.color }} />
+                    </div>
                     <div>
                         <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{meta.label}</div>
                         <div style={{ color: '#64748b', fontSize: 11 }}>
@@ -504,15 +520,17 @@ export default function SkinAnalysisPage() {
                                 Test scenario
                             </h2>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                {TEST_SCENARIOS.map(s => (
+                                {TEST_SCENARIOS.map(({ id, Icon, label, desc, color }) => (
                                     <button
-                                        key={s.id}
-                                        className={`scenario-btn ${selectedScenario === s.id ? 'active' : ''}`}
-                                        onClick={() => setSelectedScenario(s.id as any)}
+                                        key={id}
+                                        className={`scenario-btn ${selectedScenario === id ? 'active' : ''}`}
+                                        onClick={() => setSelectedScenario(id as any)}
                                     >
-                                        <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-                                        <div style={{ fontWeight: 700, fontSize: 14 }}>{s.label}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{s.desc}</div>
+                                        <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
+                                            <Icon size={22} strokeWidth={2} style={{ color }} />
+                                        </div>
+                                        <div style={{ fontWeight: 700, fontSize: 14 }}>{label}</div>
+                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{desc}</div>
                                     </button>
                                 ))}
                             </div>
@@ -730,20 +748,21 @@ export default function SkinAnalysisPage() {
                                         <div style={{ flex: 1 }}>
                                             {/* Best / Worst / Dominant */}
                                             {[
-                                                { label: 'Best', value: result.analysis.bestCondition, color: '#10b981', icon: '✅' },
-                                                { label: 'Worst', value: result.analysis.worstCondition, color: '#ef4444', icon: '⚠️' },
-                                                { label: 'Dominant', value: result.analysis.dominantCondition, color: '#f59e0b', icon: '📊' },
-                                            ].map(item => (
-                                                <div key={item.label} style={{
+                                                { label: 'Best', value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
+                                                { label: 'Worst', value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
+                                                { label: 'Dominant', value: result.analysis.dominantCondition, color: '#f59e0b', Icon: BarChart3 },
+                                            ].map(({ label, value, color, Icon }) => (
+                                                <div key={label} style={{
                                                     display: 'flex', alignItems: 'center',
                                                     justifyContent: 'space-between', marginBottom: 10
                                                 }}>
-                                                    <span style={{ fontSize: 12, color: '#64748b' }}>
-                                                        {item.icon} {item.label}
+                                                    <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <Icon size={14} style={{ color, flexShrink: 0 }} />
+                                                        {label}
                                                     </span>
-                                                    <span style={{ fontSize: 12, fontWeight: 700, color: item.color }}>
-                                                        {item.value
-                                                            ? (CONDITION_META[item.value]?.label || item.value)
+                                                    <span style={{ fontSize: 12, fontWeight: 700, color }}>
+                                                        {value
+                                                            ? (CONDITION_META[value]?.label || value)
                                                             : 'N/A'}
                                                     </span>
                                                 </div>
@@ -789,6 +808,7 @@ export default function SkinAnalysisPage() {
                                             if (!meta) return null;
                                             const severity = condition.score < 50 ? 'Severe' : condition.score < 75 ? 'Moderate' : 'Controlled';
                                             const sevColor = condition.score < 50 ? '#ef4444' : condition.score < 75 ? '#f59e0b' : '#10b981';
+                                            const CIcon = meta.icon;
 
                                             return (
                                                 <div key={condition.type} style={{
@@ -797,7 +817,13 @@ export default function SkinAnalysisPage() {
                                                     background: '#f8fafc',
                                                     border: '1px solid #e2e8f0'
                                                 }}>
-                                                    <span style={{ fontSize: 16 }}>{meta.emoji}</span>
+                                                    <div style={{
+                                                        width: 28, height: 28, borderRadius: 8,
+                                                        background: 'white', border: '1px solid #e2e8f0',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}>
+                                                        <CIcon size={14} style={{ color: meta.color }} />
+                                                    </div>
                                                     <div style={{ flex: 1 }}>
                                                         <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{meta.label}</div>
                                                         <div style={{ fontSize: 11, color: '#64748b' }}>{meta.description}</div>

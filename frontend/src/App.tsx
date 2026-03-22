@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import LoginFacePage from "./pages/LoginFacePage"
 import LoginFingerprintPage from "./pages/LoginFingerprintPage"
 import RegisterPage from './pages/RegisterPage'
+import RegisterFingerprintPage from "./pages/RegisterFingerprintPage"
 import GoogleCallback from './pages/GoogleCallback'
 import HomePage from './pages/HomePage'
 import DashboardPage from './pages/DashboardPage'
@@ -54,6 +55,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/auth/register-fingerprint" element={<RegisterFingerprintPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/auth/callback/google" element={<GoogleCallback />} />

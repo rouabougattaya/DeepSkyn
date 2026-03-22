@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, CheckCircle2 } from "lucide-react"
 
 import { loadFaceModels, getFaceDescriptor } from "../lib/face"
 import { setSession } from "@/lib/authSession"
@@ -232,8 +232,9 @@ export default function RegisterPage() {
           )}
 
           {faceDescriptor && (
-            <p className="text-green-600 text-center text-sm">
-              ✅ Face captured successfully
+            <p className="text-green-600 text-center text-sm flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              Face captured successfully
             </p>
           )}
 

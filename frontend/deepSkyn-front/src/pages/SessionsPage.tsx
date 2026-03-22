@@ -185,8 +185,9 @@ export const SessionsPage: React.FC = () => {
 
                         {/* Warning message */}
                         {session.riskAnalysis?.warning && (
-                          <p className="mt-2 text-sm text-yellow-600 bg-yellow-50 p-2 rounded-lg border border-yellow-200">
-                            ⚠️ {session.riskAnalysis.warning}
+                          <p className="mt-2 flex items-start gap-2 text-sm text-yellow-800 bg-yellow-50 p-2 rounded-lg border border-yellow-200">
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" aria-hidden />
+                            <span>{session.riskAnalysis.warning}</span>
                           </p>
                         )}
                       </div>

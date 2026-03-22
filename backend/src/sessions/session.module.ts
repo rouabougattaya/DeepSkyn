@@ -5,7 +5,7 @@ import { Session } from './session.entity';
 import { SessionController } from './session.controller';
 import { SessionService } from './session.service';
 import { FingerprintService } from '../auth/services/fingerprint.service';
-import { GeminiService } from '../ai/gemini.service';
+import { OpenRouterService } from '../ai/openrouter.service';
 
 @Module({
   imports: [
@@ -13,10 +13,10 @@ import { GeminiService } from '../ai/gemini.service';
   ],
   controllers: [SessionController],
   providers: [
-    SessionService, 
+    SessionService,
     FingerprintService,
-    GeminiService,
+    OpenRouterService,
   ],
   exports: [SessionService],
 })
-export class SessionModule {}
+export class SessionModule { }

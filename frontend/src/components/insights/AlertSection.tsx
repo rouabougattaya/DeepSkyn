@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import type { Insight } from '../../services/analysisService';
 import InsightCard from './InsightCard';
 
@@ -14,7 +15,8 @@ const AlertSection: React.FC<AlertSectionProps> = ({ insights }) => {
     return (
         <div className="mb-8">
             <h3 className="text-lg font-semibold text-red-700 mb-4 flex items-center gap-2">
-                <span>⚠️</span> Alertes Prioritaires
+                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" aria-hidden />
+                Alertes Prioritaires
             </h3>
             <div className="grid grid-cols-1 gap-4">
                 {highSeverityInsights.map((insight, idx) => (

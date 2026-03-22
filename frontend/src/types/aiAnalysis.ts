@@ -37,3 +37,11 @@ export interface GlobalScoreResult {
     dominantCondition: SkinCondition | null;
   };
 }
+
+export interface UserSkinProfile {
+  skinType: 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
+  age: number;
+  gender: 'Male' | 'Female' | 'Other';
+  concerns: string[];
+  imageBase64?: string;
+}

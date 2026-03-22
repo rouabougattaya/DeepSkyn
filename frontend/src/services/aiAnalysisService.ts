@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from './apiClient';
-import type { GlobalScoreResult, ConditionWeights } from '../types/aiAnalysis';
+import type { GlobalScoreResult, ConditionWeights, UserSkinProfile } from '../types/aiAnalysis';
 
 export const aiAnalysisService = {
   async analyzeImage(
@@ -50,6 +50,11 @@ export const aiAnalysisService = {
     weights: Partial<ConditionWeights>;
   }> {
     const data = await apiPost<{ success: boolean; data: any }>('/ai/weights/validate', weights);
+    return data.data;
+  },
+
+  async analyzeUnified(profile: UserSkinProfile): Promise<GlobalScoreResult> {
+    const data = await apiPost<{ success: boolean; data: GlobalScoreResult }>('/ai/analyze/unified', profile);
     return data.data;
   },
 };

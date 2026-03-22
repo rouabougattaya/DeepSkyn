@@ -40,3 +40,26 @@ export interface GlobalScoreResult {
     dominantCondition: SkinCondition | null;
   };
 }
+
+import { IsEnum, IsInt, IsArray, IsString, IsOptional, Min, Max } from 'class-validator';
+
+export class UserSkinProfile {
+  @IsEnum(['Oily', 'Dry', 'Combination', 'Sensitive', 'Normal'])
+  skinType: 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
+
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  age: number;
+
+  @IsEnum(['Male', 'Female', 'Other'])
+  gender: 'Male' | 'Female' | 'Other';
+
+  @IsArray()
+  @IsString({ each: true })
+  concerns: string[];
+
+  @IsString()
+  @IsOptional()
+  imageBase64?: string;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { setSession } from '@/lib/authSession';
 import GoogleRealOAuthService from '@/services/googleRealOAuthService';
 import { historyService } from '@/services/historyService';
@@ -166,17 +167,13 @@ const GoogleCallback = () => {
               'bg-red-100'
             }`}>
             {status === 'loading' && (
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" aria-hidden />
             )}
             {status === 'success' && (
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckCircle2 className="h-8 w-8 text-green-600" strokeWidth={2} aria-hidden />
             )}
             {status === 'error' && (
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <XCircle className="h-8 w-8 text-red-600" strokeWidth={2} aria-hidden />
             )}
           </div>
         </div>

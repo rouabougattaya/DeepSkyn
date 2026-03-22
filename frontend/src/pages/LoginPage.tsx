@@ -4,7 +4,7 @@ import { useState, useRef } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, ScanFace, Fingerprint } from "lucide-react"
 import { setSession } from "@/lib/authSession"
 import { historyService } from "@/services/historyService"
 import { useGoogleAuth } from "@/hooks/useGoogleAuth"
@@ -318,7 +318,8 @@ export default function LoginPage() {
             className="w-full h-12 border-slate-200 font-medium bg-white flex items-center justify-center"
             onClick={() => navigate("/auth/login-face")}
           >
-            🔐 Sign in with facial recognition
+            <ScanFace className="h-5 w-5 mr-2 text-slate-600" aria-hidden />
+            Sign in with facial recognition
           </Button>
 
           {/* Admin Fingerprint Login */}
@@ -328,7 +329,8 @@ export default function LoginPage() {
             className="w-full h-12 border-slate-200 font-medium bg-white flex items-center justify-center text-teal-600 hover:text-teal-700"
             onClick={() => navigate("/auth/login-empreinte")}
           >
-            👆 Admin login with fingerprint
+            <Fingerprint className="h-5 w-5 mr-2" aria-hidden />
+            Admin login with fingerprint
           </Button>
         </div>
 

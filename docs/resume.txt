@@ -1,0 +1,84 @@
+================================================================================
+RÉSUMÉ DU TRAVAIL : UPGRADE PROFESSIONNEL DU MOTEUR D'AGRÉGATION (DEV 1)
+================================================================================
+
+1. DOSSIERS ET FICHIERS MODIFIÉS :
+--------------------------------------------------------------------------------
+Dossier Backend : c:\Users\asus\Downloads\DeepSkyn-skin\backend\backend\src
+- metrics\metrics.service.ts     : Logique de calcul statistique complexe.
+- metrics\metrics.controller.ts  : Endpoints de l'API (Dashboard + Seed).
+- main.ts                        : Configuration de la sécurité (PublicRoutes).
+
+Dossier Frontend : c:\Users\asus\Downloads\DeepSkyn-skin\deepSkyn-front\src
+- pages\DashboardPage.tsx       : UI Premium, Header Hero, KPI Cards, Chart.js.
+- types\dashboard.ts            : Définitions TypeScript pour les statistiques.
+
+2. COMMANDES À RETENIR :
+--------------------------------------------------------------------------------
+- Lancer le Seed (Peupler les données) :
+  PowerShell : Invoke-RestMethod -Uri "http://localhost:3001/api/dashboard/seed" -Method POST
+
+- Lancer le Backend :
+  npm run start:dev (dans backend/backend)
+
+- Lancer le Frontend :
+  npm run dev (dans deepSkyn-front)
+
+3. EXPLICATION DÉTAILLÉE DES CALCULS (LOGIQUE MATHÉMATIQUE) :
+--------------------------------------------------------------------------------
+L'agrégation utilise des algorithmes de statistiques descriptives implémentés
+en JavaScript pur pour garantir la performance et la précision :
+
+A. MOYENNE ARITHMÉTIQUE (Mean) :
+   Formule : Somme de toutes les valeurs divisée par le nombre total.
+   Usage : Utilisé pour le score moyen global et mensuel.
+   Code : scores.reduce((s, v) => s + v, 0) / scores.length;
+
+B. ÉCART-TYPE (Standard Deviation σ) :
+   Logique : Mesure de la dispersion des scores par rapport à la moyenne.
+   Formule : Racine carrée de la variance (moyenne des carrés des écarts).
+   Interprétation : Un σ faible = score stable. Un σ élevé = irrégularité.
+
+C. MÉDIANE (Median) :
+   Logique : Valeur centrale qui divise l'échantillon en deux parties égales.
+   Calcul : Tri ascendant, puis sélection de l'élément au milieu (ou moyenne des 2).
+   Avantage : Moins sensible aux valeurs extrêmes (outliers) que la moyenne.
+
+D. PERCENTILES (Q1 = 25% / Q3 = 75%) :
+   Logique : Indique le seuil en dessous duquel se trouve un certain % des données.
+   Méthode : Interpolation linéaire entre les rangs (Percentile Rank).
+   Usage : Identifier la distribution des scores (excellents vs mauvais).
+
+E. MOYENNE MOBILE (Moving Average MA5) :
+   Logique : Moyenne glissante calculée sur une fenêtre tournante de 5 analyses.
+   Usage : Lissage des variations à court terme pour révéler la tendance de fond.
+
+F. VARIATION ET TENDANCE (Trend) :
+   Calcul : Δ% = ((Valeur_actuelle - Valeur_précédente) / Valeur_précédente) * 100.
+   Seuil de Stabilité : ±2%. Au-delà, la tendance est marquée comme UP ou DOWN.
+
+4. LOGIQUE DE SEEDING (GÉNÉRATION DE DONNÉES) :
+--------------------------------------------------------------------------------
+- Route : POST /api/dashboard/seed
+- Fonction : Initialise 6 mois d'historique (22 analyses) avec une progression.
+- Pourquoi QueryBuilder ? Pour forcer les dates passées ("createdAt") car
+  l'ORM NestJS remplace normalement les dates par "Maintenant".
+- Tendance injectée : Les scores commencent bas (Mois -5) et s'améliorent
+  linéairement (Mois 0) pour simuler une routine de soin efficace.
+
+5. CODE SOURCE DES FICHIERS CLÉS :
+--------------------------------------------------------------------------------
+
+[FICHIER: metrics.service.ts] (Backend)
+--------------------------------------------------------------------------------
+- Contient les méthodes : getDashboardMetrics(), getTrends(), getMonthlyData(),
+  seedDemoData() et tous les helpers mathématiques (mean, stdDev, etc.).
+
+[FICHIER: DashboardPage.tsx] (Frontend)
+--------------------------------------------------------------------------------
+- Intégration de Chart.js pour le graphique d'évolution.
+- Utilisation des composants KPIMetricCard et TrendPill pour l'affichage.
+
+================================================================================
+FIN DU RÉSUMÉ
+================================================================================

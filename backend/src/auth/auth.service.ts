@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -33,6 +34,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { GeminiService } from '../ai/gemini.service';
 
 const webauthnChallengeStore = new Map<string, string>();
 const SALT_ROUNDS = 12;
@@ -63,6 +65,7 @@ export type SessionMetadata = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private genAI: GoogleGenerativeAI;
   private transporter: nodemailer.Transporter;
 
@@ -78,6 +81,7 @@ export class AuthService {
     private readonly loginAttemptService: LoginAttemptService,
     private readonly sessionService: SessionService,
     private readonly configService: ConfigService,
+    private readonly geminiService: GeminiService,
   ) {
     this.genAI = new GoogleGenerativeAI(this.configService.get<string>('GOOGLE_GENAI_API_KEY') || '');
     this.transporter = nodemailer.createTransport({
@@ -141,24 +145,8 @@ export class AuthService {
     Respond only with a JSON object: { "riskScore": 0.0 to 1.0, "reason": "short explanation" }`;
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 256 },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = await this.geminiService.generateContent(prompt);
+      if (!text) throw new Error('No response from Gemini');
 
       const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
@@ -168,7 +156,7 @@ export class AuthService {
         reason: parsed.reason ?? 'Analysis completed'
       };
     } catch (error) {
-      console.warn('⚠️ Gemini analysis skipped or failed:', error.message || error);
+      console.warn('⚠️ Gemini abuse analysis failed:', error.message || error);
       return { riskScore: 0.1, reason: 'AI Analysis Unavailable' };
     }
   }
@@ -195,6 +183,11 @@ export class AuthService {
       throw new UnauthorizedException(
         `Compte temporairement bloqué. Réessayez dans ${blockedMinutes} minute(s).`,
       );
+    }
+
+    if (!user.passwordHash) {
+      this.logger.warn(`User ${emailNorm} attempted legacy login but has no password (likely registered via Google)`);
+      throw new UnauthorizedException('Ce compte utilise une autre méthode de connexion (Google).');
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
@@ -373,8 +366,10 @@ export class AuthService {
     // Utiliser la méthode issueTokens existante
     const tokens = await this.issueTokens(user, metadata);
 
-    // Créer la session
-    await this.sessionService.createSession(user.id, tokens.accessToken || '', req);
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la création de session (googleModern).');
+    }
+    await this.sessionService.createSession(user.id, tokens.refreshToken, req);
 
     return tokens;
   }

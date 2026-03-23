@@ -24,6 +24,7 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { EmailSecurityModule } from '../email-security/email-security.module';
 import { SessionModule } from '../sessions/session.module'; // ← Garde cette ligne
 import { RecaptchaService } from './services/recaptcha.service';
+import { AiModule } from '../ai/ai.module';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt-access' }),
@@ -39,6 +40,7 @@ import { RecaptchaService } from './services/recaptcha.service';
     SessionModule, // ← SessionModule est importé
     TwoFactorModule,
     EmailSecurityModule,
+    AiModule,
   ],
   controllers: [AuthController, ActivityController],
   providers: [

@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import csrf from 'csurf';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -28,6 +29,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  
+  // ✅ Augmenter la limite pour les images Base64
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // Swagger Documentation
   const config = new DocumentBuilder()

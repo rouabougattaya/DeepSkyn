@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 import { SkinMetric } from '../skinMetric/skin-metric.entity';
+import { RecommendationService } from '../recommendation/recommendation.service';
+import { SkinCondition } from './skin-condition.enum';
 
 @Injectable()
 export class AiAnalysisService {
@@ -16,6 +18,7 @@ export class AiAnalysisService {
     private readonly detectionAdapter: DetectionAdapterService,
     private readonly scoringEngine: ScoringEngineService,
     private readonly openRouterService: OpenRouterService,
+    private readonly recommendationService: RecommendationService,
     @InjectRepository(SkinAnalysis)
     private readonly analysisRepo: Repository<SkinAnalysis>,
     @InjectRepository(SkinMetric)
@@ -30,8 +33,8 @@ export class AiAnalysisService {
     imageId?: string,
     customWeights?: Partial<ConditionWeights>,
     testType?: 'severe' | 'mild' | 'mixed',
-    userId: string = '' // We will enforce this in the service call from controller
-  ): Promise<GlobalScoreResult> {
+    userId: string = ''
+  ): Promise<GlobalScoreResult & { recommendations?: any[] }> {
     try {
       // Étape 1: Simulation de l'analyse IA
       const rawDetections = testType
@@ -48,15 +51,29 @@ export class AiAnalysisService {
 
       // Étape 4: Calcul des scores de condition
       const conditionScores = this.scoringEngine.computeConditionScores(metrics);
+      const result = this.scoringEngine.calculateGlobalScore(conditionScores, customWeights) as any;
 
-      // Étape 5: Calcul du score global
-      const result = this.scoringEngine.calculateGlobalScore(conditionScores, customWeights);
-
-      // Étape 6: Sauvegarde uniquement si userId est présent
+      // Étape 6: Sauvegarde et Recommandations
       if (userId && (imageId || testType || result.globalScore > 0)) {
-        await this.persistResult(result, imageId || 'test_scenario', userId);
-      } else {
-        console.warn('⚠️ userId manquant, analyse non sauvegardée');
+        const saved = await this.persistResult(result, imageId || 'test_scenario', userId);
+        if (saved && (saved as any).recommendations) {
+          result.recommendations = (saved as any).recommendations;
+        }
+      }
+
+      // Toujours ajouter des recommandations même si pas de userId (pour le démo/guest mode)
+      if (!result.recommendations) {
+        let inferredSkinType = 'Normal';
+        const dominant = result.analysis?.dominantCondition;
+        if (dominant === SkinCondition.ACNE || dominant === SkinCondition.PORES) inferredSkinType = 'Oily';
+        else if (dominant === SkinCondition.REDNESS) inferredSkinType = 'Sensitive';
+        else if (result.globalScore < 40) inferredSkinType = 'Dry';
+
+        result.recommendations = await this.recommendationService.getRecommendationsForSkinState(
+          userId || 'guest',
+          'temporary',
+          inferredSkinType
+        );
       }
 
       return result;
@@ -78,10 +95,13 @@ export class AiAnalysisService {
 
     const metrics = this.detectionAdapter.aggregateDetections(rawDetections);
     const conditionScores = this.scoringEngine.computeConditionScores(metrics);
-    const result = this.scoringEngine.calculateGlobalScore(conditionScores, customWeights);
+    const result = this.scoringEngine.calculateGlobalScore(conditionScores, customWeights) as any;
 
     if (userId && result.globalScore > 0) {
-      await this.persistResult(result, `seed_${seed || 'rand'}`, userId);
+      const saved = await this.persistResult(result, `seed_${seed || 'rand'}`, userId);
+      if (saved && (saved as any).recommendations) {
+        result.recommendations = (saved as any).recommendations;
+      }
     } else {
       console.warn('⚠️ userId manquant, analyse aléatoire non sauvegardée');
     }
@@ -95,12 +115,24 @@ export class AiAnalysisService {
   async analyzeSkinWithLLM(
     profile: UserSkinProfile,
     userId: string = ''
-  ): Promise<GlobalScoreResult> {
+  ): Promise<GlobalScoreResult & { recommendations?: any[] }> {
     try {
-      const result = await this.openRouterService.analyzeSkin(profile);
+      const result = await this.openRouterService.analyzeSkin(profile) as any;
 
       if (userId && result.globalScore > 0) {
-        await this.persistResult(result, 'unified_llm', userId);
+        const saved = await this.persistResult(result, 'unified_llm', userId);
+        if (saved && (saved as any).recommendations) {
+          result.recommendations = (saved as any).recommendations;
+        }
+      } 
+      
+      // Toujours ajouter des recommandations même si pas de userId (pour le démo/guest mode)
+      if (!result.recommendations) {
+        result.recommendations = await this.recommendationService.getRecommendationsForSkinState(
+          userId || 'guest',
+          'temporary',
+          profile.skinType || 'Normal'
+        );
       }
 
       return result;
@@ -157,7 +189,6 @@ export class AiAnalysisService {
 
   /**
    * Extrait hydration, oil, acne, wrinkles depuis conditionScores pour la comparaison.
-   * Utilise ?? pour éviter les NULL ; défaut 50–80 si une métrique manque.
    */
   private getComparisonMetricsFromConditions(conditionScores: GlobalScoreResult['conditionScores']): {
     hydration: number;
@@ -178,7 +209,6 @@ export class AiAnalysisService {
 
   /**
    * Sauvegarde les résultats en base de données.
-   * Remplit hydration, oil, acne, wrinkles sur SkinAnalysis pour la comparaison (évite NULL).
    */
   private async persistResult(result: GlobalScoreResult, imageId: string, userId: string) {
     if (!userId) {
@@ -215,8 +245,27 @@ export class AiAnalysisService {
       ));
 
       await this.metricRepo.save(metrics);
-      console.log(`✅ Analyse sauvegardée pour userId=${userId}, id=${savedAnalysis.id}`);
-      return savedAnalysis;
+
+      // ✅ NOUVEAU: Générer des recommandations basées sur l'état de la peau
+      let inferredSkinType = 'Normal';
+      const dominant = result.analysis?.dominantCondition;
+      
+      if (dominant === SkinCondition.ACNE || dominant === SkinCondition.PORES) {
+        inferredSkinType = 'Oily';
+      } else if (dominant === SkinCondition.REDNESS) {
+        inferredSkinType = 'Sensitive';
+      } else if (result.globalScore < 40) {
+        inferredSkinType = 'Dry';
+      }
+
+      const recommendations = await this.recommendationService.getRecommendationsForSkinState(
+        userId,
+        savedAnalysis.id,
+        inferredSkinType
+      );
+
+      console.log(`✅ Analyse + Recommandations sauvegardées pour userId=${userId}, id=${savedAnalysis.id}`);
+      return { ...savedAnalysis, recommendations };
     } catch (error) {
       console.error('❌ Failed to persist AI analysis:', error.message);
       return null;

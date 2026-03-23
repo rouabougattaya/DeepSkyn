@@ -27,6 +27,14 @@ export interface ConditionWeights {
   blackDots: number;
 }
 
+export interface SkinProduct {
+  name: string;
+  type: string;
+  price: number;
+  skinType: string;
+  url: string;
+}
+
 export interface GlobalScoreResult {
   globalScore: number;
   conditionScores: ConditionScore[];
@@ -36,6 +44,7 @@ export interface GlobalScoreResult {
     worstCondition: SkinCondition | null;
     dominantCondition: SkinCondition | null;
   };
+  recommendations?: SkinProduct[];
 }
 
 export interface UserSkinProfile {

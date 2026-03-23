@@ -17,6 +17,7 @@ import { SessionModule } from './sessions/session.module'; // ← AJOUTE CET IMP
 import { InsightsModule } from './insights/insights.module';
 import { SkinMetricModule } from './skinMetric/skin-metric.module';
 import { AdminModule } from './admin/admin.module';
+import { RecommendationModule } from './recommendation/recommendation.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AdminModule } from './admin/admin.module';
     SessionModule, // ← AJOUTE CETTE LIGNE (ne touche pas aux autres)
     InsightsModule,
     AdminModule,
+    RecommendationModule,
   ],
   controllers: [AppController, AnalysisController],
   providers: [

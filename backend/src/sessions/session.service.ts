@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Session } from './session.entity';
 import { FingerprintService } from '../auth/services/fingerprint.service';
-import { OpenRouterService } from '../ai/openrouter.service';
+import { GeminiService } from '../ai/gemini.service';
 
 @Injectable()
 export class SessionService {
@@ -12,7 +12,7 @@ export class SessionService {
     @InjectRepository(Session)  // ← Ceci doit correspondre à TypeOrmModule.forFeature([Session])
     private sessionRepository: Repository<Session>,
     private fingerprintService: FingerprintService,
-    private openRouterService: OpenRouterService,
+    private geminiService: GeminiService,
   ) { }
 
   async createSession(
@@ -106,8 +106,9 @@ export class SessionService {
     });
 
     if (!session) return;
-
-    const analysis = await this.openRouterService.analyzeSessionRisk({
+    
+    // Utilisation de GeminiService à la place d'OpenRouter
+    const analysis = await this.geminiService.analyzeSessionRisk({
       userId: session.userId,
       fingerprint: session.fingerprint,
       createdAt: session.createdAt,

@@ -232,6 +232,14 @@ export default function SkinAnalysisPage() {
             setScanPhase('done');
             setResult(analysisResult);
             setAnalysisCount(c => c + 1);
+
+            // Auto-scroll to recommendations after a short delay
+            setTimeout(() => {
+                const recSection = document.getElementById('recommendations-section');
+                if (recSection) {
+                    recSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 1000);
         } catch (err: any) {
             console.error('Analysis error:', err);
             setError(`Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur (port 3001).'}`);
@@ -819,6 +827,96 @@ export default function SkinAnalysisPage() {
                                             L'IA analyse vos préoccupations pour pondérer le score global.
                                         </p>
                                     </div>
+                                </div>
+
+                                {/* AI Summary */}
+                                <div className="bg-[#0d9488] p-8 rounded-3xl shadow-xl shadow-teal-500/20 text-white relative overflow-hidden group">
+                                    <Sparkles className="absolute -right-4 -top-4 w-24 h-24 opacity-10 group-hover:rotate-12 transition-transform" />
+                                    <div className="relative z-10">
+                                        <h3 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 opacity-80">
+                                            <CheckCircle size={14} /> Sommaire de l'analyse
+                                        </h3>
+                                        <p className="text-lg font-medium leading-relaxed italic">
+                                            "Votre peau montre des signes de vitalité. Maintenez votre routine actuelle pour préserver ces résultats."
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Product Recommendations */}
+                                <div id="recommendations-section" className="glass-card fade-in" style={{ padding: 24, border: '2px solid #0d9488' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <Sparkles className="text-teal-600" size={20} />
+                                            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                                                Tes Recommandations Skincare
+                                            </h2>
+                                        </div>
+                                        {result.recommendations && result.recommendations.length > 0 && (
+                                            <div className="tag" style={{ background: '#f0fdf4', color: '#0d9488', border: '1px solid #dcfce7' }}>
+                                                Basé sur ton modèle Python
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {!result.recommendations || result.recommendations.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>
+                                            <Info size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                                            <p>Chargement des produits depuis ta dataset...</p>
+                                            <p style={{ fontSize: 12 }}>Assure-toi que `skincare_products_clean.csv` est bien dans `backend/data/`</p>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                                            {result.recommendations.map((product, idx) => (
+                                                <div key={idx} style={{
+                                                    background: 'white',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: 16,
+                                                    padding: 16,
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: 8,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 800,
+                                                        textTransform: 'uppercase',
+                                                        color: '#0d9488',
+                                                        letterSpacing: '0.05em'
+                                                    }}>
+                                                        {product.type}
+                                                    </div>
+                                                    <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>
+                                                        {product.name}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                                        <span style={{ fontWeight: 800, color: '#0f172a' }}>£{product.price.toFixed(2)}</span>
+                                                        <span style={{ fontSize: 10, color: '#94a3b8' }}>Peau {product.skinType}</span>
+                                                    </div>
+                                                    <a
+                                                        href={product.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            marginTop: 8,
+                                                            textAlign: 'center',
+                                                            background: '#0d9488',
+                                                            borderRadius: 10,
+                                                            padding: '8px 0',
+                                                            fontSize: 12,
+                                                            fontWeight: 700,
+                                                            color: 'white',
+                                                            textDecoration: 'none',
+                                                            boxShadow: '0 4px 10px rgba(13,148,136,0.2)'
+                                                        }}
+                                                    >
+                                                        Acheter
+                                                    </a>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Raw Metrics Summary */}

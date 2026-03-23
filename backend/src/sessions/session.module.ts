@@ -5,17 +5,17 @@ import { Session } from './session.entity';
 import { SessionController } from './session.controller';
 import { SessionService } from './session.service';
 import { FingerprintService } from '../auth/services/fingerprint.service';
-import { OpenRouterService } from '../ai/openrouter.service';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Session]), // ← Ceci rend SessionRepository disponible
+    TypeOrmModule.forFeature([Session]),
+    AiModule,
   ],
   controllers: [SessionController],
   providers: [
     SessionService,
     FingerprintService,
-    OpenRouterService,
   ],
   exports: [SessionService],
 })

@@ -99,12 +99,24 @@ const GoogleCallback = () => {
 
         const backendData = await backendResponse.json();
 
-        // Use the centralized session management
+        const accessToken = backendData.accessToken ?? backendData.token;
+        if (!accessToken) {
+          throw new Error('Backend did not return an access token');
+        }
+
+        const accessExp = backendData.accessTokenExpiresAt
+          ? new Date(backendData.accessTokenExpiresAt).toISOString()
+          : new Date(Date.now() + 3600000).toISOString();
+        const refreshExp = backendData.refreshTokenExpiresAt
+          ? new Date(backendData.refreshTokenExpiresAt).toISOString()
+          : new Date(Date.now() + 7 * 24 * 3600000).toISOString();
+
+        // Use the centralized session management (Nest issueTokens returns accessToken, not token)
         setSession({
-          accessToken: backendData.token, // This is the real JWT from NestJS
+          accessToken,
           refreshToken: backendData.refreshToken || 'google_refresh_fallback',
-          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
-          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 3600000).toISOString(),
+          accessTokenExpiresAt: accessExp,
+          refreshTokenExpiresAt: refreshExp,
           user: {
             ...backendData.user,
             authMethod: 'google'

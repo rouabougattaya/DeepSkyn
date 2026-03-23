@@ -20,7 +20,11 @@ class GoogleRealOAuthService {
         throw new Error('Invalid ID token format');
       }
 
-      const payload = JSON.parse(atob(parts[1]));
+      // JWT uses base64url; atob() expects standard base64 with padding
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4;
+      const padded = pad ? b64 + '='.repeat(4 - pad) : b64;
+      const payload = JSON.parse(atob(padded));
 
       const userInfo: GoogleUserInfo = {
         id: payload.sub,

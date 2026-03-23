@@ -99,8 +99,8 @@ const GoogleCallback = () => {
 
         const backendData = await backendResponse.json();
 
-        const accessToken = backendData.accessToken ?? backendData.token;
-        if (!accessToken) {
+        const backendToken = backendData.accessToken ?? backendData.token;
+        if (!backendToken) {
           throw new Error('Backend did not return an access token');
         }
 
@@ -113,7 +113,7 @@ const GoogleCallback = () => {
 
         // Use the centralized session management (Nest issueTokens returns accessToken, not token)
         setSession({
-          accessToken,
+          accessToken: backendToken,
           refreshToken: backendData.refreshToken || 'google_refresh_fallback',
           accessTokenExpiresAt: accessExp,
           refreshTokenExpiresAt: refreshExp,

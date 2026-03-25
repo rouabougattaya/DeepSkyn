@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { authFetch, getUser } from "@/lib/authSession"
-import { Check, Moon, Sparkles, Sun, ShoppingBag } from "lucide-react"
+import { Check, Moon, Sparkles, Sun, ShoppingBag, ArrowUpRight, ArrowDownRight, Minus, History, RefreshCw, AlertCircle } from "lucide-react"
+import { updateRoutine } from "@/services/routinePersonalizationService"
+import type { RoutineUpdateResponseDto, TrendDetail } from "@/types/routinePersonalization"
 
 type RoutineProduct = {
   id: string
@@ -16,6 +18,7 @@ type RoutineStep = {
   stepOrder: number
   stepName: "Cleanser" | "Serum" | "Moisturizer"
   notes?: string
+  adjustmentReason?: string
   product: RoutineProduct
 }
 
@@ -50,6 +53,12 @@ export default function RoutinesPage() {
   const stepKey = (routineType: "morning" | "night", stepOrder: number, productId: string) =>
     `${routineType}_${stepOrder}_${productId}`
 
+  const [personalizing, setPersonalizing] = useState(false)
+  const [personalizationResult, setPersonalizationResult] = useState<RoutineUpdateResponseDto | null>(null)
+  const [history, setHistory] = useState<RoutineUpdateResponseDto[]>([])
+
+  const historyKey = userId ? `routine_history_${userId}` : null
+
   const allSteps = routine ? [...routine.morning.steps, ...routine.night.steps] : []
 
   const completedCount = routine
@@ -75,6 +84,16 @@ export default function RoutinesPage() {
       setCompleted({})
     }
   }, [storageKey])
+
+  useEffect(() => {
+    if (!historyKey) return
+    try {
+      const raw = localStorage.getItem(historyKey)
+      setHistory(raw ? (JSON.parse(raw) as RoutineUpdateResponseDto[]) : [])
+    } catch {
+      setHistory([])
+    }
+  }, [historyKey])
 
   useEffect(() => {
     if (!userId) {
@@ -108,6 +127,47 @@ export default function RoutinesPage() {
       return next
     })
   }
+
+  const handleUpdateRoutine = async () => {
+    if (!userId) return
+    setPersonalizing(true)
+    setError(null)
+    try {
+      const result = await updateRoutine({ forceRegenerate: true })
+      setRoutine(result.routine as any)
+      setPersonalizationResult(result)
+      
+      // Save to history
+      const newHistory = [{ ...result, createdAt: new Date().toISOString() }, ...history].slice(0, 10)
+      setHistory(newHistory)
+      if (historyKey) localStorage.setItem(historyKey, JSON.stringify(newHistory))
+    } catch (err: any) {
+      setError(err?.message || "Erreur lors de la mise à jour de la routine.")
+    } finally {
+      setPersonalizing(false)
+    }
+  }
+
+  const TrendIcon = ({ trend }: { trend: TrendDetail['trend'] }) => {
+    if (trend === 'improving') return <ArrowUpRight className="text-emerald-500" size={16} />
+    if (trend === 'worsening') return <ArrowDownRight className="text-rose-500" size={16} />
+    return <Minus className="text-slate-400" size={16} />
+  }
+
+  const TrendCard = ({ label, detail }: { label: string, detail: TrendDetail }) => (
+    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="mt-1 flex items-center justify-between">
+        <div className="text-lg font-black text-slate-900">{detail.current}%</div>
+        <div className="flex items-center gap-1">
+          <TrendIcon trend={detail.trend} />
+          <span className={`text-xs font-bold ${detail.delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {detail.delta > 0 ? '+' : ''}{detail.delta}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 py-10">
@@ -177,10 +237,64 @@ export default function RoutinesPage() {
                     </button>
                   </div>
                 </div>
+
+                <button
+                  onClick={handleUpdateRoutine}
+                  disabled={personalizing}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 disabled:opacity-50 transition"
+                >
+                  {personalizing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+                  Mettre à jour
+                </button>
               </div>
             </div>
           </div>
         </div>
+
+        {personalizationResult && (
+          <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="rounded-3xl border border-indigo-100 bg-indigo-50/50 p-6 backdrop-blur">
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="text-indigo-600" size={20} />
+                    <h2 className="text-lg font-black text-slate-900">Analyse & Ajustements</h2>
+                    <span className="ml-auto rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                      Peau {personalizationResult.inferredSkinType}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <TrendCard label="Hydratation" detail={personalizationResult.trends.hydration} />
+                    <TrendCard label="Sébum" detail={personalizationResult.trends.oil} />
+                    <TrendCard label="Acné" detail={personalizationResult.trends.acne} />
+                    <TrendCard label="Rides" detail={personalizationResult.trends.wrinkles} />
+                  </div>
+                </div>
+
+                <div className="lg:w-1/3 border-t lg:border-t-0 lg:border-l border-indigo-100 pt-6 lg:pt-0 lg:pl-6">
+                  <div className="text-sm font-bold text-slate-800 mb-3">Règles appliquées :</div>
+                  <ul className="space-y-3">
+                    {personalizationResult.adjustments.map((adj, i) => (
+                      <li key={i} className="flex gap-3">
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-extrabold text-slate-900">{adj.action}</p>
+                          <p className="text-[10px] text-slate-500">{adj.reason}</p>
+                        </div>
+                      </li>
+                    ))}
+                    {personalizationResult.adjustments.length === 0 && (
+                      <li className="text-xs italic text-slate-500">Aucun ajustement majeur nécessaire.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6">
           {loading && (
@@ -267,6 +381,13 @@ export default function RoutinesPage() {
 
                               <div className="mt-2 text-sm font-semibold text-slate-800">{s.product.name}</div>
 
+                              {s.adjustmentReason && (
+                                <div className="mt-2 flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-2 py-1.5 text-[10px] font-bold text-indigo-700">
+                                  <AlertCircle size={12} />
+                                  {s.adjustmentReason}
+                                </div>
+                              )}
+
                               {productHref ? (
                                 <a
                                   href={productHref}
@@ -293,6 +414,50 @@ export default function RoutinesPage() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+              <History size={16} />
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Historique des personnalisations</h2>
+          </div>
+
+          <div className="space-y-4">
+            {history.map((item, i) => (
+              <div key={item.personalizationId + i} className="group relative rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-teal-200 transition">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2 w-2 rounded-full ${item.trends.globalScoreTrend === 'improving' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                    <div>
+                      <div className="text-xs font-black text-slate-900">
+                        {new Date(item.createdAt || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                        {item.analysisCount} analyses prises en compte • Type {item.inferredSkinType}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-1">
+                      {item.adjustments.slice(0, 3).map((_, idx) => (
+                        <div key={idx} className="h-5 w-5 rounded-full border-2 border-white bg-indigo-100" />
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600">
+                      {item.adjustments.length} ajustements
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {history.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                <p className="text-sm font-medium text-slate-500">Aucun historique disponible. Cliquez sur "Mettre à jour" pour commencer.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 text-center text-xs text-slate-400">

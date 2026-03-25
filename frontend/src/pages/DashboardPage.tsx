@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUser } from '@/lib/authSession';
 import {
   TrendingUp, TrendingDown, Minus, BarChart2, Activity,
-  Zap, ArrowRight, LayoutDashboard,
-  Settings, Search, User as UserIcon
+  Zap, ArrowRight
 } from 'lucide-react';
 import {
   Brain,
@@ -13,13 +12,15 @@ import {
   Shield,
   History,
   Sparkles,
-  RefreshCw,
-  LogOut
+  RefreshCw
 } from 'lucide-react';
 import AIStatusBadge from '@/components/AIStatusBadge';
 import { simpleAuthService } from '@/services/authService-simple';
 import { dashboardService } from '@/services/dashboardService';
 import { comparisonService } from '@/services/comparison.service';
+import { skinAgeInsightsService, type SkinAgeInsightResponse } from '@/services/skinAgeInsightsService';
+import SkinAgeInsightCard from '@/components/insights/SkinAgeInsightCard';
+import { productService, type Product } from '@/services/product.service';
 import type { DashboardMetrics, TrendData, MonthlyData } from '@/types/dashboard';
 
 /* ─── Chart.js — Dev 1 (Roua) ─── */
@@ -152,36 +153,26 @@ function KPIMetricCard({
 
 /* ──────────────────────── SUB-COMPONENTS ──────────────────── */
 
-function SidebarItem({ icon: Icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className="sidebar-item" style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12,
-      cursor: 'pointer', marginBottom: 4, transition: 'all 0.2s',
-      background: active ? THEME.greenSoft : 'transparent',
-      color: active ? THEME.primary : THEME.textSecondary,
-      fontWeight: active ? 700 : 500,
-      fontSize: 14,
-    }}>
-      <Icon size={20} />
-      <span>{label}</span>
-      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: THEME.primary }} />}
-    </div>
-  );
-}
-
 /* ──────────────────────── MAIN COMPONENT ──────────────────── */
 
 export default function ProfessionalDashboard() {
   const [user, setUser] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [analysisJustCompleted, setAnalysisJustCompleted] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const lastFetchTimeRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [trends, setTrends] = useState<TrendData[]>([]);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [recentHistory, setRecentHistory] = useState<any[]>([]);
+  const [skinAgeInsight, setSkinAgeInsight] = useState<SkinAgeInsightResponse | null>(null);
+  const [skinAgeLoading, setSkinAgeLoading] = useState<boolean>(true);
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -189,6 +180,14 @@ export default function ProfessionalDashboard() {
       if (!currentUser) { navigate('/auth/login'); return; }
       setUser(currentUser);
       setAiStatus({ verified: currentUser.aiVerified || false, score: currentUser.aiScore || 0 });
+      
+      // Check if an analysis was just completed
+      const analysisCompleted = sessionStorage.getItem('analysisCompleted');
+      if (analysisCompleted) {
+        sessionStorage.removeItem('analysisCompleted');
+        setAnalysisJustCompleted(true);
+      }
+      
       setLoading(false);
     };
     loadUserData();
@@ -211,9 +210,131 @@ export default function ProfessionalDashboard() {
     }
   };
 
+  const loadSkinAgeRecommendations = async (insightData?: SkinAgeInsightResponse | null) => {
+    // If we already have products from the backend, use them
+    const insight = insightData ?? skinAgeInsight;
+    if (insight?.products && insight.products.length > 0) {
+      setRecommendedProducts(insight.products);
+      return;
+    }
+
+    // Only search for products if backend didn't provide any
+    const searchCandidates = [
+      ...(insight?.productSuggestions?.filter(Boolean) || []),
+      ...(insight?.status === 'older'
+        ? ['anti-aging', 'anti aging', 'retinol']
+        : ['hydration', 'moisturizer', 'spf']),
+      'skin barrier',
+      'cleanser',
+    ];
+
+    if (searchCandidates.length === 0) return;
+
+    setProductsLoading(true);
+    try {
+      // Try with clean products first, then without the clean filter, then no search at all
+      for (const term of searchCandidates) {
+        if (!term) continue;
+
+        const attempts = [
+          { search: term, isClean: true },
+          { search: term, isClean: undefined },
+        ];
+
+        for (const attempt of attempts) {
+          const products = await productService.filter({
+            ...attempt,
+            sortBy: 'rating',
+            sortOrder: 'DESC',
+          });
+          const top = (products || []).slice(0, 6);
+          if (top.length > 0) {
+            setRecommendedProducts(top);
+            return;
+          }
+        }
+      }
+
+      // Final fallback: grab top-rated products overall
+      const anyTop = await productService.filter({ sortBy: 'rating', sortOrder: 'DESC' });
+      const top = (anyTop || []).slice(0, 6);
+      setRecommendedProducts(top);
+    } catch (err) {
+      console.error('Error fetching recommended products:', err);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const loadSkinAgeInsights = async (skipDebounce: boolean = false) => {
+    if (!user?.id) return;
+    if (isFetchingRef.current) return; // Prevent overlapping requests
+    
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTimeRef.current;
+    
+    // Only fetch if more than 5 seconds have passed (debounce polling), UNLESS skipDebounce is true
+    if (!skipDebounce && timeSinceLastFetch < 5000) return;
+    
+    isFetchingRef.current = true;
+    setSkinAgeLoading(true);
+    try {
+      console.log(`[loadSkinAgeInsights] Fetching fresh insights... (skipDebounce: ${skipDebounce})`);
+      const data = await skinAgeInsightsService.getInsights(user.id);
+      console.log(`[loadSkinAgeInsights] Got data - advice:`, data.advice);
+      setSkinAgeInsight(data);
+      // Always refresh recommendations based on latest insight to avoid stale products
+      setRecommendedProducts(data.products ?? []);
+      loadSkinAgeRecommendations(data);
+      lastFetchTimeRef.current = now;
+    } catch (err) {
+      console.error('Error fetching skin-age insights:', err);
+    } finally {
+      setSkinAgeLoading(false);
+      isFetchingRef.current = false;
+    }
+  };
+
+  const handleLaunchAnalysis = async () => {
+    navigate('/ai-demo');
+  };
+
   useEffect(() => {
-    if (!loading) loadSkinMetrics();
-  }, [loading]);
+    if (!loading) {
+      loadSkinMetrics();
+      loadSkinAgeInsights();
+    }
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch immediately if analysis just completed
+  useEffect(() => {
+    if (analysisJustCompleted && !loading) {
+      loadSkinMetrics();
+      loadSkinAgeInsights(true); // Skip debounce - we know there's fresh data
+      setAnalysisJustCompleted(false);
+    }
+  }, [analysisJustCompleted, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refetch when returning to dashboard page
+  useEffect(() => {
+    if (!loading && location.pathname === '/dashboard') {
+      loadSkinMetrics();
+      loadSkinAgeInsights(true); // Skip debounce - fresh route navigation
+    }
+  }, [location.pathname, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for storage changes to detect analysis completion from other tab/window
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'analysisCompleted' && e.newValue && !loading) {
+        console.log('[Dashboard] Storage event detected - analysis completed');
+        loadSkinMetrics();
+        loadSkinAgeInsights(true); // Skip debounce - fresh data available
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefreshAI = async () => {
     setLoading(true);
@@ -244,58 +365,36 @@ export default function ProfessionalDashboard() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{`
         .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
-        .sidebar-item:hover { background: ${THEME.greenSoft}; color: ${THEME.primary}; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
 
-      {/* ── SIDEBAR ── */}
-      <aside style={{ width: '240px', background: THEME.surface, borderRight: `1px solid ${THEME.border}`, position: 'fixed', top: '64px', height: 'calc(100vh - 64px)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '24px 16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '24px' }}>Menu Principal</div>
-          <SidebarItem icon={LayoutDashboard} label="Vue d'ensemble" active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
-          <SidebarItem icon={Camera} label="Analyse IA" onClick={() => navigate('/ai-demo')} />
-          <SidebarItem icon={History} label="Archives médicales" onClick={() => navigate('/analysis')} />
-          <SidebarItem icon={Shield} label="Sécurité & IPs" onClick={() => navigate('/security')} />
-
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '32px 0 24px' }}>Système</div>
-          <SidebarItem icon={UserIcon} label="Mon Profil" onClick={() => navigate('/profile')} />
-          <SidebarItem icon={Shield} label="Sécurité" onClick={() => navigate('/security-history')} />
-          <SidebarItem icon={Settings} label="Paramètres" onClick={() => navigate('/settings')} />
-        </div>
-
-        <div style={{ marginTop: 'auto', padding: '24px', borderTop: `1px solid ${THEME.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: THEME.greenSoft, display: 'grid', placeItems: 'center', fontWeight: 700, color: THEME.primary, border: `1px solid ${THEME.primary}20` }}>
-              {user?.firstName?.charAt(0) || user?.name?.charAt(0) || 'U'}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.firstName || user?.name || 'Utilisateur'}</div>
-              <div style={{ fontSize: 12, color: THEME.textSecondary }}>Plan Premium</div>
-            </div>
-          </div>
-          <button onClick={async () => { await simpleAuthService.logout(); navigate('/auth/login'); }} style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1px solid ${THEME.border}`, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>
-            <LogOut size={16} /> Déconnexion
-          </button>
-        </div>
-      </aside>
-
       {/* ── MAIN CONTENT ── */}
-      <main style={{ marginLeft: '240px', flex: 1, marginTop: '64px', padding: '40px' }}>
+      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px 56px', marginTop: '12px' }}>
 
         {/* Header Hero */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          marginBottom: 40,
+          padding: '20px 24px',
+          borderRadius: 20,
+          background: 'linear-gradient(120deg, #f0fdfa, #e0f2fe)',
+          border: `1px solid ${THEME.border}`,
+          boxShadow: '0 14px 28px rgba(13,148,136,0.12)',
+        }} className="kpi-card">
           <div>
             <h1 style={{ fontSize: 32, fontWeight: 800, color: THEME.textPrimary, letterSpacing: '-0.02em', marginBottom: 8 }}>
-              Bonjour, <span style={{ color: THEME.primary }}>{user?.firstName || user?.name?.split(' ')[0]}</span> 👋
+              Welcome back, <span style={{ color: THEME.primary }}>{user?.firstName || user?.name?.split(' ')[0]}</span> 👋
             </h1>
-            <p style={{ color: THEME.textSecondary, fontSize: 16 }}>Voici l'état actuel de votre santé cutanée.</p>
+            <p style={{ color: THEME.textSecondary, fontSize: 16 }}>Here is your latest skin health snapshot.</p>
           </div>
           <button onClick={handleRefreshAI} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, background: THEME.surface, border: `1px solid ${THEME.border}`, fontWeight: 600, fontSize: 14, color: THEME.textPrimary, cursor: 'pointer', transition: 'all 0.2s' }}>
-            <RefreshCw size={16} /> Actualiser les données IA
+            <RefreshCw size={16} /> Refresh AI data
           </button>
         </div>
 
@@ -305,23 +404,33 @@ export default function ProfessionalDashboard() {
             {/* KPI ROW */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
               <KPIMetricCard
-                title="Score moyen"
+                title="Average score"
                 value={metrics?.averageScore ?? '—'}
                 unit="/100"
                 trend={metrics ? { direction: metrics.trendDirection, percentage: metrics.trendPercentage } : undefined}
                 icon={<BarChart2 size={24} />}
                 color="#0d9488"
                 sparkData={monthly.filter(m => m.analysisCount > 0).map(m => m.averageScore).slice(-5)}
-                subtitle={metrics ? (metrics.averageScore >= 75 ? 'Optimal' : 'À surveiller') : 'Prêt pour analyse'}
+                subtitle={metrics ? (metrics.averageScore >= 75 ? 'Optimal' : 'Needs attention') : 'Ready for analysis'}
               />
               <KPIMetricCard
-                title="Analyses totales"
+                title="Total analyses"
                 value={metrics?.totalAnalyses ?? '0'}
                 icon={<Activity size={24} />}
                 color="#8b5cf6"
-                subtitle="Derniers 30 jours"
+                subtitle="Last 30 days"
               />
             </div>
+
+            <SkinAgeInsightCard
+              insight={skinAgeInsight}
+              loading={skinAgeLoading}
+              productsLoading={productsLoading}
+              onRetry={loadSkinAgeInsights}
+              onRefreshProducts={() => loadSkinAgeRecommendations(skinAgeInsight)}
+              onLaunchAnalysis={handleLaunchAnalysis}
+              recommendedProducts={recommendedProducts}
+            />
 
             {/* ════════════════════════════════════════════════════════════
              *  📊 METRICS AGGREGATION ENGINE — Dev 1 (Roua)
@@ -333,10 +442,10 @@ export default function ProfessionalDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, letterSpacing: '-0.02em', margin: 0 }}>
-                    Moteur d'Agrégation Statistique
+                    Statistical Aggregation Engine
                   </h3>
                   <p style={{ fontSize: 12, color: THEME.textSecondary, marginTop: 4 }}>
-                    Analyse avancée • Moyenne dynamique • Tendances • Dispersion
+                    Advanced analytics • Dynamic averages • Trends • Dispersion
                   </p>
                 </div>
 
@@ -345,10 +454,10 @@ export default function ProfessionalDashboard() {
               {/* ── GRADIENT KPI CARDS ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
-                  { label: 'Score Moyen', value: metrics?.averageScore ?? 0, sub: 'Moyenne dynamique (reduce)', gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', icon: <BarChart2 size={22} /> },
-                  { label: 'Meilleur Score', value: metrics?.bestScore ?? 0, sub: 'Math.max() sur tous les scores', gradient: 'linear-gradient(135deg, #10b981, #059669)', icon: <TrendingUp size={22} /> },
-                  { label: 'Pire Score', value: metrics?.worstScore ?? 0, sub: 'Math.min() sur tous les scores', gradient: 'linear-gradient(135deg, #f43f5e, #e11d48)', icon: <TrendingDown size={22} /> },
-                  { label: 'Total Analyses', value: metrics?.totalAnalyses ?? 0, sub: 'Nombre total en base', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', icon: <Activity size={22} /> },
+                  { label: 'Average Score', value: metrics?.averageScore ?? 0, sub: 'Dynamic average (reduce)', gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', icon: <BarChart2 size={22} /> },
+                  { label: 'Best Score', value: metrics?.bestScore ?? 0, sub: 'Math.max across all scores', gradient: 'linear-gradient(135deg, #10b981, #059669)', icon: <TrendingUp size={22} /> },
+                  { label: 'Lowest Score', value: metrics?.worstScore ?? 0, sub: 'Math.min across all scores', gradient: 'linear-gradient(135deg, #f43f5e, #e11d48)', icon: <TrendingDown size={22} /> },
+                  { label: 'Total Analyses', value: metrics?.totalAnalyses ?? 0, sub: 'All analyses recorded', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', icon: <Activity size={22} /> },
                 ].map(kpi => (
                   <div key={kpi.label} style={{
                     background: kpi.gradient, borderRadius: 20, padding: 22,
@@ -378,29 +487,29 @@ export default function ProfessionalDashboard() {
                 display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 20,
               }}>
                 <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Écart-type (σ)</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Standard deviation (σ)</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{(metrics?.standardDeviation ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Dispersion des scores</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Score spread</div>
                 </div>
                 <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Médiane</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Median</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{(metrics?.medianScore ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Valeur centrale</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Central value</div>
                 </div>
                 <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q1 (25e %ile)</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q1 (25th %ile)</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#ef4444' }}>{(metrics?.percentile25 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>25% en dessous</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Bottom 25%</div>
                 </div>
                 <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q3 (75e %ile)</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Q3 (75th %ile)</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>{(metrics?.percentile75 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>75% en dessous</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Top 75%</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Moy. Mobile (5)</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Rolling Avg (5)</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#8b5cf6' }}>{(metrics?.movingAverage5 ?? 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Dernières 5 analyses</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4 }}>Last 5 analyses</div>
                 </div>
               </div>
 
@@ -421,9 +530,9 @@ export default function ProfessionalDashboard() {
                     {(!metrics || metrics?.trendDirection === 'stable') && <Minus size={20} style={{ color: '#64748b' }} />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary }}>Tendance Globale</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary }}>Overall trend</div>
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                      {metrics?.trendPercentage?.toFixed(1) ?? '0.0'}% {metrics?.trendDirection === 'up' ? 'd\'amélioration' : metrics?.trendDirection === 'down' ? 'de baisse' : '— zone stable'}
+                      {metrics?.trendPercentage?.toFixed(1) ?? '0.0'}% {metrics?.trendDirection === 'up' ? 'improvement' : metrics?.trendDirection === 'down' ? 'decline' : 'stable range'}
                     </div>
                   </div>
                 </div>
@@ -433,8 +542,8 @@ export default function ProfessionalDashboard() {
                   color: 'white', fontSize: 13, fontWeight: 800, letterSpacing: '0.02em',
                   boxShadow: metrics?.trendDirection === 'up' ? '0 4px 12px rgba(16,185,129,0.3)' : metrics?.trendDirection === 'down' ? '0 4px 12px rgba(244,63,94,0.3)' : '0 4px 12px rgba(148,163,184,0.3)',
                 }}>
-                  {metrics?.trendDirection === 'up' ? '↑ EN HAUSSE' :
-                    metrics?.trendDirection === 'down' ? '↓ EN BAISSE' : '― STABLE'}
+                  {metrics?.trendDirection === 'up' ? '↑ IMPROVING' :
+                    metrics?.trendDirection === 'down' ? '↓ DECLINING' : '― STABLE'}
                 </div>
               </div>
 
@@ -468,7 +577,7 @@ export default function ProfessionalDashboard() {
                           }}>
                             {isUp ? '+' : isDown ? '-' : ''}{t.percentage.toFixed(1)}%
                           </div>
-                          <span style={{ fontSize: 9, color: '#94a3b8' }}>{t.sampleSize} analyse{t.sampleSize !== 1 ? 's' : ''}</span>
+                          <span style={{ fontSize: 9, color: '#94a3b8' }}>{t.sampleSize} {t.sampleSize === 1 ? 'analysis' : 'analyses'}</span>
                         </div>
                       </div>
                     );
@@ -500,21 +609,21 @@ export default function ProfessionalDashboard() {
                       <BarChart3 size={22} style={{ color: 'white' }} />
                     </div>
                     <h4 style={{ fontSize: 15, fontWeight: 800, color: THEME.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>
-                      Évolution Mensuelle des Scores
+                      Monthly Score Evolution
                     </h4>
                     <p style={{ fontSize: 11, color: THEME.textSecondary, marginTop: 2 }}>
-                      Analyse historique de la santé de votre peau • Progression sur les 6 derniers mois
+                      Historical skin health analysis • Progress over the last 6 months
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#64748b', fontWeight: 600 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#0d9488' }} /> Score moyen
+                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#0d9488' }} /> Average score
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#8b5cf6', backgroundImage: 'repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 6px, transparent 6px, transparent 10px)' }} /> Meilleur
+                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#8b5cf6', backgroundImage: 'repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 6px, transparent 6px, transparent 10px)' }} /> Best
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#f43f5e', backgroundImage: 'repeating-linear-gradient(90deg, #f43f5e 0, #f43f5e 3px, transparent 3px, transparent 6px)' }} /> Pire
+                      <span style={{ width: 20, height: 3, borderRadius: 2, background: '#f43f5e', backgroundImage: 'repeating-linear-gradient(90deg, #f43f5e 0, #f43f5e 3px, transparent 3px, transparent 6px)' }} /> Lowest
                     </span>
                   </div>
                 </div>
@@ -526,11 +635,11 @@ export default function ProfessionalDashboard() {
                       data={{
                         labels: monthly.filter(m => m.analysisCount > 0).map(m => {
                           const [y, mo] = m.month.split('-');
-                          return new Date(+y, +mo - 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+                          return new Date(+y, +mo - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                         }),
                         datasets: [
                           {
-                            label: 'Score moyen',
+                            label: 'Average score',
                             data: monthly.filter(m => m.analysisCount > 0).map(m => m.averageScore),
                             borderColor: '#0d9488',
                             backgroundColor: 'rgba(13,148,136,0.08)',
@@ -544,7 +653,7 @@ export default function ProfessionalDashboard() {
                             borderWidth: 3,
                           },
                           {
-                            label: 'Meilleur score',
+                            label: 'Best score',
                             data: monthly.filter(m => m.analysisCount > 0).map(m => m.bestScore),
                             borderColor: '#8b5cf6',
                             backgroundColor: 'transparent',
@@ -559,7 +668,7 @@ export default function ProfessionalDashboard() {
                             borderDash: [6, 4],
                           },
                           {
-                            label: 'Pire score',
+                            label: 'Lowest score',
                             data: monthly.filter(m => m.analysisCount > 0).map(m => m.worstScore),
                             borderColor: '#f43f5e',
                             backgroundColor: 'transparent',
@@ -625,7 +734,7 @@ export default function ProfessionalDashboard() {
                             ticks: { color: '#64748b', font: { size: 11, weight: 'bold' } },
                             title: {
                               display: true,
-                              text: 'Période (Mois)',
+                              text: 'Period (month)',
                               color: '#64748b',
                               font: { size: 11, weight: 'bold' },
                               padding: { top: 8 },
@@ -641,17 +750,17 @@ export default function ProfessionalDashboard() {
                       background: 'linear-gradient(135deg, #f8fafc,  #f1f5f9)', borderRadius: 14,
                     }}>
                       <div style={{ fontSize: 11, color: '#64748b' }}>
-                        <strong style={{ color: THEME.textPrimary }}>{monthly.filter(m => m.analysisCount > 0).length}</strong> mois avec données
+                        <strong style={{ color: THEME.textPrimary }}>{monthly.filter(m => m.analysisCount > 0).length}</strong> months with data
                       </div>
                       <div style={{ width: 1, background: '#e2e8f0' }} />
                       <div style={{ fontSize: 11, color: '#64748b' }}>
-                        <strong style={{ color: THEME.textPrimary }}>{monthly.reduce((s, m) => s + m.analysisCount, 0)}</strong> analyses totales
+                        <strong style={{ color: THEME.textPrimary }}>{monthly.reduce((s, m) => s + m.analysisCount, 0)}</strong> total analyses
                       </div>
                       <div style={{ width: 1, background: '#e2e8f0' }} />
                       <div style={{ fontSize: 11, color: '#64748b' }}>
-                        Variation: <strong style={{ color: monthly[monthly.length - 1]?.changePercent && monthly[monthly.length - 1].changePercent! > 0 ? '#10b981' : '#ef4444' }}>
+                        Change: <strong style={{ color: monthly[monthly.length - 1]?.changePercent && monthly[monthly.length - 1].changePercent! > 0 ? '#10b981' : '#ef4444' }}>
                           {monthly[monthly.length - 1]?.changePercent != null ? `${monthly[monthly.length - 1].changePercent! > 0 ? '+' : ''}${monthly[monthly.length - 1].changePercent!.toFixed(1)}%` : '—'}
-                        </strong> (dernier mois)
+                        </strong> (last month)
                       </div>
                     </div>
                   </div>
@@ -672,11 +781,11 @@ export default function ProfessionalDashboard() {
                       <BarChart3 size={32} style={{ color: '#0d9488' }} />
                     </div>
                     <h5 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, margin: 0, marginBottom: 8 }}>
-                      Aucune donnée mensuelle
+                      No monthly data yet
                     </h5>
                     <p style={{ fontSize: 12, color: THEME.textSecondary, textAlign: 'center', maxWidth: 360, lineHeight: 1.6 }}>
-                      Le graphique d'évolution apparaîtra ici après vos premières analyses IA.
-                      Lancez une analyse depuis la page <strong>AI Demo</strong> pour commencer.
+                      Your trend chart will appear here after your first AI analyses.
+                      Start a new session from the <strong>AI Demo</strong> page to begin.
                     </p>
                     <Link to="/ai-demo" style={{
                       marginTop: 20, padding: '10px 24px', borderRadius: 12,
@@ -686,7 +795,7 @@ export default function ProfessionalDashboard() {
                       boxShadow: '0 4px 12px rgba(13,148,136,0.3)',
                       transition: 'transform 0.2s, box-shadow 0.2s',
                     }}>
-                      <Sparkles size={16} /> Lancer une analyse IA
+                      <Sparkles size={16} /> Launch an AI analysis
                     </Link>
                   </div>
                 )}
@@ -696,8 +805,8 @@ export default function ProfessionalDashboard() {
             {/* RECENT HISTORY SECTION */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, margin: 0 }}>Analyses Récentes</h3>
-                <Link to="/analysis" style={{ fontSize: 12, fontWeight: 700, color: THEME.primary, textDecoration: 'none' }}>Voir tout</Link>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: THEME.textPrimary, margin: 0 }}>Recent Analyses</h3>
+                <Link to="/analysis" style={{ fontSize: 12, fontWeight: 700, color: THEME.primary, textDecoration: 'none' }}>View all</Link>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -730,10 +839,10 @@ export default function ProfessionalDashboard() {
                         </div>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary }}>
-                            {new Date(analysis.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                            {new Date(analysis.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long' })}
                           </div>
                           <div style={{ fontSize: 11, color: THEME.textSecondary }}>
-                            {analysis.summary || 'Analyse de santé cutanée'}
+                            {analysis.summary || 'Skin health analysis'}
                           </div>
                         </div>
                       </div>
@@ -749,7 +858,7 @@ export default function ProfessionalDashboard() {
                           gap: 4
                         }}
                       >
-                        Détails <ArrowRight size={14} />
+                        Details <ArrowRight size={14} />
                       </Link>
                     </div>
                   ))
@@ -763,7 +872,7 @@ export default function ProfessionalDashboard() {
                     color: THEME.textSecondary,
                     fontSize: 13
                   }}>
-                    Aucune analyse récente
+                    No recent analyses
                   </div>
                 )}
               </div>
@@ -771,7 +880,7 @@ export default function ProfessionalDashboard() {
 
             {/* SINGLE PROMINENT ACTION */}
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16, letterSpacing: '0.05em' }}>Action Principale</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16, letterSpacing: '0.05em' }}>Primary Action</h3>
               <Link to="/ai-demo" style={{
                 textDecoration: 'none',
                 display: 'flex',
@@ -786,7 +895,7 @@ export default function ProfessionalDashboard() {
                 color: 'white'
               }} className="kpi-card">
                 <Zap size={18} fill="white" />
-                <span style={{ fontSize: 15, fontWeight: 600 }}>Lancer l'Analyse IA</span>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Launch AI Analysis</span>
                 <ArrowRight size={18} />
               </Link>
             </div>
@@ -795,12 +904,12 @@ export default function ProfessionalDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* STATUS WIDGET */}
             <div style={{ background: THEME.surface, borderRadius: 24, padding: 24, border: `1px solid ${THEME.border}` }}>
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>Vérification IA</h4>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', marginBottom: 16 }}>AI Verification</h4>
               <AIStatusBadge verified={aiStatus?.verified} score={aiStatus?.score} compact={false} />
 
               <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <StatusRow label="Email" value={user?.email} icon={<Search size={14} />} />
-                <StatusRow label="Sécurité" value="Chiffrement AES-256" icon={<Shield size={14} />} />
+                <StatusRow label="Email" value={user?.email} icon={<Zap size={14} />} />
+                <StatusRow label="Security" value="AES-256 encryption" icon={<Shield size={14} />} />
               </div>
             </div>
 
@@ -808,8 +917,8 @@ export default function ProfessionalDashboard() {
             <div style={{ background: `linear-gradient(135deg, ${THEME.primary}, #0d9488)`, borderRadius: 24, padding: 24, color: 'white', position: 'relative', overflow: 'hidden' }}>
               <Brain size={120} style={{ position: 'absolute', right: -30, bottom: -30, opacity: 0.1 }} />
               <h4 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>DeepSkyn Pro</h4>
-              <p style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.5, marginBottom: 20 }}>Accédez à des rapports cliniques détaillés et des conseils personnalisés.</p>
-              <button style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>En savoir plus</button>
+              <p style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.5, marginBottom: 20 }}>Access detailed clinical-style reports and personalized guidance.</p>
+              <button style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Learn more</button>
             </div>
             {/* Right Column: Actions Grid */}
             <div className="lg:col-span-2">
@@ -835,7 +944,7 @@ export default function ProfessionalDashboard() {
                 ))}
               </div>
               <p className="text-xs text-slate-400 mt-4 ml-2">
-                ℹ️ 4 actions disponibles • Gérez votre profil et vos analyses
+                ℹ️ 4 actions available • Manage your profile and analyses
               </p>
             </div>
           </div>

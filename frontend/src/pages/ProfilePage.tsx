@@ -13,6 +13,7 @@ type MeUser = {
   firstName: string
   lastName: string
   bio: string | null
+  birthDate?: string | null
   aiScore?: number
   googleName?: string
   picture?: string
@@ -46,6 +47,7 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [bio, setBio] = useState("")
+  const [birthDate, setBirthDate] = useState("")
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -81,6 +83,7 @@ export default function ProfilePage() {
           const initialFirstName = userData.firstName ?? ""
           const initialLastName = userData.lastName ?? ""
           const initialBio = userData.bio ?? ""
+          const initialBirth = userData.birthDate ? userData.birthDate.slice(0, 10) : ""
 
           // Si les champs sont vides mais qu'on a un nom complet (ex: Google)
           if (!initialFirstName && !initialLastName && userData.name) {
@@ -93,6 +96,7 @@ export default function ProfilePage() {
           }
 
           setBio(initialBio)
+          setBirthDate(initialBirth)
 
           // Déterminer si c'est une première connexion
           const hasProfileData = !!(userData.firstName && userData.lastName);
@@ -121,6 +125,7 @@ export default function ProfilePage() {
     firstName: firstName.trim(),
     lastName: lastName.trim(),
     bio,
+    birthDate: birthDate || undefined,
   }
 
   const vErrors = validateProfile(payload)
@@ -178,6 +183,7 @@ export default function ProfilePage() {
       name: newName,
       bio: payload.bio,
       aiScore: newScore,
+      birthDate: payload.birthDate,
     } as MeUser
 
     localStorage.setItem("user", JSON.stringify(updatedUser))
@@ -324,6 +330,17 @@ export default function ProfilePage() {
                 {fieldErrors.bio ? <p className="text-sm text-red-600">{fieldErrors.bio}</p> : <span />}
                 <p className="text-xs text-slate-400">{bio.length}/500</p>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-900">Date de naissance</label>
+              <Input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="h-12 bg-white border-slate-200 focus:ring-[#0d9488]"
+              />
+              <p className="text-xs text-slate-400">Utilisée pour calculer votre âge réel dans les insights.</p>
             </div>
 
             <div className="flex gap-3">

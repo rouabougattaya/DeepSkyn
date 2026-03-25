@@ -26,3 +26,16 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 
     return res.json();
 }
+
+// Objet apiClient pour compatibilité avec skinAgeInsightsService
+export const apiClient = {
+    async get(path: string) {
+        const data = await apiGet(path);
+        return { data };
+    },
+    async post(path: string, body: unknown) {
+        const data = await apiPost(path, body);
+        return { data };
+    },
+};
+

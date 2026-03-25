@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { 
   Sparkles, 
@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 
 export default function HomePage() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* --- NAVIGATION --- */}
@@ -42,21 +44,21 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <Link 
-              to="/analysis" 
+            <button
+              onClick={() => navigate('/analysis')}
               className="group inline-flex items-center px-8 py-4 bg-[#0d9488] hover:bg-[#0a7a70] text-white font-bold rounded-2xl transition-all shadow-xl shadow-teal-500/20 hover:scale-[1.02]"
             >
               <Camera className="w-5 h-5 mr-2" />
               Start Free Analysis
               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            
-            <Link 
-              to="/pricing" 
+            </button>
+
+            <button
+              onClick={() => navigate('/products')}
               className="inline-flex items-center px-8 py-4 bg-white hover:bg-slate-50 text-slate-900 font-bold rounded-2xl border border-slate-200 transition-all shadow-sm hover:shadow-md"
             >
               View Plans
-            </Link>
+            </button>
           </div>
 
           {/* Quick Features Row */}
@@ -103,10 +105,10 @@ export default function HomePage() {
       <section className="py-24 px-4 bg-slate-50">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <FeatureCard icon={<Camera />} title="Skin Analysis" description="Fitzpatrick scale and deep tissue assessment." />
-            <FeatureCard icon={<Sun />} title="AM Routine" description="Protection and hydration for your busy day." />
-            <FeatureCard icon={<Moon />} title="PM Routine" description="Repair and rejuvenation while you sleep." />
-            <FeatureCard icon={<MessageCircle />} title="AI Coach" description="Chat anytime for expert skincare advice." />
+            <FeatureCard to="/analysis" icon={<Camera />} title="Skin Analysis" description="Fitzpatrick scale and deep tissue assessment." />
+            <FeatureCard to="/routines" icon={<Sun />} title="AM Routine" description="Protection and hydration for your busy day." />
+            <FeatureCard to="/routines" icon={<Moon />} title="PM Routine" description="Repair and rejuvenation while you sleep." />
+            <FeatureCard to="/ai-demo" icon={<MessageCircle />} title="AI Coach" description="Chat anytime for expert skincare advice." />
           </div>
         </div>
       </section>
@@ -138,9 +140,9 @@ export default function HomePage() {
 
 // --- LIBRLESS COMPONENTS ---
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
-  return (
-    <div className="bg-white p-8 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all group">
+function FeatureCard({ icon, title, description, to }: { icon: React.ReactNode, title: string, description: string, to?: string }) {
+  const content = (
+    <div className="bg-white p-8 rounded-3xl border border-slate-200 hover:border-[#0d9488]/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all group cursor-pointer h-full">
       <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-[#0d9488] mb-6 group-hover:bg-[#0d9488] group-hover:text-white transition-colors">
         {React.cloneElement(icon as React.ReactElement, { className: "w-6 h-6" } as any)}
       </div>
@@ -148,6 +150,12 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode, titl
       <p className="text-slate-500 leading-relaxed">{description}</p>
     </div>
   )
+
+  return to ? (
+    <Link to={to} className="block h-full">
+      {content}
+    </Link>
+  ) : content
 }
 
 function Step({ number, title, description }: { number: string, title: string, description: string }) {

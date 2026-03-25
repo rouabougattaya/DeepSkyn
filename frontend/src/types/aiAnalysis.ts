@@ -45,6 +45,14 @@ export interface GlobalScoreResult {
     dominantCondition: SkinCondition | null;
   };
   recommendations?: SkinProduct[];
+  userInputs?: Partial<UserSkinProfile>;
+  metaWeighting?: { aiWeight: number; userWeight: number };
+  combinedInsights?: Record<string, {
+    aiScore: number | null;
+    userScore?: number;
+    combinedScore: number;
+    weight: { ai: number; user: number };
+  }>;
 }
 
 export interface UserSkinProfile {
@@ -53,4 +61,11 @@ export interface UserSkinProfile {
   gender: 'Male' | 'Female' | 'Other';
   concerns: string[];
   imageBase64?: string;
+  acneLevel?: number;
+  blackheadsLevel?: number;
+  poreSize?: number;
+  wrinklesDepth?: number;
+  sensitivityLevel?: number;
+  hydrationLevel?: number;
+  rednessLevel?: number;
 }

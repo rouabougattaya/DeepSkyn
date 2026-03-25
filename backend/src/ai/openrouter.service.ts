@@ -41,29 +41,47 @@ export class OpenRouterService {
         - Âge : ${profile.age} ans
         - Genre : ${profile.gender}
         - Préoccupations majeures : ${profile.concerns.length > 0 ? profile.concerns.join(', ') : "Général"}
+        - Auto-évaluation :
+            * Acné : ${profile.acneLevel ?? 'N/A'}/100
+            * Points noirs : ${profile.blackheadsLevel ?? 'N/A'}/100
+            * Pores : ${profile.poreSize ?? 'N/A'}/100
+            * Rougeurs : ${profile.rednessLevel ?? 'N/A'}/100
+            * Déshydratation : ${profile.hydrationLevel ?? 'N/A'}/100
+            * Sensibilité : ${profile.sensitivityLevel ?? 'N/A'}/100
+            * Rides : ${profile.wrinklesDepth ?? 'N/A'}/100
 
         INSTRUCTIONS d'ANALYSE :
-        Évalue les 7 conditions suivantes sur une échelle de 0 à 100 (100 = Parfait, 0 = Sévère) :
-        1. Acne (Acné)
-        2. Enlarged-Pores (Pores dilatés)
-        3. Atrophic Scars (Cicatrices atrophiques)
-        4. Skin Redness (Rougeurs/Érythème)
-        5. Blackheads (Points noirs)
-        6. Dark-Spots (Taches pigmentaires)
-        7. black_dots (Micro-comédons)
+        Évalue les 9 conditions suivantes sur une échelle de 0 à 100 (100 = Excellent, 0 = Sévère) :
+        1. Acne (Acné) - Éruptions et inflammation
+        2. Enlarged-Pores (Pores dilatés) - Pores visibles
+        3. Atrophic Scars (Cicatrices atrophiques) - Dépression cutanée
+        4. Skin Redness (Rougeurs) - Érythème et irritation
+        5. Blackheads (Points noirs) - Comédons ouverts
+        6. Dark-Spots (Taches pigmentaires) - Hyperpigmentation
+        7. black_dots (Micro-comédons) - Mini-imperfections
+        8. Hydration (Hydratation) - Niveau d'humidité cutanée (IMPORTANT: 0= très sec, 100=bien hydraté)
+        9. Wrinkles (Rides) - Profondeur des rides/ridules (IMPORTANT: 0=nombreuses rides profondes, 100=peau lisse)
 
         RÈGLES D'EXPERTISE :
-        - La cohérence est CRITIQUE. Un type "${profile.skinType}" doit influencer les scores logiquement (ex: Oily -> risque accru de Pores et Blackheads).
-        - L'âge (${profile.age}) doit influencer l'interprétation (ex: Ridules vs Élasticité).
+        - La cohérence est CRITIQUE. Un type "${profile.skinType}" doit influencer les scores logiquement (ex: Oily -> Pores et Blackheads élevés, Hydration peut être basse).
+        - L'âge (${profile.age}) doit influencer l'interprétation (ex: Jeune = moins de rides; Âgé = plus d'attention à Hydration et Wrinkles).
         ${profile.imageBase64 ? "- ANALYSE VISUELLE : Examine méticuleusement l'image. Tes yeux d'expert doivent primer sur les déclarations si une contradiction est visible." : "- ANALYSE STATISTIQUE : Basée sur les corrélations dermatologiques du profil fourni."}
-        - SCORE GLOBAL : Calcule une moyenne pondérée intelligente où les préoccupations de l'utilisateur (${profile.concerns.join(', ')}) pèsent plus lourd (x2) dans le calcul.
+        - PONDÉRATION USER-INPUT : L'auto-évaluation utilisateur (acneLevel, hydrationLevel, wrinklesDepth, etc.) doit FORTEMENT influencer les scores correspondants (~70% du calcul), plus 30% pour l'analyse visuelle.
+        - COHÉRENCE: Hydration doit être INVERSEMENT corrélé avec Wrinkles (peau sèche = plus de rides).
 
         FORMAT DE RÉPONSE (JSON UNIQUEMENT) :
         {
           "globalScore": [0-100],
           "conditionScores": [
             { "type": "Acne", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
-            ... (pour les 7 conditions)
+            { "type": "Enlarged-Pores", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "Atrophic Scars", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "Skin Redness", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "Blackheads", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "Dark-Spots", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "black_dots", "score": [0-100], "count": [estimé], "severity": [0.0-1.0] },
+            { "type": "Hydration", "score": [0-100], "severity": [0.0-1.0] },
+            { "type": "Wrinkles", "score": [0-100], "severity": [0.0-1.0] }
           ],
           "totalDetections": [total estimé],
           "analysis": {
@@ -181,6 +199,49 @@ export class OpenRouterService {
         } catch (error: any) {
             this.logger.error('❌ Erreur OpenRouter Risk:', error.message);
             return this.getDefaultSessionAnalysis();
+        }
+    }
+
+    /**
+     * Chatbot response via OpenRouter
+     */
+    async chat(message: string, systemPrompt?: string): Promise<string> {
+        if (!this.apiKey) {
+            return "Je suis désolé, le service d'IA est actuellement indisponible.";
+        }
+
+        try {
+            const model = 'google/gemini-2.0-flash-001';
+            const messages: any[] = [];
+            
+            if (systemPrompt) {
+                messages.push({ role: 'system', content: systemPrompt });
+            }
+            
+            messages.push({ role: 'user', content: message });
+
+            const response = await axios.post(
+                `${this.baseUrl}/chat/completions`,
+                {
+                    model: model,
+                    messages: messages,
+                    temperature: 0.7,
+                    max_tokens: 1000,
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'HTTP-Referer': 'https://deepskyn.app',
+                        'X-Title': 'DeepSkyn Chat',
+                    }
+                }
+            );
+
+            return response.data.choices[0].message.content || "Désolé, je n'ai pas pu générer de réponse.";
+
+        } catch (error: any) {
+            this.logger.error('❌ Erreur OpenRouter Chat:', error.message);
+            return "Une erreur est survenue lors de la communication avec l'IA.";
         }
     }
 

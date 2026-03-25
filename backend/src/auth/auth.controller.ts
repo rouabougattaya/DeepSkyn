@@ -13,6 +13,7 @@ import {
   InternalServerErrorException,
   Param,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -202,7 +203,15 @@ export class AuthController {
 
       return res.json(result);
     } catch (error) {
-      throw new InternalServerErrorException(error.message);
+      console.error('[GoogleAuth] Backend error:', error.message, error.stack);
+      
+      if (error instanceof UnauthorizedException || error instanceof BadRequestException || error instanceof ConflictException) {
+        throw error;
+      }
+      
+      throw new InternalServerErrorException(
+        error.message || 'Une erreur est survenue lors de l\'authentification Google'
+      );
     }
   }
 

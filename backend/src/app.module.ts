@@ -19,6 +19,8 @@ import { SkinMetricModule } from './skinMetric/skin-metric.module';
 import { AdminModule } from './admin/admin.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
 import { RoutineModule } from './routine/routine.module';
+import { ProductsModule } from './products/products.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -55,6 +57,8 @@ import { RoutineModule } from './routine/routine.module';
     AdminModule,
     RecommendationModule,
     RoutineModule,
+    ProductsModule,
+    ChatModule,
   ],
   controllers: [AppController, AnalysisController],
   providers: [

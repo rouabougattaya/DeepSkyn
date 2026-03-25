@@ -65,6 +65,9 @@ export class User {
   @Column({ type: 'text', nullable: true })
   bio: string | null;
 
+  @Column({ type: 'date', nullable: true })
+  birthDate: Date | null;
+
   // ✅ Face embedding (128 floats) stocké en JSON
   @Column({ type: 'simple-json', nullable: true })
   faceDescriptor: number[] | null;

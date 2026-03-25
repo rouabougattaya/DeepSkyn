@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { setSession } from '@/lib/authSession';
@@ -10,9 +10,12 @@ const GoogleCallback = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
+  const processingRef = useRef(false);
 
   useEffect(() => {
     const handleCallback = async () => {
+      if (processingRef.current) return;
+      processingRef.current = true;
       try {
         const hash = window.location.hash;
         const searchParams = new URLSearchParams(window.location.search);
@@ -94,7 +97,8 @@ const GoogleCallback = () => {
         });
 
         if (!backendResponse.ok) {
-          throw new Error('Backend authentication failed');
+          const errorData = await backendResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Backend authentication failed');
         }
 
         const backendData = await backendResponse.json();

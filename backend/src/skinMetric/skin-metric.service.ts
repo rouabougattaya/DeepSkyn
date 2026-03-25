@@ -80,6 +80,40 @@ export class SkinMetricService {
     };
   }
 
+  /**
+   * Retourne les dernières analyses d'un utilisateur avec les champs skinAge/realAge pour les insights skin age.
+   */
+  async getUserSkinAgeSeries(
+    userId: string,
+    limit: number = 5
+  ): Promise<{ id: string; createdAt: Date; skinAge: number | null; realAge: number | null; skinScore: number | null; acne?: number | null; oil?: number | null; hydration?: number | null; wrinkles?: number | null }[]> {
+    if (!userId || typeof userId !== 'string') {
+      this.logger.warn('getUserSkinAgeSeries called with missing or invalid userId');
+      throw new UnauthorizedException('User ID is required');
+    }
+
+    const list = await this.analysisRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      select: ['id', 'createdAt', 'skinAge', 'realAge', 'skinScore', 'acne', 'oil', 'hydration', 'wrinkles', 'aiRawResponse'],
+      take: limit,
+    });
+
+    return list.map(item => ({
+      id: item.id,
+      createdAt: item.createdAt,
+      skinAge: typeof item.skinAge === 'number' ? item.skinAge : null,
+      realAge: item.aiRawResponse?.realAgeSource === 'analysis-input' && typeof item.realAge === 'number'
+        ? item.realAge
+        : null,
+      skinScore: typeof item.skinScore === 'number' ? item.skinScore : null,
+      acne: typeof (item as any).acne === 'number' ? (item as any).acne : null,
+      oil: typeof (item as any).oil === 'number' ? (item as any).oil : null,
+      hydration: typeof (item as any).hydration === 'number' ? (item as any).hydration : null,
+      wrinkles: typeof (item as any).wrinkles === 'number' ? (item as any).wrinkles : null,
+    }));
+  }
+
   async getAnalysisById(id: string) {
     const analysis = await this.analysisRepo.findOne({ where: { id } });
     if (!analysis) throw new NotFoundException('Analysis not found');
@@ -168,6 +202,9 @@ export class SkinMetricService {
     if (scoreDelta > THRESHOLD) globalTrend = 'improvement';
     else if (scoreDelta < -THRESHOLD) globalTrend = 'regression';
 
+    const firstRealAge = first.aiRawResponse?.realAgeSource === 'analysis-input' ? first.realAge ?? null : null;
+    const secondRealAge = second.aiRawResponse?.realAgeSource === 'analysis-input' ? second.realAge ?? null : null;
+
     const summaryText = this.buildComparisonSummary(
       { first, second, m1, m2, differences, globalTrend }
     );
@@ -177,7 +214,7 @@ export class SkinMetricService {
         id: first.id,
         skinScore: first.skinScore ?? 0,
         skinAge: first.skinAge ?? null,
-        realAge: first.realAge ?? null,
+        realAge: firstRealAge,
         createdAt: first.createdAt.toISOString(),
         metrics: m1,
         summary: first.summary ?? null,
@@ -186,7 +223,7 @@ export class SkinMetricService {
         id: second.id,
         skinScore: second.skinScore ?? 0,
         skinAge: second.skinAge ?? null,
-        realAge: second.realAge ?? null,
+        realAge: secondRealAge,
         createdAt: second.createdAt.toISOString(),
         metrics: m2,
         summary: second.summary ?? null,

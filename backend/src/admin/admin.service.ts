@@ -87,12 +87,14 @@ export class AdminService {
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
     // Créer l'utilisateur
+    const birthDate = dto.birthDate ? new Date(dto.birthDate) : null;
     const user = this.usersRepo.create({
       email: emailNorm,
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
       name: `${dto.firstName} ${dto.lastName}`,
+      birthDate: birthDate && !Number.isNaN(birthDate.getTime()) ? birthDate : null,
       role: dto.role || 'USER',
       bio: dto.bio || null,
       isEmailVerified: true, // Admin créé = vérifié automatiquement

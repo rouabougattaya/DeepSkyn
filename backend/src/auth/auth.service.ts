@@ -95,6 +95,12 @@ export class AuthService {
     });
   }
 
+  private parseBirthDate(raw?: string): Date | null {
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
   /* ================= LEGACY / UTILITY METHODS ================= */
 
   private generateToken(user: User) {
@@ -299,6 +305,7 @@ export class AuthService {
         photoAnalysis: googleUser.photoAnalysis || {},
         emailAnalysis: googleUser.emailAnalysis || {},
         aiScore: googleUser.aiScore || 0.5,
+        birthDate: this.parseBirthDate((googleUser as any).birthDate),
       });
       await this.userRepository.save(user);
     } else {
@@ -309,6 +316,7 @@ export class AuthService {
       user.photoAnalysis = googleUser.photoAnalysis || {};
       user.emailAnalysis = googleUser.emailAnalysis || {};
       user.aiScore = googleUser.aiScore || 0.5;
+      user.birthDate = this.parseBirthDate((googleUser as any).birthDate) ?? user.birthDate;
       await this.userRepository.save(user);
     }
 
@@ -337,11 +345,13 @@ export class AuthService {
       ]
     });
 
-    let user;
+    let user: User;
     if (!existingUser) {
       user = this.userRepository.create({
         email: googleUser.email,
         name: googleUser.name,
+        firstName: googleUser.given_name,
+        lastName: googleUser.family_name,
         googleId: googleUser.id,
         avatarUrl: googleUser.picture,
         authMethod: 'google',
@@ -350,26 +360,45 @@ export class AuthService {
         aiScore: googleUser.aiScore || 0.5,
       });
       await this.userRepository.save(user);
+      this.logger.log(`Created new Google user: ${googleUser.email}`);
     } else {
       user = existingUser;
+      
+      // Update fields if they changed or were missing
       user.name = googleUser.name;
+      user.firstName = googleUser.given_name || user.firstName;
+      user.lastName = googleUser.family_name || user.lastName;
+      user.googleId = googleUser.id; // Crucial: ensure googleId is set
       user.avatarUrl = googleUser.picture;
       user.authMethod = 'google';
-      user.photoAnalysis = googleUser.photoAnalysis || {};
-      user.emailAnalysis = googleUser.emailAnalysis || {};
-      user.aiScore = googleUser.aiScore || 0.5;
+      user.photoAnalysis = googleUser.photoAnalysis || user.photoAnalysis || {};
+      user.emailAnalysis = googleUser.emailAnalysis || user.emailAnalysis || {};
+      user.aiScore = googleUser.aiScore || user.aiScore || 0.5;
+      
       await this.userRepository.save(user);
+      this.logger.log(`Updated existing Google user: ${googleUser.email}`);
     }
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, metadata?.ipAddress || undefined, metadata?.userAgent || undefined, { method: 'google' });
 
-    // Utiliser la méthode issueTokens existante
     const tokens = await this.issueTokens(user, metadata);
 
     if (!tokens.refreshToken) {
-      throw new Error('Refresh token manquant lors de la création de session (googleModern).');
+      this.logger.error('Refresh token missing after issueTokens in loginWithGoogleModern');
+      throw new Error('Refresh token manquant lors de la création de session.');
     }
-    await this.sessionService.createSession(user.id, tokens.refreshToken, req);
+
+    try {
+      await this.sessionService.createSession(user.id, tokens.refreshToken, req);
+    } catch (sessionError) {
+      this.logger.error(`Failed to create session for user ${user.id}:`, sessionError.message);
+      // We don't necessarily want to fail the whole login if session creation fails, 
+      // but if we depend on it for some features, we might.
+      // For now, let's keep it required as per original logic.
+      throw sessionError;
+    }
+
+    return tokens;
 
     return tokens;
   }
@@ -464,6 +493,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const faceDescriptor = (dto as any).faceDescriptor ?? null;
+    const birthDate = this.parseBirthDate(dto.birthDate);
 
     const user = this.userRepository.create({
       email: emailNorm,
@@ -471,6 +501,7 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       name: `${dto.firstName} ${dto.lastName}`,
+      birthDate,
       role: 'USER',
       isEmailVerified: false,
       isPremium: false,
@@ -496,11 +527,13 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(signUpDto.password, salt);
+    const birthDate = this.parseBirthDate(signUpDto.birthDate);
 
     const user = this.userRepository.create({
       email: signUpDto.email,
       name: signUpDto.name,
       passwordHash: passwordHash,
+      birthDate,
       aiScore: 0.5,
     });
 
@@ -734,14 +767,19 @@ export class AuthService {
   private async issueTokens(user: User, metadata?: SessionMetadata): Promise<SessionTokens> {
     const accessToken = this.jwtTokenService.generateAccessToken(user);
     const accessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(this.jwtTokenService.getAccessTokenTtl());
-    const refreshTokenRecord = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
+    const refreshTokenResult = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
+    const refreshToken = (refreshTokenResult as any).refreshToken;
 
-    const tokens: SessionTokens = {
+    if (!refreshToken) {
+      throw new Error('Le Refresh Token n\'a pas pu être généré.');
+    }
+
+    return {
       success: true,
       accessToken,
-      refreshToken: (refreshTokenRecord as any).refreshToken,
+      refreshToken,
       accessTokenExpiresAt,
-      refreshTokenExpiresAt: refreshTokenRecord.expiresAt,
+      refreshTokenExpiresAt: refreshTokenResult.expiresAt,
       user: {
         id: user.id,
         email: user.email,
@@ -752,12 +790,6 @@ export class AuthService {
         isTwoFAEnabled: user.isTwoFAEnabled,
       },
     };
-
-    if (!tokens.refreshToken) {
-      throw new Error('Refresh token manquant lors de la génération des tokens.');
-    }
-
-    return tokens;
   }
 
   private async logActivity(userId: string, type: ActivityType, ip?: string, deviceInfo?: string, metadata?: any) {

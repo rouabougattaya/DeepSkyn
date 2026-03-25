@@ -30,6 +30,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import './App.css'
+import ProductsPage from './pages/ProductsPage';
 
 function Home() {
   return (
@@ -63,6 +64,7 @@ function App() {
         <Route path="/auth/2fa" element={<TwoFactorPage />} />
         <Route path="/auth/login-face" element={<LoginFacePage />} />
         <Route path="/auth/login-empreinte" element={<LoginFingerprintPage />} />
+        <Route path="/products" element={<ProductsPage />} />
 
         {/* Protected Routes inside AppLayout */}
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

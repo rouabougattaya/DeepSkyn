@@ -3,9 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Like, Repository } from 'typeorm';
 import { Routine } from './routine.entity';
 import { RoutineStep } from '../routineStep/routine-step.entity';
-import { Product } from '../recommendation/product.entity';
+import { Product } from '../products/entities/product.entity';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 import { RecommendationService } from '../recommendation/recommendation.service';
+import { IncompatibilityService } from './incompatibility.service';
 
 export type RoutineStepName = 'Cleanser' | 'Serum' | 'Moisturizer';
 
@@ -25,6 +26,7 @@ export interface RoutineStepDto {
 }
 
 export interface RoutineResponseDto {
+  compatibilityWarning?: string;
   morning: { steps: RoutineStepDto[] };
   night: { steps: RoutineStepDto[] };
 }
@@ -57,7 +59,8 @@ export class RoutineService {
     @InjectRepository(SkinAnalysis)
     private readonly skinAnalysisRepository: Repository<SkinAnalysis>,
     private readonly recommendationService: RecommendationService,
-  ) {}
+    private readonly incompatibilityService: IncompatibilityService,
+  ) { }
 
   async getOrGenerateRoutine(userId: string): Promise<RoutineResponseDto> {
     // Récupérer la dernière analyse complétée pour adapter le builder
@@ -176,8 +179,8 @@ export class RoutineService {
 
       const bySkin = skinTypeLower
         ? await this.productRepository.findOne({
-            where: { skinType: skinTypeLower, type: Like(`%${typeKeyword}%`) },
-          })
+          where: { skinType: skinTypeLower, type: Like(`%${typeKeyword}%`) },
+        })
         : null;
 
       if (bySkin) return bySkin;
@@ -216,7 +219,17 @@ export class RoutineService {
     const amDto = await this.buildRoutineDto(amRoutine.id);
     const pmDto = await this.buildRoutineDto(pmRoutine.id);
 
+    const productIds = [...amDto, ...pmDto].map(s => s.product.id);
+    const allStepProducts = productIds.length ? await this.productRepository.find({
+      where: {
+        id: In(productIds)
+      }
+    }) : [];
+    
+    const checkResult = this.incompatibilityService.checkRoutine(allStepProducts);
+
     return {
+      compatibilityWarning: checkResult.message,
       morning: { steps: amDto },
       night: { steps: pmDto },
     };

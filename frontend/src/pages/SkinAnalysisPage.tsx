@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
-    Camera, Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
+    Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
     CheckCircle, RefreshCw, Activity,
     BarChart2, Info, Waves, Flame, Microscope,
-    Bandage, CircleDot, HeartPulse, Sprout, Leaf, Dice5,
+    Bandage, CircleDot, HeartPulse,
     CircleCheck, AlertTriangle, BarChart3,
+    Upload, X, Download, Printer, Volume2, VolumeX,
 } from 'lucide-react';
 import { aiAnalysisService } from '../services/aiAnalysisService';
 import type { GlobalScoreResult, ConditionScore, UserSkinProfile } from '../types/aiAnalysis';
 import { SkinProfileForm } from '../components/analysis/SkinProfileForm';
+import { DEFAULT_QUESTIONNAIRE, type SkinQuestionnaireData } from '../types/skinQuestionnaire';
 
 /* ─────────────────────────── Constants ─────────────────────────── */
 
@@ -67,18 +69,13 @@ const CONDITION_META: Record<string, {
     },
 };
 
-const TEST_SCENARIOS: {
-    id: 'mild' | 'mixed' | 'severe' | 'random';
-    label: string;
-    Icon: LucideIcon;
-    desc: string;
-    color: string;
-}[] = [
-    { id: 'mild', label: 'Mild', Icon: Sprout, desc: 'A few minor imperfections', color: '#10b981' },
-    { id: 'mixed', label: 'Mixed', Icon: Leaf, desc: 'Combination of various conditions', color: '#f59e0b' },
-    { id: 'severe', label: 'Severe', Icon: Flame, desc: 'Multiple and intense conditions', color: '#ef4444' },
-    { id: 'random', label: 'Random', Icon: Dice5, desc: 'Realistic random simulation', color: '#8b5cf6' },
-];
+const BLEND_LABELS: Record<string, { label: string; helper: string }> = {
+    'Acne': { label: 'Acné', helper: 'Fusion photo + questionnaire' },
+    'Blackheads': { label: 'Points noirs', helper: 'Visuel + auto-évaluation' },
+    'Enlarged-Pores': { label: 'Pores', helper: 'Mix AI + ressenti' },
+    'Skin Redness': { label: 'Rougeurs', helper: 'Observation + vécu' },
+};
+
 
 function normalizeExternalUrl(url: unknown): string | null {
     if (typeof url !== 'string') return null
@@ -86,7 +83,6 @@ function normalizeExternalUrl(url: unknown): string | null {
     if (!trimmed || trimmed === '#') return null
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
     if (trimmed.startsWith('//')) return `https:${trimmed}`
-    // Defensive fallback: if dataset returns "www..." or similar
     return `https://${trimmed}`
 }
 
@@ -102,9 +98,7 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
     return (
         <div style={{ position: 'relative', width: size, height: size }}>
             <svg width={size} height={size} viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                {/* Background track */}
                 <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-                {/* Glow ring */}
                 <circle
                     cx="50" cy="50" r={r} fill="none"
                     stroke={color} strokeWidth="8"
@@ -173,7 +167,6 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
                 </div>
             </div>
 
-            {/* Progress bar */}
             <div style={{
                 height: 6, background: '#e2e8f0',
                 borderRadius: 99, overflow: 'hidden'
@@ -196,16 +189,94 @@ export default function SkinAnalysisPage() {
     const [result, setResult] = useState<GlobalScoreResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedScenario, setSelectedScenario] = useState<'mild' | 'mixed' | 'severe' | 'random'>('mixed');
     const [analysisCount, setAnalysisCount] = useState(0);
     const [scanPhase, setScanPhase] = useState<'idle' | 'capturing' | 'processing' | 'scoring' | 'done'>('idle');
-    const [useLLM, setUseLLM] = useState(true);
+    const [useLLM] = useState(true);
+    const [questionnaire, setQuestionnaire] = useState<SkinQuestionnaireData>(DEFAULT_QUESTIONNAIRE);
     const [profile, setProfile] = useState<UserSkinProfile>({
         skinType: 'Combination',
         age: 25,
         gender: 'Female',
-        concerns: []
+        concerns: [],
+        acneLevel: 50,
+        blackheadsLevel: 50,
+        poreSize: 50,
+        wrinklesDepth: 50,
+        sensitivityLevel: 50,
+        hydrationLevel: 50,
+        rednessLevel: 50,
     });
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const exportToCSV = useCallback(() => {
+        if (!result) return;
+        const headers = ['Condition', 'Score', 'Detections', 'Severity'];
+        const rows = result.conditionScores.map(c => [
+            c.type,
+            c.score,
+            c.count || 0,
+            (c.severity * 100).toFixed(0) + '%'
+        ]);
+        
+        let csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(",") + "\n"
+            + rows.map(e => e.join(",")).join("\n");
+            
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `DeepSkyn_Analysis_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, [result]);
+
+    const exportToPDF = useCallback(() => {
+        // Optimal way without extra libs: Use browser print
+        window.print();
+    }, []);
+
+    const speakAnalysis = useCallback(() => {
+        if (!result || !window.speechSynthesis) return;
+        
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+            return;
+        }
+
+        const text = `
+            Voici l'analyse de votre peau par DeepSkyn. 
+            Votre score global est de ${Math.round(result.globalScore)} sur 100. 
+            Votre meilleur aspect est ${CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}. 
+            Le point critique identifié est ${CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}. 
+            Prenez soin de vous avec une routine adaptée.
+        `;
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'fr-FR';
+        utterance.onend = () => setIsSpeaking(false);
+        
+        setIsSpeaking(true);
+        window.speechSynthesis.speak(utterance);
+    }, [result, isSpeaking]);
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfile(prev => ({ ...prev, imageBase64: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const removeImage = () => {
+        setProfile(prev => ({ ...prev, imageBase64: undefined }));
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
 
     useEffect(() => {
         // weights logic removed as per user request
@@ -214,12 +285,17 @@ export default function SkinAnalysisPage() {
 
 
     const runAnalysis = useCallback(async () => {
+        // Validate age is provided
+        if (!profile.age || profile.age < 1 || profile.age > 120) {
+            setError('Please enter a valid age (1-120) to perform analysis');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setScanPhase('capturing');
 
         try {
-            // Simulate progressive phases for UX
             await new Promise(r => setTimeout(r, 600));
             setScanPhase('processing');
             await new Promise(r => setTimeout(r, 800));
@@ -227,23 +303,16 @@ export default function SkinAnalysisPage() {
 
             let analysisResult: GlobalScoreResult;
 
-            if (useLLM) {
-                analysisResult = await aiAnalysisService.analyzeUnified(profile);
-            } else if (selectedScenario === 'random') {
-                const randomResult = await aiAnalysisService.analyzeRandom(
-                    Date.now() % 9999
-                );
-                analysisResult = randomResult.result;
-            } else {
-                analysisResult = await aiAnalysisService.analyzeTestCase(selectedScenario);
-            }
+            analysisResult = await aiAnalysisService.analyzeUnified(profile);
 
             await new Promise(r => setTimeout(r, 400));
             setScanPhase('done');
             setResult(analysisResult);
             setAnalysisCount(c => c + 1);
 
-            // Auto-scroll to recommendations after a short delay
+            // Signal to dashboard that analysis was completed
+            sessionStorage.setItem('analysisCompleted', Date.now().toString());
+
             setTimeout(() => {
                 const recSection = document.getElementById('recommendations-section');
                 if (recSection) {
@@ -257,13 +326,15 @@ export default function SkinAnalysisPage() {
         } finally {
             setLoading(false);
         }
-    }, [selectedScenario, useLLM, profile]);
+    }, [profile]);
 
 
 
     const globalScoreColor = result
         ? result.globalScore >= 75 ? '#10b981' : result.globalScore >= 50 ? '#f59e0b' : '#ef4444'
         : '#0d9488';
+
+    const hasPhoto = Boolean(profile.imageBase64);
 
     const scanLabels: Record<string, string> = {
         capturing: 'Capture de l\'image...',
@@ -281,7 +352,7 @@ export default function SkinAnalysisPage() {
         background: #f8fafc;
         color: #1e293b;
         font-family: 'Inter', system-ui, sans-serif;
-        padding: 80px 16px 60px;  /* ← 80px en haut au lieu de 24px */
+        padding: 80px 16px 60px;
         margin-top: 0;
         }
         .glass-card {
@@ -392,11 +463,43 @@ export default function SkinAnalysisPage() {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        /* ──── PRINT STYLES ──── */
+        @media print {
+          @page {
+            margin: 15mm;
+            size: A4;
+          }
+          body {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .skin-analysis-root > div:not(#printable-report) {
+            display: none !important;
+          }
+          #printable-report {
+            display: block !important;
+            visibility: visible !important;
+            width: 100% !important;
+            position: relative !important;
+            background: white !important;
+            color: black !important;
+            font-family: 'Inter', system-ui, sans-serif;
+          }
+          .glass-card {
+            box-shadow: none !important;
+            border: 1px solid #eee !important;
+          }
+          button { display: none !important; }
+        }
+        #printable-report {
+          display: none;
+        }
       `}</style>
 
             <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
-                {/* ── Header ── */}
                 {/* ── Header ── */}
                 <div style={{
                     display: 'flex',
@@ -405,7 +508,6 @@ export default function SkinAnalysisPage() {
                     gap: 16,
                     marginBottom: 40
                 }}>
-                    {/* Boutons côte à côte */}
                     <div style={{
                         display: 'flex',
                         justifyContent: 'center',
@@ -476,7 +578,6 @@ export default function SkinAnalysisPage() {
                         </Link>
                     </div>
 
-                    {/* Indicateur d'analyses (si résultat disponible) */}
                     {result && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                             <div className="pulse-dot" />
@@ -522,118 +623,89 @@ export default function SkinAnalysisPage() {
                     {/* ── LEFT: Controls ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                        {/* LLM Toggle */}
-                        <div className="glass-card" style={{ padding: '4px' }}>
-                            <div className="flex bg-slate-100 p-1 rounded-xl">
-                                <button
-                                    onClick={() => setUseLLM(true)}
-                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${useLLM ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500'
-                                        }`}
-                                >
-                                    Analyse Réelle (LLM)
-                                </button>
-                                <button
-                                    onClick={() => setUseLLM(false)}
-                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!useLLM ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500'
-                                        }`}
-                                >
-                                    Scénarios de Test
-                                </button>
-                            </div>
+                        <div className="glass-card fade-in" style={{ padding: 24 }}>
+                            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+                                Profil de Peau
+                            </h2>
+                            <SkinProfileForm
+                                profile={profile}
+                                setProfile={setProfile}
+                                questionnaire={questionnaire}
+                                setQuestionnaire={setQuestionnaire}
+                                disabled={loading}
+                            />
                         </div>
 
-                        {/* Skin Profile Form (LLM Mode) */}
-                        {useLLM && (
-                            <div className="glass-card fade-in" style={{ padding: 24 }}>
-                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                    Profil de Peau
-                                </h2>
-                                <SkinProfileForm profile={profile} setProfile={setProfile} disabled={loading} />
-                            </div>
-                        )}
-
-                        {/* Scenario Selection (Test Mode) */}
-                        {!useLLM && (
-                            <div className="glass-card fade-in" style={{ padding: 24 }}>
-                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                    Scénario de test
-                                </h2>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                    {TEST_SCENARIOS.map(({ id, Icon, label, desc, color }) => (
-                                        <button
-                                            key={id}
-                                            className={`scenario-btn ${selectedScenario === id ? 'active' : ''}`}
-                                            onClick={() => setSelectedScenario(id as any)}
-                                        >
-                                            <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
-                                                <Icon size={22} strokeWidth={2} style={{ color }} />
-                                            </div>
-                                            <div style={{ fontWeight: 700, fontSize: 14 }}>{label}</div>
-                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Camera Simulation */}
+                        {/* Upload + Scan */}
                         <div className="glass-card" style={{ padding: 24 }}>
                             <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                Camera interface
+                                Ajouter une image
                             </h2>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleImageUpload}
+                                accept="image/*"
+                                className="hidden"
+                            />
                             <div style={{
-                                position: 'relative', background: '#f1f5f9',
-                                borderRadius: 16, border: '1px solid #e2e8f0',
-                                height: 180, display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', justifyContent: 'center',
+                                position: 'relative',
+                                background: '#f1f5f9',
+                                borderRadius: 16,
+                                border: '1px solid #e2e8f0',
                                 overflow: 'hidden'
                             }}>
-                                {/* Corner brackets */}
-                                {['tl', 'tr', 'bl', 'br'].map(c => (
-                                    <div key={c} style={{
-                                        position: 'absolute',
-                                        ...(c.includes('t') ? { top: 12 } : { bottom: 12 }),
-                                        ...(c.includes('l') ? { left: 12 } : { right: 12 }),
-                                        width: 20, height: 20,
-                                        borderTop: c.includes('t') ? '2px solid #0d9488' : 'none',
-                                        borderBottom: c.includes('b') ? '2px solid #0d9488' : 'none',
-                                        borderLeft: c.includes('l') ? '2px solid #0d9488' : 'none',
-                                        borderRight: c.includes('r') ? '2px solid #0d9488' : 'none',
-                                    }} />
-                                ))}
-
-                                {loading && <div className="scan-line" style={{ top: 0 }} />}
-
-                                {loading ? (
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{
-                                            width: 56, height: 56, borderRadius: '50%',
-                                            border: '3px solid rgba(13,148,136,0.2)',
-                                            borderTop: '3px solid #0d9488',
-                                            animation: 'spin 1s linear infinite',
-                                            margin: '0 auto 12px'
-                                        }} />
-                                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                                        <div style={{ color: '#0d9488', fontSize: 13, fontWeight: 600 }}>
-                                            {scanLabels[scanPhase]}
+                                {profile.imageBase64 ? (
+                                    <div style={{ position: 'relative' }}>
+                                        <img
+                                            src={profile.imageBase64}
+                                            alt="Preview"
+                                            style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }}
+                                        />
+                                        <button
+                                            onClick={removeImage}
+                                            className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full text-red-500 shadow-lg hover:bg-red-50 transition-colors"
+                                            type="button"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-[2px] text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                            <CheckCircle size={12} className="text-teal-300" />
+                                            Image prête pour l'analyse IA
                                         </div>
+                                        {loading && <div className="scan-line" style={{ top: 0 }} />}
                                     </div>
                                 ) : (
-                                    <div style={{ textAlign: 'center', color: '#94a3b8' }}>
-                                        <Camera size={32} style={{ margin: '0 auto 8px' }} />
-                                        <div style={{ fontSize: 12 }}>Prêt pour l'analyse</div>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={loading}
+                                        className="w-full h-[220px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all hover:bg-slate-100 hover:border-slate-300 group"
+                                    >
+                                        <div className="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-teal-500 group-hover:scale-110 transition-all shadow-sm">
+                                            <Upload size={20} />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-slate-600">Ajouter une photo</p>
+                                            <p className="text-[10px] text-slate-400 mt-1">Selfie clair recommande</p>
+                                        </div>
+                                    </button>
                                 )}
                             </div>
+                            {loading && (
+                                <div className="mt-3 text-sm text-teal-700 font-semibold flex items-center gap-2">
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    {scanLabels[scanPhase]}
+                                </div>
+                            )}
                         </div>
-
-
 
                         {/* Analyze Button */}
                         <button
                             className="analyze-btn"
                             onClick={runAnalysis}
-                            disabled={loading}
+                            disabled={loading || !profile.age || profile.age < 1 || profile.age > 120}
+                            title={!profile.age ? 'Please enter your age' : ''}
                         >
                             {loading ? (
                                 <>
@@ -664,7 +736,6 @@ export default function SkinAnalysisPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                         {!result ? (
-                            /* Empty state */
                             <div className="glass-card" style={{
                                 padding: 48, display: 'flex', flexDirection: 'column',
                                 alignItems: 'center', justifyContent: 'center',
@@ -687,7 +758,6 @@ export default function SkinAnalysisPage() {
                                     </p>
                                 </div>
 
-                                {/* Architecture info */}
                                 <div style={{
                                     background: 'rgba(13,148,136,0.05)', border: '1px solid rgba(13,148,136,0.1)',
                                     borderRadius: 12, padding: 16, width: '100%'
@@ -711,7 +781,6 @@ export default function SkinAnalysisPage() {
                                 </div>
                             </div>
                         ) : (
-                            /* Results */
                             <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                                 {/* Global Score Card */}
@@ -731,7 +800,6 @@ export default function SkinAnalysisPage() {
                                         <ScoreRing score={result.globalScore} size={130} />
 
                                         <div style={{ flex: 1 }}>
-                                            {/* Best / Worst / Dominant */}
                                             {[
                                                 { label: 'Meilleur', value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
                                                 { label: 'Point critique', value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
@@ -765,6 +833,42 @@ export default function SkinAnalysisPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Action Buttons for Results */}
+                                    <div style={{
+                                        marginTop: 20,
+                                        paddingTop: 16,
+                                        borderTop: '1px solid rgba(13,148,136,0.1)',
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: 10
+                                    }}>
+                                        <button
+                                            onClick={exportToCSV}
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                                        >
+                                            <Download size={14} className="text-teal-600" />
+                                            Export CSV
+                                        </button>
+                                        <button
+                                            onClick={exportToPDF}
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 border border-teal-700 rounded-xl text-xs font-bold text-white hover:bg-teal-700 transition-all shadow-md active:scale-95"
+                                        >
+                                            <Download size={14} />
+                                            Exporter Rapport PDF
+                                        </button>
+                                        <button
+                                            onClick={speakAnalysis}
+                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 ${
+                                                isSpeaking 
+                                                ? 'bg-red-50 border border-red-100 text-red-600' 
+                                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} className="text-orange-500" />}
+                                            {isSpeaking ? 'Arrêter l\'écoute' : 'Écouter l\'analyse'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Condition Scores */}
@@ -772,6 +876,63 @@ export default function SkinAnalysisPage() {
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
                                         Scores par condition
                                     </h2>
+                                    {result.combinedInsights && (
+                                        <div style={{
+                                            marginBottom: 16,
+                                            padding: 12,
+                                            borderRadius: 12,
+                                            border: '1px dashed #bae6fd',
+                                            background: 'linear-gradient(135deg, #ecfeff, #f8fafc)'
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>Fusion photo + questionnaire</div>
+                                                {result.metaWeighting && (
+                                                    <div style={{ fontSize: 11, color: '#0ea5e9', fontWeight: 700 }}>
+                                                        {Math.round((result.metaWeighting.aiWeight ?? 0) * 100)}% IA · {Math.round((result.metaWeighting.userWeight ?? 0) * 100)}% Vous
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+                                                {Object.entries(result.combinedInsights).map(([key, entry]) => {
+                                                    const meta = BLEND_LABELS[key];
+                                                    if (!meta) return null;
+                                                    return (
+                                                        <div key={key} style={{
+                                                            padding: 12,
+                                                            borderRadius: 10,
+                                                            background: '#fff',
+                                                            border: '1px solid #e2e8f0',
+                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                                                        }}>
+                                                            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{meta.label}</div>
+                                                            <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>{meta.helper}</div>
+                                                            {hasPhoto && (
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#0f172a' }}>
+                                                                    <span>IA (photo)</span>
+                                                                    <span>{entry.aiScore ?? '—'}</span>
+                                                                </div>
+                                                            )}
+                                                            {entry.userScore !== undefined && (
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#0f172a' }}>
+                                                                    <span>Vous</span>
+                                                                    <span>{entry.userScore}</span>
+                                                                </div>
+                                                            )}
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 800, color: '#0ea5e9', marginTop: 6 }}>
+                                                                <span>Fusion</span>
+                                                                <span>{Math.round(entry.combinedScore)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            {!hasPhoto && (
+                                                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
+                                                    Aucun selfie fourni · Fusion basée sur le questionnaire et l'estimation profil IA.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {result.conditionScores
                                             .sort((a, b) => a.score - b.score)
@@ -824,7 +985,6 @@ export default function SkinAnalysisPage() {
                                         })}
                                     </div>
 
-                                    {/* Score interpretation guide */}
                                     <div style={{
                                         marginTop: 16, padding: 12, borderRadius: 10,
                                         background: 'rgba(13,148,136,0.05)',
@@ -982,6 +1142,19 @@ export default function SkinAnalysisPage() {
                                     )}
                                 </div>
 
+                                {/* 👇 BOUTON VERS TA PAGE PRODUITS 👇 */}
+                                <div className="mt-4 text-center">
+                                    <Link
+                                        to="/products"
+                                        className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md"
+                                    >
+                                        🛍️ Parcourir tous les produits
+                                    </Link>
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Filtrez par prix, ingrédients, type de peau et plus
+                                    </p>
+                                </div>
+
                                 {/* Raw Metrics Summary */}
                                 <div className="glass-card" style={{ padding: 24 }}>
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
@@ -1038,6 +1211,128 @@ export default function SkinAnalysisPage() {
                     </div>
                 </div>
             </div>
+
+            {/* ──── PRINTABLE REPORT TEMPLATE ──── */}
+            {result && (
+                <div id="printable-report" style={{ background: 'white', padding: '10mm' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0d9488', paddingBottom: 20, marginBottom: 30 }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                <div style={{ background: '#0d9488', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                    <Sparkles size={20} />
+                                </div>
+                                <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0d9488', margin: 0, letterSpacing: '-0.02em' }}>DEEPSKYN AI</h1>
+                            </div>
+                            <p style={{ margin: 0, color: '#64748b', fontSize: 12, fontWeight: 600 }}>ADVANCED DERMATOLOGICAL ANALYTICS</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>REPORT #DS-{new Date().getTime().toString().slice(-6)}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>Date: {new Date().toLocaleDateString('fr-FR')}</div>
+                        </div>
+                    </div>
+
+                    {/* Summary Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 40, marginBottom: 40 }}>
+                        <div style={{ background: '#f8fafc', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 15 }}>Score Global</div>
+                            <div style={{ fontSize: 64, fontWeight: 900, color: globalScoreColor, lineHeight: 1 }}>{Math.round(result.globalScore)}</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: globalScoreColor, marginBottom: 20 }}>
+                                {result.globalScore >= 75 ? 'EXCELLENT' : result.globalScore >= 50 ? 'AVERAGE' : 'TO IMPROVE'}
+                            </div>
+                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 15, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                    <span style={{ color: '#64748b' }}>Âge:</span>
+                                    <span style={{ fontWeight: 700 }}>{profile.age} ans</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                    <span style={{ color: '#64748b' }}>Type de peau:</span>
+                                    <span style={{ fontWeight: 700 }}>{profile.skinType}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Diagnostic Expert</h2>
+                            <div style={{ marginBottom: 20 }}>
+                                <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, marginBottom: 15 }}>
+                                    L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition <strong>{CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}</strong>. 
+                                    Cependant, une attention particulière est recommandée pour <strong>{CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}</strong> qui présente le score le plus bas de la série.
+                                </p>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+                                <div style={{ padding: 12, borderRadius: 12, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.1)' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase' }}>Meilleur aspect</div>
+                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}</div>
+                                </div>
+                                <div style={{ padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' }}>Point critique</div>
+                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Conditions Table */}
+                    <div style={{ marginBottom: 40 }}>
+                        <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Analyse des Conditions Cutatnées</h2>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                    <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 12, color: '#64748b' }}>CONDITION</th>
+                                    <th style={{ textAlign: 'center', padding: '12px 8px', fontSize: 12, color: '#64748b' }}>SCORE IA</th>
+                                    <th style={{ textAlign: 'center', padding: '12px 8px', fontSize: 12, color: '#64748b' }}>SÉVÉRITÉ</th>
+                                    <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 12, color: '#64748b' }}>INTERPRÉTATION</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {result.conditionScores.map(c => {
+                                    const meta = CONDITION_META[c.type];
+                                    const scoreColor = c.score >= 75 ? '#10b981' : c.score >= 50 ? '#f59e0b' : '#ef4444';
+                                    const status = c.score >= 75 ? 'Contrôlé' : c.score >= 50 ? 'Modéré' : 'Sévère';
+                                    return (
+                                        <tr key={c.type} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '12px 8px', fontSize: 14, fontWeight: 700 }}>{meta?.label || c.type}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'center', fontSize: 14, fontWeight: 800, color: scoreColor }}>{Math.round(c.score)}/100</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: `${scoreColor}10`, color: scoreColor, border: `1px solid ${scoreColor}20` }}>
+                                                    {status}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 8px', fontSize: 12, color: '#64748b' }}>{meta?.description}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Recommendations */}
+                    {result.recommendations && result.recommendations.length > 0 && (
+                        <div style={{ marginBottom: 40, breakInside: 'avoid' }}>
+                            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Routine Recommandée</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 15 }}>
+                                {result.recommendations.slice(0, 3).map((p, idx) => (
+                                    <div key={idx} style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white' }}>
+                                        <div style={{ fontSize: 10, fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', marginBottom: 4 }}>{p.type}</div>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, height: 40, overflow: 'hidden' }}>{p.name}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>£{p.price.toFixed(2)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer / Disclaimer */}
+                    <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #eee', textAlign: 'center' }}>
+                        <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>
+                            Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn. 
+                            Cette analyse n'est pas un diagnostic médical et ne remplace pas l'avis d'un dermatologue professionnel.
+                        </p>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: '#0d9488', marginTop: 8 }}>www.deepskyn.app</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

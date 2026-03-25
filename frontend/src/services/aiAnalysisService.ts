@@ -5,21 +5,24 @@ export const aiAnalysisService = {
   async analyzeImage(
     imageId?: string,
     weights?: Partial<ConditionWeights>,
-    testType?: 'severe' | 'mild' | 'mixed'
+    testType?: 'severe' | 'mild' | 'mixed',
+    age?: number
   ): Promise<GlobalScoreResult> {
     const data = await apiPost<{ success: boolean; data: GlobalScoreResult }>('/ai/analyze', {
-      imageId, weights, testType,
+      imageId, weights, testType, age
     });
     return data.data;
   },
 
   async analyzeRandom(
     seed?: number,
-    weights?: Partial<ConditionWeights>
+    weights?: Partial<ConditionWeights>,
+    age?: number
   ): Promise<{ result: GlobalScoreResult; seed: number }> {
     const params = new URLSearchParams();
     if (seed !== undefined) params.append('seed', seed.toString());
     if (weights) params.append('weights', JSON.stringify(weights));
+    if (age !== undefined) params.append('age', age.toString());
     const query = params.toString() ? `?${params}` : '';
     const data = await apiGet<{ success: boolean; data: GlobalScoreResult; seed: number }>(
       `/ai/analyze/random${query}`
@@ -29,10 +32,12 @@ export const aiAnalysisService = {
 
   async analyzeTestCase(
     testType: 'severe' | 'mild' | 'mixed',
-    weights?: Partial<ConditionWeights>
+    weights?: Partial<ConditionWeights>,
+    age?: number
   ): Promise<GlobalScoreResult> {
     const params = new URLSearchParams();
     if (weights) params.append('weights', JSON.stringify(weights));
+    if (age !== undefined) params.append('age', age.toString());
     const query = params.toString() ? `?${params}` : '';
     const data = await apiGet<{ success: boolean; data: GlobalScoreResult }>(
       `/ai/analyze/test/${testType}${query}`

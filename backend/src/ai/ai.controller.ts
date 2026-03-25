@@ -17,6 +17,7 @@ export class AiController {
       imageId?: string;
       weights?: Partial<ConditionWeights>;
       testType?: 'severe' | 'mild' | 'mixed';
+      age?: number; // Add age from analysis form
     },
     @CurrentUser() user?: any
   ) {
@@ -30,7 +31,8 @@ export class AiController {
         body.imageId,
         body.weights,
         body.testType,
-        userId
+        userId,
+        body.age // Pass age to service
       );
 
       return {
@@ -45,7 +47,7 @@ export class AiController {
     }
   }
 
-  @Public()
+  @UseGuards(JwtAccessGuard)
   @Post('analyze/unified')
   async analyzeUnified(
     @Body() profile: UserSkinProfile,
@@ -75,6 +77,7 @@ export class AiController {
   async analyzeRandom(
     @Query('seed') seed?: string,
     @Query('weights') weights?: string,
+    @Query('age') age?: string,
     @CurrentUser() user?: any
   ) {
     try {
@@ -85,11 +88,13 @@ export class AiController {
 
       const parsedWeights = weights ? JSON.parse(weights) : undefined;
       const seedNum = seed ? parseInt(seed, 10) : undefined;
+      const analysisAge = age ? parseInt(age, 10) : undefined;
 
       const result = await this.aiAnalysisService.analyzeWithRandomDetections(
         seedNum,
         parsedWeights,
-        userId
+        userId,
+        analysisAge
       );
 
       return {
@@ -110,6 +115,7 @@ export class AiController {
   async analyzeTestCase(
     @Param('testType') testType: 'severe' | 'mild' | 'mixed',
     @Query('weights') weights?: string,
+    @Query('age') age?: string,
     @CurrentUser() user?: any
   ) {
     try {
@@ -119,12 +125,14 @@ export class AiController {
       }
 
       const parsedWeights = weights ? JSON.parse(weights) : undefined;
+      const analysisAge = age ? parseInt(age, 10) : undefined;
 
       const result = await this.aiAnalysisService.analyzeImage(
         undefined,
         parsedWeights,
         testType,
-        userId
+        userId,
+        analysisAge
       );
 
       return {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { User } from '../../user/user.entity';
 
 @Injectable()
@@ -29,6 +30,7 @@ export class JwtTokenService {
       role: user.role,
       tokenType: 'access',
       version: tokenVersion,
+      jti: crypto.randomUUID(), // Assure l'unicité même dans la même seconde
     };
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
@@ -45,6 +47,7 @@ export class JwtTokenService {
       email: user.email,
       tokenType: 'refresh',
       version: tokenVersion,
+      jti: crypto.randomUUID(), // Crucial pour la contrainte UNIQUE en base
     };
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),

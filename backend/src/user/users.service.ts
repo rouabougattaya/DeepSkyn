@@ -45,7 +45,16 @@ export class UsersService {
       }
     }
 
-    await this.usersRepo.update(id, dto);
+    const payload: any = { ...dto };
+    if (dto.birthDate) {
+      const parsed = new Date(dto.birthDate);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException('Invalid birthDate');
+      }
+      payload.birthDate = parsed;
+    }
+
+    await this.usersRepo.update(id, payload);
     return this.findById(id);
   }
 

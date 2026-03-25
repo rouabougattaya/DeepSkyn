@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsOptional, IsString, Length, IsDateString } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -21,4 +21,8 @@ export class UpdateUserDto {
 
   @IsOptional()
   faceUpdatedAt?: Date;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
 }

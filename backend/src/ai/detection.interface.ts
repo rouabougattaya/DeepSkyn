@@ -28,6 +28,8 @@ export interface ConditionWeights {
   blackheads: number;
   darkSpots: number;
   blackDots: number;
+  hydration: number;
+  wrinkles: number;
 }
 
 export interface GlobalScoreResult {
@@ -39,6 +41,14 @@ export interface GlobalScoreResult {
     worstCondition: SkinCondition | null;
     dominantCondition: SkinCondition | null;
   };
+  userInputs?: Partial<UserSkinProfile>;
+  metaWeighting?: { aiWeight: number; userWeight: number };
+  combinedInsights?: Record<string, {
+    aiScore: number | null;
+    userScore?: number;
+    combinedScore: number;
+    weight: { ai: number; user: number };
+  }>;
 }
 
 import { IsEnum, IsInt, IsArray, IsString, IsOptional, Min, Max } from 'class-validator';
@@ -62,4 +72,46 @@ export class UserSkinProfile {
   @IsString()
   @IsOptional()
   imageBase64?: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  acneLevel?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  blackheadsLevel?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  poreSize?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  wrinklesDepth?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  sensitivityLevel?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  hydrationLevel?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  rednessLevel?: number;
 }

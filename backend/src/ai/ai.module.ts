@@ -9,11 +9,13 @@ import { GeminiService } from './gemini.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 import { SkinMetric } from '../skinMetric/skin-metric.entity';
+import { UserProfile } from '../userProfile/user-profile.entity';
 import { RecommendationModule } from '../recommendation/recommendation.module';
+import { IncompatibilityService } from '../routine/incompatibility.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SkinAnalysis, SkinMetric]),
+    TypeOrmModule.forFeature([SkinAnalysis, SkinMetric, UserProfile]),
     RecommendationModule,
   ],
   controllers: [AiController],
@@ -24,6 +26,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     AiAnalysisService,
     OpenRouterService,
     GeminiService,
+    IncompatibilityService,
   ],
   exports: [
     FakeAiService,

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Papa from 'papaparse';
-import { Product } from './product.entity';
+import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
 import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
 
@@ -18,7 +18,7 @@ export class RecommendationService {
     private readonly recommendationRepository: Repository<Recommendation>,
     @InjectRepository(RecommendationItem)
     private readonly itemRepository: Repository<RecommendationItem>,
-  ) {}
+  ) { }
 
   /**
    * Implémentation du moteur de recommandation basé sur le modèle Python et la DATASET réelle
@@ -33,13 +33,12 @@ export class RecommendationService {
     const { exec } = require('child_process');
     const path = require('path');
     const fs = require('fs');
-    
+
     const scriptPath = path.join(process.cwd(), 'scripts', 'recommend.py');
     const dataPath = path.join(process.cwd(), 'data', 'skincare_products_clean.csv');
 
     this.logger.debug(`Paths - Script: ${scriptPath}, Data: ${dataPath}`);
-
-    const pythonPath = 'C:\\Python313\\python.exe';
+    const pythonPath = process.env.PYTHON_PATH || 'python';
 
     // Si on a la dataset réelle, on utilise le script Python
     if (fs.existsSync(dataPath)) {
@@ -56,7 +55,7 @@ export class RecommendationService {
             this.getDatabaseFallback(userId, analysisId, skinType).then(resolve).catch(reject);
             return;
           }
-          
+
           try {
             const results = JSON.parse(stdout);
             if (results.error) {
@@ -90,11 +89,27 @@ export class RecommendationService {
    */
   private async getDatabaseFallback(userId: string, analysisId: string, skinType: string): Promise<any[]> {
     const mappedType = skinType.toLowerCase();
-    // On over-fetch, puis on filtre pour ne garder que des URLs valides.
-    const matchedProducts = await this.productRepository.find({
+    
+    // Try 1: Find products with matching skinType
+    let matchedProducts = await this.productRepository.find({
       where: { skinType: mappedType },
       take: 20,
     });
+
+    // Try 2: If no products found, get popular products without skinType filter
+    if (matchedProducts.length === 0) {
+      this.logger.warn(`No products found for skinType '${mappedType}', falling back to top-rated products`);
+      matchedProducts = await this.productRepository.find({
+        order: { rating: 'DESC' },
+        take: 20,
+      });
+    }
+
+    // Try 3: If still no products, get any available products
+    if (matchedProducts.length === 0) {
+      this.logger.warn('No products available in database');
+      matchedProducts = await this.productRepository.find({ take: 20 });
+    }
 
     const normalizeUrl = (u: unknown): string | null => {
       if (typeof u !== 'string') return null;
@@ -111,7 +126,7 @@ export class RecommendationService {
         return { p, url };
       })
       .filter(({ url }) => !!url)
-      .slice(0, 5)
+      .slice(0, 6)
       .map(({ p, url }) => ({
         ...p,
         url,
@@ -130,7 +145,7 @@ export class RecommendationService {
     const sensitiveKeywords = ['allantoin', 'pelargonium', 'chamomilla', 'calendula', 'panthenol', 'niacinamide', 'asiaticoside'];
 
     const ingredsLower = ingredients.toLowerCase();
-    
+
     let dryCount = 0;
     dryKeywords.forEach(k => { if (ingredsLower.includes(k)) dryCount++; });
 
@@ -211,7 +226,7 @@ export class RecommendationService {
 
         p.url = url;
         p.type = type;
-        p.ingredients = ingredients;
+        p.ingredients = ingredients.split(',').map((s) => s.trim()).filter(Boolean);
         p.price = price;
         p.skinType = this.inferSkinTypeFromIngredients(ingredients);
         p.cluster = p.cluster ?? Math.floor(Math.random() * 5);
@@ -249,7 +264,7 @@ export class RecommendationService {
         name,
         type,
         url,
-        ingredients,
+        ingredients: ingredients.split(',').map((s) => s.trim()).filter(Boolean),
         price,
         skinType: this.inferSkinTypeFromIngredients(ingredients),
         cluster: Math.floor(Math.random() * 5),

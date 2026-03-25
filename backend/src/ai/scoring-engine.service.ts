@@ -16,6 +16,8 @@ export class ScoringEngineService {
     blackheads: 10,   // Points noirs - impact faible
     darkSpots: 10,    // Taches brunes - impact faible
     blackDots: 5,     // Points noirs - impact très faible
+    hydration: 10,    // Hydratation - impact modéré
+    wrinkles: 15,     // Rides - impact élevé
   };
 
   /**
@@ -63,6 +65,8 @@ export class ScoringEngineService {
       [SkinCondition.BLACKHEADS]: 20,      // Max 20 points noirs
       [SkinCondition.DARK_SPOTS]: 15,      // Max 15 taches
       [SkinCondition.BLACK_DOTS]: 25,      // Max 25 points noirs
+      [SkinCondition.HYDRATION]: 20,       // Max 20 zones de deshydratation
+      [SkinCondition.WRINKLES]: 15,        // Max 15 zones de rides
     };
 
     return maxCounts[condition] || 10;
@@ -119,6 +123,8 @@ export class ScoringEngineService {
       blackheads: (weights.blackheads / total) * 100,
       darkSpots: (weights.darkSpots / total) * 100,
       blackDots: (weights.blackDots / total) * 100,
+      hydration: (weights.hydration / total) * 100,
+      wrinkles: (weights.wrinkles / total) * 100,
     };
   }
 
@@ -134,6 +140,8 @@ export class ScoringEngineService {
       [SkinCondition.BLACKHEADS]: 'blackheads',
       [SkinCondition.DARK_SPOTS]: 'darkSpots',
       [SkinCondition.BLACK_DOTS]: 'blackDots',
+      [SkinCondition.HYDRATION]: 'hydration',
+      [SkinCondition.WRINKLES]: 'wrinkles',
     };
 
     return weights[weightMap[condition]] || 0;

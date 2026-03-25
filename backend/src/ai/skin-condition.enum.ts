@@ -6,6 +6,8 @@ export enum SkinCondition {
   BLACKHEADS = "Blackheads",
   DARK_SPOTS = "Dark-Spots",
   BLACK_DOTS = "black_dots",
+  HYDRATION = "Hydration",
+  WRINKLES = "Wrinkles",
 }
 
 export const SKIN_CONDITION_LABELS: Record<SkinCondition, string> = {
@@ -16,4 +18,6 @@ export const SKIN_CONDITION_LABELS: Record<SkinCondition, string> = {
   [SkinCondition.BLACKHEADS]: "Points noirs",
   [SkinCondition.DARK_SPOTS]: "Taches brunes",
   [SkinCondition.BLACK_DOTS]: "Points noirs",
+  [SkinCondition.HYDRATION]: "Hydratation",
+  [SkinCondition.WRINKLES]: "Rides",
 };

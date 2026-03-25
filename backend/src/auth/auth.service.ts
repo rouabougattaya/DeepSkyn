@@ -95,6 +95,12 @@ export class AuthService {
     });
   }
 
+  private parseBirthDate(raw?: string): Date | null {
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
   /* ================= LEGACY / UTILITY METHODS ================= */
 
   private generateToken(user: User) {
@@ -299,6 +305,7 @@ export class AuthService {
         photoAnalysis: googleUser.photoAnalysis || {},
         emailAnalysis: googleUser.emailAnalysis || {},
         aiScore: googleUser.aiScore || 0.5,
+        birthDate: this.parseBirthDate((googleUser as any).birthDate),
       });
       await this.userRepository.save(user);
     } else {
@@ -309,6 +316,7 @@ export class AuthService {
       user.photoAnalysis = googleUser.photoAnalysis || {};
       user.emailAnalysis = googleUser.emailAnalysis || {};
       user.aiScore = googleUser.aiScore || 0.5;
+      user.birthDate = this.parseBirthDate((googleUser as any).birthDate) ?? user.birthDate;
       await this.userRepository.save(user);
     }
 
@@ -464,6 +472,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const faceDescriptor = (dto as any).faceDescriptor ?? null;
+    const birthDate = this.parseBirthDate(dto.birthDate);
 
     const user = this.userRepository.create({
       email: emailNorm,
@@ -471,6 +480,7 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       name: `${dto.firstName} ${dto.lastName}`,
+      birthDate,
       role: 'USER',
       isEmailVerified: false,
       isPremium: false,
@@ -496,11 +506,13 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(signUpDto.password, salt);
+    const birthDate = this.parseBirthDate(signUpDto.birthDate);
 
     const user = this.userRepository.create({
       email: signUpDto.email,
       name: signUpDto.name,
       passwordHash: passwordHash,
+      birthDate,
       aiScore: 0.5,
     });
 

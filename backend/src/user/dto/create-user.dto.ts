@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsDateString } from 'class-validator';
 
 export class CreateUserDto {
   @IsEmail()
@@ -23,4 +23,8 @@ export class CreateUserDto {
 
   @IsOptional()
   isPremium?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
 }

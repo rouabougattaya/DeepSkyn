@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsEnum, IsOptional, Length, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsString, IsEnum, IsOptional, Length, MinLength, Matches, IsDateString } from 'class-validator';
 
 export class CreateAdminDto {
   @IsEmail({}, { message: 'Email invalide' })
@@ -27,4 +27,8 @@ export class CreateAdminDto {
   @IsString()
   @Length(0, 500)
   bio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
 }

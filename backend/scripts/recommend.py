@@ -42,7 +42,7 @@ def main():
         print(json.dumps({"error": "Missing target skin type"}))
         return
 
-    target_skin_type = sys.argv[1].capitalize() # e.g. "Dry", "Oily", "Sensitive"
+    target_skin_type = sys.argv[1].strip().lower() # e.g. "dry", "oily", "sensitive", "normal"
 
     if not os.path.exists(DATA_PATH):
         print(json.dumps({"error": f"Dataset not found at {DATA_PATH}"}))
@@ -69,15 +69,18 @@ def main():
         df['cluster'] = kmeans.fit_predict(X_text)
 
         # 5. Filtrage et Recommandation "Smart"
-        # On cherche des produits du même type de peau et du même cluster dominant pour ce type
-        filtered = df[df['skin_type'] == target_skin_type]
-        
+        # On cherche des produits du même type de peau
+        filtered = df[df['skin_type'].str.lower() == target_skin_type]
+
         if filtered.empty:
-            # Fallback : on prend tous les produits si le type exact n'est pas trouvé
-            filtered = df
-            
-        # On retourne les 5 meilleurs produits (par exemple les 5 premiers du cluster majoritaire du type de peau)
-        # Ou simplement les 5 premiers filtrés si on veut rester simple
+            # Fallback : on prend un échantillon représentatif si le type exact n'est pas trouvé
+            # pour éviter d’afficher 5 produits identiques pour toutes les peaux
+            filtered = df.sample(n=min(5, len(df)), random_state=42)
+        else:
+            # On peut prioriser par cluster commun, mais au moins on garde du vécu cohérent
+            results_candidates = filtered.sort_values(by=['cluster', 'price'])
+            filtered = results_candidates.head(5)
+
         results = filtered.head(5).to_dict(orient='records')
         
         # Conversion pour JSON

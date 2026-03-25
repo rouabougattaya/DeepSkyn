@@ -73,12 +73,18 @@ export class RecommendationService {
    * Fallback base de données (si dataset absente ou erreur)
    */
   private async getDatabaseFallback(userId: string, analysisId: string, skinType: string): Promise<any[]> {
-    const mappedType = skinType.toLowerCase();
-    const matchedProducts = await this.productRepository.find({
+    const mappedType = (skinType || 'normal').toLowerCase().trim();
+
+    let matchedProducts = await this.productRepository.find({
       where: { skinType: mappedType },
       take: 5,
     });
-    // ... la suite de la logique de sauvegarde recommendationId ...
+
+    if (!matchedProducts || matchedProducts.length === 0) {
+      this.logger.warn(`Aucun produit trouvé pour skinType=${mappedType}, fallback all products`);
+      matchedProducts = await this.productRepository.find({ take: 5 });
+    }
+
     return matchedProducts;
   }
 

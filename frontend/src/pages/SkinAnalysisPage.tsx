@@ -167,6 +167,7 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
                 </div>
             </div>
 
+            {/* Progress bar */}
             <div style={{
                 height: 6, background: '#e2e8f0',
                 borderRadius: 99, overflow: 'hidden'
@@ -249,8 +250,8 @@ export default function SkinAnalysisPage() {
         const text = `
             Voici l'analyse de votre peau par DeepSkyn. 
             Votre score global est de ${Math.round(result.globalScore)} sur 100. 
-            Votre meilleur aspect est ${CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}. 
-            Le point critique identifié est ${CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}. 
+            Votre meilleur aspect est ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'non déterminé'}. 
+            Le point critique identifié est ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'non déterminé'}. 
             Prenez soin de vous avec une routine adaptée.
         `;
         
@@ -1256,18 +1257,18 @@ export default function SkinAnalysisPage() {
                             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Diagnostic Expert</h2>
                             <div style={{ marginBottom: 20 }}>
                                 <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, marginBottom: 15 }}>
-                                    L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition <strong>{CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}</strong>. 
-                                    Cependant, une attention particulière est recommandée pour <strong>{CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}</strong> qui présente le score le plus bas de la série.
+                                    L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition <strong>{result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}</strong>. 
+                                    Cependant, une attention particulière est recommandée pour <strong>{result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'}</strong> qui présente le score le plus bas de la série.
                                 </p>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
                                 <div style={{ padding: 12, borderRadius: 12, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.1)' }}>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase' }}>Meilleur aspect</div>
-                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}</div>
                                 </div>
                                 <div style={{ padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)' }}>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' }}>Point critique</div>
-                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 800 }}>{result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'}</div>
                                 </div>
                             </div>
                         </div>

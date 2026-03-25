@@ -95,12 +95,15 @@ export class AuthService {
     });
   }
 
+<<<<<<< HEAD
   private parseBirthDate(raw?: string): Date | null {
     if (!raw) return null;
     const d = new Date(raw);
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
   /* ================= LEGACY / UTILITY METHODS ================= */
 
   private generateToken(user: User) {
@@ -305,7 +308,10 @@ export class AuthService {
         photoAnalysis: googleUser.photoAnalysis || {},
         emailAnalysis: googleUser.emailAnalysis || {},
         aiScore: googleUser.aiScore || 0.5,
+<<<<<<< HEAD
         birthDate: this.parseBirthDate((googleUser as any).birthDate),
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
       });
       await this.userRepository.save(user);
     } else {
@@ -316,7 +322,10 @@ export class AuthService {
       user.photoAnalysis = googleUser.photoAnalysis || {};
       user.emailAnalysis = googleUser.emailAnalysis || {};
       user.aiScore = googleUser.aiScore || 0.5;
+<<<<<<< HEAD
       user.birthDate = this.parseBirthDate((googleUser as any).birthDate) ?? user.birthDate;
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
       await this.userRepository.save(user);
     }
 
@@ -345,13 +354,20 @@ export class AuthService {
       ]
     });
 
+<<<<<<< HEAD
     let user: User;
+=======
+    let user;
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
     if (!existingUser) {
       user = this.userRepository.create({
         email: googleUser.email,
         name: googleUser.name,
+<<<<<<< HEAD
         firstName: googleUser.given_name,
         lastName: googleUser.family_name,
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
         googleId: googleUser.id,
         avatarUrl: googleUser.picture,
         authMethod: 'google',
@@ -360,6 +376,7 @@ export class AuthService {
         aiScore: googleUser.aiScore || 0.5,
       });
       await this.userRepository.save(user);
+<<<<<<< HEAD
       this.logger.log(`Created new Google user: ${googleUser.email}`);
     } else {
       user = existingUser;
@@ -377,10 +394,22 @@ export class AuthService {
       
       await this.userRepository.save(user);
       this.logger.log(`Updated existing Google user: ${googleUser.email}`);
+=======
+    } else {
+      user = existingUser;
+      user.name = googleUser.name;
+      user.avatarUrl = googleUser.picture;
+      user.authMethod = 'google';
+      user.photoAnalysis = googleUser.photoAnalysis || {};
+      user.emailAnalysis = googleUser.emailAnalysis || {};
+      user.aiScore = googleUser.aiScore || 0.5;
+      await this.userRepository.save(user);
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
     }
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, metadata?.ipAddress || undefined, metadata?.userAgent || undefined, { method: 'google' });
 
+<<<<<<< HEAD
     const tokens = await this.issueTokens(user, metadata);
 
     if (!tokens.refreshToken) {
@@ -399,6 +428,15 @@ export class AuthService {
     }
 
     return tokens;
+=======
+    // Utiliser la méthode issueTokens existante
+    const tokens = await this.issueTokens(user, metadata);
+
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la création de session (googleModern).');
+    }
+    await this.sessionService.createSession(user.id, tokens.refreshToken, req);
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
 
     return tokens;
   }
@@ -493,7 +531,10 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const faceDescriptor = (dto as any).faceDescriptor ?? null;
+<<<<<<< HEAD
     const birthDate = this.parseBirthDate(dto.birthDate);
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
 
     const user = this.userRepository.create({
       email: emailNorm,
@@ -501,7 +542,10 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       name: `${dto.firstName} ${dto.lastName}`,
+<<<<<<< HEAD
       birthDate,
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
       role: 'USER',
       isEmailVerified: false,
       isPremium: false,
@@ -527,13 +571,19 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(signUpDto.password, salt);
+<<<<<<< HEAD
     const birthDate = this.parseBirthDate(signUpDto.birthDate);
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
 
     const user = this.userRepository.create({
       email: signUpDto.email,
       name: signUpDto.name,
       passwordHash: passwordHash,
+<<<<<<< HEAD
       birthDate,
+=======
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
       aiScore: 0.5,
     });
 
@@ -767,6 +817,7 @@ export class AuthService {
   private async issueTokens(user: User, metadata?: SessionMetadata): Promise<SessionTokens> {
     const accessToken = this.jwtTokenService.generateAccessToken(user);
     const accessTokenExpiresAt = this.jwtTokenService.calculateExpirationDate(this.jwtTokenService.getAccessTokenTtl());
+<<<<<<< HEAD
     const refreshTokenResult = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
     const refreshToken = (refreshTokenResult as any).refreshToken;
 
@@ -780,6 +831,16 @@ export class AuthService {
       refreshToken,
       accessTokenExpiresAt,
       refreshTokenExpiresAt: refreshTokenResult.expiresAt,
+=======
+    const refreshTokenRecord = await this.refreshTokenService.createRefreshToken(user, metadata?.ipAddress ?? null, metadata?.userAgent ?? null);
+
+    const tokens: SessionTokens = {
+      success: true,
+      accessToken,
+      refreshToken: (refreshTokenRecord as any).refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt: refreshTokenRecord.expiresAt,
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
       user: {
         id: user.id,
         email: user.email,
@@ -790,6 +851,15 @@ export class AuthService {
         isTwoFAEnabled: user.isTwoFAEnabled,
       },
     };
+<<<<<<< HEAD
+=======
+
+    if (!tokens.refreshToken) {
+      throw new Error('Refresh token manquant lors de la génération des tokens.');
+    }
+
+    return tokens;
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
   }
 
   private async logActivity(userId: string, type: ActivityType, ip?: string, deviceInfo?: string, metadata?: any) {

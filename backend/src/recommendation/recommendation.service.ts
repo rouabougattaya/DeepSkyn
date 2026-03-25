@@ -145,7 +145,6 @@ export class RecommendationService {
     const sensitiveKeywords = ['allantoin', 'pelargonium', 'chamomilla', 'calendula', 'panthenol', 'niacinamide', 'asiaticoside'];
 
     const ingredsLower = ingredients.toLowerCase();
-
     let dryCount = 0;
     dryKeywords.forEach(k => { if (ingredsLower.includes(k)) dryCount++; });
 

@@ -90,6 +90,7 @@ export function hasSession(): boolean {
   // Vérifier si le token n'est pas expiré
   const expiresAt = localStorage.getItem(KEY_ACCESS_EXPIRES)
   console.log("[DEBUG] ExpiresAt:", expiresAt)
+<<<<<<< HEAD
   // Important: si l'app n'a pas l'information d'expiration, on ne doit pas considérer la session valide.
   // Sinon, on garde des sessions "stales" (ExpiresAt: null => accès autorisé).
   if (!expiresAt) {
@@ -114,6 +115,22 @@ export function hasSession(): boolean {
     return false
   }
 
+=======
+  if (expiresAt) {
+    const expirationTime = new Date(expiresAt).getTime()
+    const now = new Date().getTime()
+    console.log("[DEBUG] ExpirationTime:", expirationTime, "Now:", now, "Expired?", now >= expirationTime)
+    if (now >= expirationTime) {
+      // Token expiré, nettoyer la session
+      console.log("[DEBUG] Token expiré, clearSession appelé")
+      clearSession()
+      return false
+    }
+  }
+
+  // Si pas de refreshToken mais accessToken valide, autoriser l'accès
+  // (solution temporaire en attendant correction backend)
+>>>>>>> b36a9b8f7575f365cc99cafbece67e0ddb62ed19
   console.log("[DEBUG] Session valide, retour true")
   return true
 }

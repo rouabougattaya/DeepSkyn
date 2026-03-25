@@ -9,9 +9,9 @@ import type { SkinQuestionnaireData } from '../../types/skinQuestionnaire';
 
 interface SkinProfileFormProps {
     profile: UserSkinProfile;
-    setProfile: (profile: UserSkinProfile) => void;
+    setProfile: React.Dispatch<React.SetStateAction<UserSkinProfile>>;
     questionnaire: SkinQuestionnaireData;
-    setQuestionnaire: (data: SkinQuestionnaireData) => void;
+    setQuestionnaire: React.Dispatch<React.SetStateAction<SkinQuestionnaireData>>;
     disabled?: boolean;
 }
 

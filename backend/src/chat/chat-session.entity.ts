@@ -17,6 +17,9 @@ export class ChatSession {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ name: 'title', nullable: true, default: 'Nouvelle discussion' })
+  title: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

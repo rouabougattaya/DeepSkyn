@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -7,7 +7,6 @@ import {
   BarChart2,
   ShoppingBag,
   CalendarCheck,
-  ListChecks,
   Brain,
   CreditCard,
   Settings,
@@ -17,7 +16,7 @@ import {
   MapPin,
   LogOut,
 } from "lucide-react";
-import { getUser, logout } from "@/lib/authSession";
+import { getUser, logout, authFetch } from "@/lib/authSession";
 import { simpleAuthService } from "@/services/authService-simple";
 
 const groups = [
@@ -52,25 +51,42 @@ const groups = [
     ],
   },
   {
-    title: "Subscription",
+    title: 'Abonnement',
     items: [
-      { href: "/pricing", label: "Plans", icon: CreditCard },
-      { href: "/pricing", label: "Billing", icon: CreditCard },
+      { href: '/upgrade', label: 'Plans & Facturation', icon: CreditCard },
     ],
   },
   {
-    title: "Security",
+    title: "Sécurité",
     items: [
-      { href: "/security-history", label: "Connections & Activity", icon: Lock },
-      { href: "/security", label: "IP Logs", icon: MapPin },
+      { href: "/security-history", label: "Connexions & Activité", icon: Lock },
+      { href: "/security", label: "Logs IP", icon: MapPin },
     ],
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onOpenCoach?: () => void;
+  isCoachOpen?: boolean;
+}
+
+export function Sidebar({ onOpenCoach, isCoachOpen = false }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const user = getUser();
+  const [status, setStatus] = useState<any>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      authFetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"}/subscription/status/${user.id}`)
+        .then(res => {
+           if (!res.ok) throw new Error('Unauthorized');
+           return res.json();
+        })
+        .then(data => setStatus(data))
+        .catch(err => console.error("Error fetching status:", err));
+    }
+  }, [user?.id, location.pathname]);
 
   const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href);
 
@@ -88,7 +104,25 @@ export function Sidebar() {
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = isActive(item.href);
+                const isCoachItem = item.label === 'AI Skin Coach';
+                const active = isCoachItem ? isCoachOpen : isActive(item.href);
+
+                if (isCoachItem) {
+                  return (
+                    <button
+                      key={item.href + item.label}
+                      type="button"
+                      onClick={onOpenCoach}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
+                        ? "bg-teal-50 text-teal-700 border border-teal-100"
+                        : "text-slate-700 hover:bg-slate-100"}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href + item.label}
@@ -105,6 +139,42 @@ export function Sidebar() {
             </div>
           </div>
         ))}
+
+        {/* 📊 USAGE INDICATOR */}
+        {status && status.chat && status.analysis && (
+          <div className="mx-2 mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+             <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                <span>Usage {status.plan}</span>
+                <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
+             </div>
+             <div className="space-y-3">
+                <div className="space-y-1.5">
+                   <div className="flex justify-between text-[11px] font-semibold">
+                      <span className="text-slate-600">Messages Chat</span>
+                      <span className="text-slate-900">{status.chat.used}/{status.chat.limit}</span>
+                   </div>
+                   <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-teal-500 transition-all duration-500" 
+                        style={{ width: `${Math.min(100, (status.chat.used / status.chat.limit) * 100)}%` }} 
+                      />
+                   </div>
+                </div>
+                <div className="space-y-1.5">
+                   <div className="flex justify-between text-[11px] font-semibold">
+                      <span className="text-slate-600">Analyses Peau</span>
+                      <span className="text-slate-900">{status.analysis.used}/{status.analysis.limit}</span>
+                   </div>
+                   <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-teal-500 transition-all duration-500" 
+                        style={{ width: `${Math.min(100, (status.analysis.used / status.analysis.limit) * 100)}%` }} 
+                      />
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-slate-200 px-4 py-4">
@@ -114,7 +184,7 @@ export function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 truncate">{user?.firstName || user?.name || "User"}</p>
-            <p className="text-xs text-slate-500 truncate">Signed in</p>
+            <p className="text-xs text-slate-500 truncate">Plan : {status?.plan || "FREE"}</p>
           </div>
         </div>
         <button
@@ -154,7 +224,28 @@ export function Sidebar() {
                 <div className="space-y-1">
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const active = isActive(item.href);
+                    const isCoachItem = item.label === 'AI Skin Coach';
+                    const active = isCoachItem ? isCoachOpen : isActive(item.href);
+
+                    if (isCoachItem) {
+                      return (
+                        <button
+                          key={item.href + item.label}
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            onOpenCoach?.();
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
+                            ? "bg-teal-50 text-teal-700 border border-teal-100"
+                            : "text-slate-700 hover:bg-slate-100"}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      );
+                    }
+
                     return (
                       <Link
                         key={item.href + item.label}

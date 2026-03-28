@@ -12,6 +12,7 @@ import { UserProfile } from '../userProfile/user-profile.entity';
 import { RecommendationService } from '../recommendation/recommendation.service';
 import { SkinCondition } from './skin-condition.enum';
 import { IncompatibilityService } from '../routine/incompatibility.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class AiAnalysisService {
@@ -28,6 +29,7 @@ export class AiAnalysisService {
     private readonly metricRepo: Repository<SkinMetric>,
     @InjectRepository(UserProfile)
     private readonly profileRepo: Repository<UserProfile>,
+    private readonly subscriptionService: SubscriptionService,
   ) { }
 
   /**
@@ -42,6 +44,13 @@ export class AiAnalysisService {
     analysisAge?: number
   ): Promise<GlobalScoreResult & { recommendations?: any[] }> {
     try {
+      // LIMIT CHECK (DEV 4)
+      if (userId) {
+        const { allowed } = await this.subscriptionService.checkAnalysisLimit(userId);
+        if (!allowed) {
+          throw new Error('LIMIT_REACHED');
+        }
+      }
       // Étape 1: Simulation de l'analyse IA
       const rawDetections = testType
         ? this.fakeAiService.generateTestCase(testType)
@@ -85,6 +94,11 @@ export class AiAnalysisService {
       if (result.recommendations && result.recommendations.length > 0) {
         const checkResult = this.incompatibilityService.checkRoutine(result.recommendations);
         (result as any).compatibilityWarning = checkResult.message;
+      }
+
+      // INCREMENT USAGE (DEV 4)
+      if (userId) {
+        await this.subscriptionService.incrementImages(userId);
       }
 
       return result;
@@ -134,7 +148,19 @@ export class AiAnalysisService {
     userId: string = ''
   ): Promise<GlobalScoreResult & { recommendations?: any[] }> {
     try {
-      const result = await this.openRouterService.analyzeSkin(profile) as any;
+      // LIMIT CHECK (DEV 4)
+      let plan = 'FREE';
+      if (userId) {
+        const sub = await this.subscriptionService.getSubscription(userId);
+        plan = sub.plan;
+        
+        const { allowed } = await this.subscriptionService.checkAnalysisLimit(userId);
+        if (!allowed) {
+          throw new Error('LIMIT_REACHED');
+        }
+      }
+      
+      const result = await this.openRouterService.analyzeSkin(profile, plan) as any;
 
       const hasPhoto = Boolean(profile.imageBase64);
       const aiWeight = hasPhoto ? 0.7 : 0;
@@ -252,6 +278,11 @@ export class AiAnalysisService {
       if (result.recommendations && result.recommendations.length > 0) {
         const checkResult = this.incompatibilityService.checkRoutine(result.recommendations);
         (result as any).compatibilityWarning = checkResult.message;
+      }
+
+      // INCREMENT USAGE (DEV 4)
+      if (userId) {
+        await this.subscriptionService.incrementImages(userId);
       }
 
       return result;

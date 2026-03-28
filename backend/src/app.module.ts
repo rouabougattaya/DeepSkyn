@@ -21,6 +21,9 @@ import { RecommendationModule } from './recommendation/recommendation.module';
 import { RoutineModule } from './routine/routine.module';
 import { ProductsModule } from './products/products.module';
 import { ChatModule } from './chat/chat.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { PaymentModule } from './payment/payment.module';
+import { PlansModule } from './plans/plans.module';
 
 @Module({
   imports: [
@@ -59,6 +62,9 @@ import { ChatModule } from './chat/chat.module';
     RoutineModule,
     ProductsModule,
     ChatModule,
+    SubscriptionModule,
+    PaymentModule,
+    PlansModule,
   ],
   controllers: [AppController, AnalysisController],
   providers: [

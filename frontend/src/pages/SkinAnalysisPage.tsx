@@ -1,15 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import type { LucideIcon } from 'lucide-react';
 import {
     Sparkles, ArrowLeft, Zap, AlertCircle, GitCompare,
     CheckCircle, RefreshCw, Activity,
     BarChart2, Info, Waves, Flame, Microscope,
     Bandage, CircleDot, HeartPulse,
     CircleCheck, AlertTriangle, BarChart3,
-    Upload, X, Download, Printer, Volume2, VolumeX,
+    Upload, X, Download, Volume2, VolumeX,
+    Send, Loader2, Bot, ArrowUpCircle, Lock, ArrowRight, Printer
 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+
 import { aiAnalysisService } from '../services/aiAnalysisService';
+import { chatService } from '../services/chat.service';
+import { getUser } from '../lib/authSession';
+import { apiGet } from '../services/apiClient';
+import type { SubscriptionData } from '../services/paymentService';
+
 import type { GlobalScoreResult, ConditionScore, UserSkinProfile } from '../types/aiAnalysis';
 import { SkinProfileForm } from '../components/analysis/SkinProfileForm';
 import { DEFAULT_QUESTIONNAIRE, type SkinQuestionnaireData } from '../types/skinQuestionnaire';
@@ -187,13 +193,24 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
 /* ──────────────────────── Main Page ──────────────────────────── */
 
 export default function SkinAnalysisPage() {
+    const navigate = useNavigate();
     const [result, setResult] = useState<GlobalScoreResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [analysisCount, setAnalysisCount] = useState(0);
     const [scanPhase, setScanPhase] = useState<'idle' | 'capturing' | 'processing' | 'scoring' | 'done'>('idle');
-    const [useLLM] = useState(true);
     const [questionnaire, setQuestionnaire] = useState<SkinQuestionnaireData>(DEFAULT_QUESTIONNAIRE);
+    const [currentPlan, setCurrentPlan] = useState<string>('FREE');
+
+    useEffect(() => {
+        const user = getUser();
+        if (user?.id) {
+            apiGet<SubscriptionData>(`/subscription/${user.id}`)
+                .then(s => setCurrentPlan(s.plan))
+                .catch(() => {});
+        }
+    }, []);
+
     const [profile, setProfile] = useState<UserSkinProfile>({
         skinType: 'Combination',
         age: 25,
@@ -209,9 +226,20 @@ export default function SkinAnalysisPage() {
     });
     const [isSpeaking, setIsSpeaking] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    // Chat states
+    const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+    const [chatInput, setChatInput] = useState('');
+    const [chatLoading, setChatLoading] = useState(false);
+
 
     const exportToCSV = useCallback(() => {
         if (!result) return;
+        if (currentPlan === 'FREE') {
+            setError('L\'exportation CSV est réservée aux utilisateurs PRO et PREMIUM. Passez au plan supérieur !');
+            return;
+        }
         const headers = ['Condition', 'Score', 'Detections', 'Severity'];
         const rows = result.conditionScores.map(c => [
             c.type,
@@ -231,12 +259,15 @@ export default function SkinAnalysisPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    }, [result]);
+    }, [result, currentPlan]);
 
     const exportToPDF = useCallback(() => {
-        // Optimal way without extra libs: Use browser print
+        if (currentPlan === 'FREE') {
+            setError('L\'exportation PDF est réservée aux utilisateurs PRO et PREMIUM. Passez au plan supérieur !');
+            return;
+        }
         window.print();
-    }, []);
+    }, [currentPlan]);
 
     const speakAnalysis = useCallback(() => {
         if (!result || !window.speechSynthesis) return;
@@ -280,8 +311,35 @@ export default function SkinAnalysisPage() {
     };
 
     useEffect(() => {
-        // weights logic removed as per user request
-    }, []);
+        // Auto-scroll chat
+        if (chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [chatMessages]);
+
+    const sendChatMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInput.trim() || chatLoading) return;
+
+        const userMessage = chatInput.trim();
+        setChatInput('');
+        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setChatLoading(true);
+
+        try {
+            const response = await chatService.sendPersonalizedMessage(userMessage);
+            setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
+        } catch (err: any) {
+            console.error('Chat error:', err);
+            const msg = err.message?.includes('LIMIT_REACHED') 
+                ? "🔒 Limite journalière de messages atteinte (Plan FREE). Passez au plan PRO pour discuter sans limites !" 
+                : "Désolé, j'ai rencontré une erreur. Réessaye plus tard.";
+            setChatMessages(prev => [...prev, { role: 'assistant', content: msg }]);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
 
 
 
@@ -322,7 +380,10 @@ export default function SkinAnalysisPage() {
             }, 1000);
         } catch (err: any) {
             console.error('Analysis error:', err);
-            setError(`Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur (port 3001).'}`);
+            const errorMsg = err.message?.includes('LIMIT_REACHED')
+                ? "🚫 Limite d'analyses mensuelles atteinte (Plan FREE). Débloquez le plan PRO pour continuer vos analyses !"
+                : `Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur.'}`;
+            setError(errorMsg);
             setScanPhase('idle');
         } finally {
             setLoading(false);
@@ -589,7 +650,6 @@ export default function SkinAnalysisPage() {
                     )}
                 </div>
 
-                {/* ── Page Title ── */}
                 <div style={{ marginBottom: 36, textAlign: 'center' }}>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -724,11 +784,35 @@ export default function SkinAnalysisPage() {
                         {/* Error */}
                         {error && (
                             <div style={{
-                                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                                borderRadius: 12, padding: 14, display: 'flex', gap: 10, alignItems: 'flex-start'
+                                background: error.includes('LIMIT_REACHED') ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', 
+                                border: error.includes('LIMIT_REACHED') ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(239,68,68,0.2)',
+                                borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start'
                             }}>
-                                <AlertCircle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                                <p style={{ fontSize: 12, color: '#fca5a5', lineHeight: 1.5 }}>{error}</p>
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                    <AlertCircle size={18} style={{ color: error.includes('LIMIT_REACHED') ? '#f59e0b' : '#ef4444', flexShrink: 0 }} />
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: error.includes('LIMIT_REACHED') ? '#b45309' : '#b91c1c', margin: 0 }}>
+                                        {error.includes('LIMIT_REACHED') ? 'Limite mensuelle atteinte' : 'Erreur d\'analyse'}
+                                    </p>
+                                </div>
+                                <p style={{ fontSize: 12, color: error.includes('LIMIT_REACHED') ? '#92400e' : '#fca5a5', lineHeight: 1.5, margin: 0 }}>
+                                    {error.includes('LIMIT_REACHED') 
+                                      ? 'Vous avez atteint le nombre maximal d\'analyses pour votre plan actuel ce mois-ci.' 
+                                      : error}
+                                </p>
+                                {error.includes('LIMIT_REACHED') && (
+                                    <Link 
+                                      to="/upgrade" 
+                                      style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                                        backgroundColor: '#f59e0b', color: 'white',
+                                        padding: '8px 16px', borderRadius: '10px',
+                                        fontSize: '12px', fontWeight: '700', textDecoration: 'none',
+                                        boxShadow: '0 4px 12px rgba(245,158,11,0.3)', transition: 'all 0.2s'
+                                      }}
+                                    >
+                                        <ArrowUpCircle size={14} /> Passer au plan supérieur
+                                    </Link>
+                                )}
                             </div>
                         )}
                     </div>
@@ -945,11 +1029,23 @@ export default function SkinAnalysisPage() {
                                 </div>
 
                                 {/* Skin Conditions Legend */}
-                                <div className="glass-card" style={{ padding: 24 }}>
+                                <div className="glass-card relative overflow-hidden" style={{ padding: 24 }}>
+                                    {currentPlan === 'FREE' && (
+                                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 bg-white/40 backdrop-blur-md">
+                                            <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mb-4 border border-teal-100">
+                                                <Lock size={24} className="text-teal-600" />
+                                            </div>
+                                            <h3 className="text-sm font-black text-slate-900 mb-1">Détails Cliniques PRO</h3>
+                                            <p className="text-slate-500 text-[11px] text-center max-w-[200px] mb-4">Accédez à l'interprétation experte de chaque mesure.</p>
+                                            <button onClick={() => navigate('/upgrade')} className="px-5 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs shadow-lg hover:scale-105 transition-transform">
+                                                Voir les détails
+                                            </button>
+                                        </div>
+                                    )}
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
                                         Interprétation clinique
                                     </h2>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} className={currentPlan === 'FREE' ? 'blur-sm pointer-events-none' : ''}>
                                         {result.conditionScores.map(condition => {
                                             const meta = CONDITION_META[condition.type];
                                             if (!meta) return null;
@@ -985,25 +1081,21 @@ export default function SkinAnalysisPage() {
                                             );
                                         })}
                                     </div>
-
-                                    <div style={{
-                                        marginTop: 16, padding: 12, borderRadius: 10,
-                                        background: 'rgba(13,148,136,0.05)',
-                                        border: '1px solid rgba(13,148,136,0.1)',
-                                        display: 'flex', gap: 8, alignItems: 'flex-start'
-                                    }}>
-                                        <Info size={14} style={{ color: '#0d9488', flexShrink: 0, marginTop: 1 }} />
-                                        <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>
-                                            Score 0–100 : plus le score est <strong style={{ color: '#10b981' }}>élevé</strong>, meilleure est la condition.
-                                            L'IA analyse vos préoccupations pour pondérer le score global.
-                                        </p>
-                                    </div>
                                 </div>
 
                                 {/* AI Summary */}
                                 <div className="bg-[#0d9488] p-8 rounded-3xl shadow-xl shadow-teal-500/20 text-white relative overflow-hidden group">
+                                    {currentPlan === 'FREE' && (
+                                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 bg-teal-800/80 backdrop-blur-md">
+                                            <Lock size={24} className="text-teal-200 mb-2" />
+                                            <h3 className="text-sm font-bold text-white mb-2">Diagnostic Expert PRO</h3>
+                                            <button onClick={() => navigate('/upgrade')} className="px-4 py-2 bg-white text-teal-700 rounded-lg font-bold text-[11px]">
+                                                DÉBLOQUER
+                                            </button>
+                                        </div>
+                                    )}
                                     <Sparkles className="absolute -right-4 -top-4 w-24 h-24 opacity-10 group-hover:rotate-12 transition-transform" />
-                                    <div className="relative z-10">
+                                    <div className={`relative z-10 ${currentPlan === 'FREE' ? 'blur-md' : ''}`}>
                                         <h3 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 opacity-80">
                                             <CheckCircle size={14} /> Sommaire de l'analyse
                                         </h3>
@@ -1013,134 +1105,119 @@ export default function SkinAnalysisPage() {
                                     </div>
                                 </div>
 
-                                {/* Product Recommendations */}
+                                 {/* Product Recommendations */}
                                 <div id="recommendations-section" className="glass-card fade-in" style={{ padding: 24, border: '2px solid #0d9488' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <Sparkles className="text-teal-600" size={20} />
-                                            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                                                Tes Recommandations Skincare
-                                            </h2>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            {result.recommendations && result.recommendations.length > 0 && (
-                                                <div
-                                                    className="tag"
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, rgba(13,148,136,0.10) 0%, rgba(8,145,178,0.06) 100%)',
-                                                        color: '#0d9488',
-                                                        border: '1px solid rgba(13,148,136,0.20)',
-                                                        boxShadow: '0 6px 18px rgba(13,148,136,0.10)',
-                                                    }}
-                                                >
-                                                    Recommandations personnalisées
-                                                </div>
-                                            )}
-                                            <Link
-                                                to="/routines"
-                                                style={{
-                                                    background: '#0d9488',
-                                                    color: 'white',
-                                                    padding: '8px 12px',
-                                                    borderRadius: 10,
-                                                    fontSize: 12,
-                                                    fontWeight: 800,
-                                                    textDecoration: 'none',
-                                                    boxShadow: '0 10px 25px rgba(13,148,136,0.22)',
-                                                    border: '1px solid rgba(10,122,112,0.35)',
-                                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'translateY(-1px)'
-                                                    e.currentTarget.style.boxShadow = '0 14px 35px rgba(13,148,136,0.28)'
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'translateY(0)'
-                                                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(13,148,136,0.22)'
-                                                }}
-                                            >
-                                                Voir ta routine AM/PM
-                                            </Link>
-                                        </div>
-                                    </div>
-
-                                    {!result.recommendations || result.recommendations.length === 0 ? (
-                                        <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>
-                                            <Info size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-                                            <p>Chargement des produits depuis ta dataset...</p>
-                                            <p style={{ fontSize: 12 }}>Assure-toi que `skincare_products_clean.csv` est bien dans `backend/data/`</p>
+                                    {currentPlan === 'FREE' ? (
+                                        <div className="text-center py-12">
+                                            <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Lock size={32} className="text-teal-600" />
+                                            </div>
+                                            <h3 className="text-xl font-black text-slate-900 mb-2">Recommandations PRO</h3>
+                                            <p className="text-slate-500 mb-6 max-w-xs mx-auto">Passez au plan PRO pour débloquer vos suggestions de produits personnalisées basées sur l'IA.</p>
+                                            <button onClick={() => navigate('/upgrade')} className="px-8 py-3 bg-teal-600 text-white rounded-xl font-bold">
+                                                Débloquer maintenant
+                                            </button>
                                         </div>
                                     ) : (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-                                            {result.recommendations.map((product, idx) => (
-                                                <div key={idx} style={{
-                                                    background: 'white',
-                                                    border: '1px solid #e2e8f0',
-                                                    borderRadius: 16,
-                                                    padding: 16,
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: 8,
-                                                    transition: 'all 0.2s',
-                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                                                }}>
-                                                    <div style={{
-                                                        fontSize: 10,
-                                                        fontWeight: 800,
-                                                        textTransform: 'uppercase',
-                                                        color: '#0d9488',
-                                                        letterSpacing: '0.05em'
-                                                    }}>
-                                                        {product.type}
-                                                    </div>
-                                                    <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>
-                                                        {product.name}
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                                                        <span style={{ fontWeight: 800, color: '#0f172a' }}>£{product.price.toFixed(2)}</span>
-                                                        <span style={{ fontSize: 10, color: '#94a3b8' }}>Peau {product.skinType}</span>
-                                                    </div>
-                                                    {normalizeExternalUrl(product.url) ? (
-                                                        <a
-                                                            href={normalizeExternalUrl(product.url) as string}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            style={{
-                                                                marginTop: 8,
-                                                                textAlign: 'center',
-                                                                background: '#0d9488',
-                                                                borderRadius: 10,
-                                                                padding: '8px 0',
-                                                                fontSize: 12,
-                                                                fontWeight: 700,
-                                                                color: 'white',
-                                                                textDecoration: 'none',
-                                                                boxShadow: '0 4px 10px rgba(13,148,136,0.2)'
-                                                            }}
-                                                        >
-                                                            Acheter
-                                                        </a>
-                                                    ) : (
-                                                        <div
-                                                            style={{
-                                                                marginTop: 8,
-                                                                textAlign: 'center',
-                                                                background: '#e2e8f0',
-                                                                borderRadius: 10,
-                                                                padding: '8px 0',
-                                                                fontSize: 12,
-                                                                fontWeight: 700,
-                                                                color: '#94a3b8',
-                                                                boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
-                                                            }}
-                                                        >
-                                                            Lien indisponible
-                                                        </div>
-                                                    )}
+                                        <>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <Sparkles className="text-teal-600" size={20} />
+                                                    <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                                                        Tes Recommandations Skincare
+                                                    </h2>
                                                 </div>
-                                            ))}
+                                                <Link
+                                                    to="/routines"
+                                                    style={{
+                                                        background: '#0d9488',
+                                                        color: 'white',
+                                                        padding: '8px 12px',
+                                                        borderRadius: 10,
+                                                        fontSize: 12,
+                                                        fontWeight: 800,
+                                                        textDecoration: 'none',
+                                                    }}
+                                                >
+                                                    Voir ta routine AM/PM
+                                                </Link>
+                                            </div>
+
+                                            {!result.recommendations || result.recommendations.length === 0 ? (
+                                                <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>
+                                                    <Info size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                                                    <p>Analyse en cours...</p>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                                                    {result.recommendations.map((product, idx) => (
+                                                        <div key={idx} style={{
+                                                            background: 'white',
+                                                            border: '1px solid #e2e8f0',
+                                                            borderRadius: 16,
+                                                            padding: 16,
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: 8,
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                                                        }}>
+                                                            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: '#0d9488' }}>
+                                                                {product.type}
+                                                            </div>
+                                                            <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>
+                                                                {product.name}
+                                                            </div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                                                <span style={{ fontWeight: 800 }}>£{product.price.toFixed(2)}</span>
+                                                            </div>
+                                                            {normalizeExternalUrl(product.url) && (
+                                                                <a href={normalizeExternalUrl(product.url) as string} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, textAlign: 'center', background: '#0d9488', borderRadius: 10, padding: '8px 0', fontSize: 12, color: 'white', textDecoration: 'none' }}>
+                                                                    Acheter
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Progress Tracking Section */}
+                                <div id="history-section" className="glass-card fade-in relative overflow-hidden" style={{ padding: 24, minHeight: 400 }}>
+                                    {currentPlan === 'FREE' && (
+                                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 bg-white/60 backdrop-blur-md">
+                                            <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center mb-4 border border-amber-100">
+                                                <Lock size={28} className="text-amber-600" />
+                                            </div>
+                                            <h3 className="text-lg font-black text-slate-900 mb-2">Suivi de Progression PRO</h3>
+                                            <p className="text-slate-500 text-sm text-center max-w-[240px] mb-6">Visualisez l'évolution de votre peau avec des graphiques détaillés. Réservé aux membres PRO.</p>
+                                            <Link to="/upgrade" className="px-6 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-amber-100 hover:scale-105 transition-transform" style={{ textDecoration: 'none' }}>
+                                                Débloquer le suivi
+                                            </Link>
                                         </div>
                                     )}
+                                    
+                                    <div className={currentPlan === 'FREE' ? 'opacity-20 pointer-events-none' : ''}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <BarChart2 className="text-teal-600" size={20} />
+                                                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                                                    Suivi de progression
+                                                </h2>
+                                            </div>
+                                        </div>
+                                        {/* Mock chart content for visual reference */}
+                                        <div className="space-y-6">
+                                            <div className="h-48 w-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex items-center justify-center">
+                                                <Activity className="text-slate-300 w-12 h-12 animate-pulse" />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 h-24 flex items-center justify-center font-bold text-slate-400">GRAPH 1</div>
+                                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 h-24 flex items-center justify-center font-bold text-slate-400">GRAPH 2</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* 👇 BOUTON VERS TA PAGE PRODUITS 👇 */}
@@ -1148,13 +1225,115 @@ export default function SkinAnalysisPage() {
                                     <Link
                                         to="/products"
                                         className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md"
+                                        style={{ textDecoration: 'none' }}
                                     >
                                         🛍️ Parcourir tous les produits
                                     </Link>
-                                    <p className="text-xs text-slate-500 mt-2">
-                                        Filtrez par prix, ingrédients, type de peau et plus
-                                    </p>
                                 </div>
+
+                                { /* AI Chat Section */ }
+                                <div className="glass-card fade-in overflow-hidden" style={{ border: '2px solid #0d9488', marginTop: 32, boxShadow: '0 12px 40px rgba(13,148,136,0.15)' }}>
+                                    <div className="bg-teal-600 p-4 text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                                                <Bot size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>💬 Pose ta question à l'IA</h3>
+                                                <p style={{ fontSize: 11, opacity: 0.8, margin: 0 }}>Conseils personnalisés basés sur ton analyse</p>
+                                            </div>
+                                        </div>
+                                        <Sparkles size={18} className="opacity-40" />
+                                    </div>
+
+                                    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 400, overflowY: 'auto', background: '#f8fafc' }}>
+                                        {chatMessages.length === 0 ? (
+                                            <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>
+                                                Pose-moi une question sur tes résultats ou ta routine...
+                                            </div>
+                                        ) : (
+                                            chatMessages.map((msg, i) => (
+                                                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                                                    <div style={{ 
+                                                        maxWidth: '85%', 
+                                                        padding: '12px 16px', 
+                                                        borderRadius: 20, 
+                                                        fontSize: 14,
+                                                        background: msg.role === 'user' ? '#0d9488' : 'white',
+                                                        color: msg.role === 'user' ? 'white' : '#1e293b',
+                                                        border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
+                                                        borderTopRightRadius: msg.role === 'user' ? 4 : 20,
+                                                        borderTopLeftRadius: msg.role === 'user' ? 20 : 4,
+                                                        boxShadow: msg.role === 'user' ? '0 4px 12px rgba(13,148,136,0.2)' : '0 2px 8px rgba(0,0,0,0.03)'
+                                                    }}>
+                                                        {msg.content}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                        {chatLoading && (
+                                            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                                <div style={{ 
+                                                    background: 'white', 
+                                                    border: '1px solid #e2e8f0', 
+                                                    padding: '12px 16px', 
+                                                    borderRadius: 20, 
+                                                    borderTopLeftRadius: 4,
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: 12, 
+                                                    color: '#94a3b8', 
+                                                    fontSize: 14, 
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)' 
+                                                }}>
+                                                    <Loader2 size={16} className="animate-spin" style={{ color: '#0d9488' }} />
+                                                    L'IA réfléchit...
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={chatEndRef} />
+                                    </div>
+
+                                    <form onSubmit={sendChatMessage} style={{ padding: 16, borderTop: '1px solid #f1f5f9', background: 'white' }}>
+                                        <div style={{ display: 'flex', gap: 12 }}>
+                                            <input
+                                                type="text"
+                                                value={chatInput}
+                                                onChange={(e) => setChatInput(e.target.value)}
+                                                placeholder="Comment traiter mes pores dilatés ?"
+                                                style={{ 
+                                                    flex: 1, 
+                                                    background: '#f8fafc', 
+                                                    border: '1px solid #e2e8f0', 
+                                                    borderRadius: 12, 
+                                                    padding: '10px 16px', 
+                                                    fontSize: 14,
+                                                    outline: 'none'
+                                                }}
+                                                disabled={chatLoading}
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={chatLoading || !chatInput.trim()}
+                                                style={{ 
+                                                    background: '#0d9488', 
+                                                    color: 'white', 
+                                                    padding: '10px 16px', 
+                                                    borderRadius: 12, 
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    opacity: (chatLoading || !chatInput.trim()) ? 0.5 : 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                            >
+                                                <Send size={18} />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
 
                                 {/* Raw Metrics Summary */}
                                 <div className="glass-card" style={{ padding: 24 }}>
@@ -1242,10 +1421,12 @@ export default function SkinAnalysisPage() {
                                 {result.globalScore >= 75 ? 'EXCELLENT' : result.globalScore >= 50 ? 'AVERAGE' : 'TO IMPROVE'}
                             </div>
                             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 15, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                                    <span style={{ color: '#64748b' }}>Âge:</span>
-                                    <span style={{ fontWeight: 700 }}>{profile.age} ans</span>
-                                </div>
+                                {currentPlan !== 'FREE' && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                        <span style={{ color: '#64748b' }}>Âge:</span>
+                                        <span style={{ fontWeight: 700 }}>{profile.age} ans</span>
+                                    </div>
+                                )}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                                     <span style={{ color: '#64748b' }}>Type de peau:</span>
                                     <span style={{ fontWeight: 700 }}>{profile.skinType}</span>
@@ -1257,8 +1438,10 @@ export default function SkinAnalysisPage() {
                             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Diagnostic Expert</h2>
                             <div style={{ marginBottom: 20 }}>
                                 <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, marginBottom: 15 }}>
-                                    L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition <strong>{result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}</strong>. 
-                                    Cependant, une attention particulière est recommandée pour <strong>{result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'}</strong> qui présente le score le plus bas de la série.
+                                    {currentPlan === 'FREE' 
+                                        ? 'Le diagnostic expert détaillé est réservé aux membres PRO et PREMIUM. Passez au plan supérieur pour obtenir une analyse approfondie de vos résultats.'
+                                        : `L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}. Cependant, une attention particulière est recommandée pour ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'} qui présente le score le plus bas de la série.`
+                                    }
                                 </p>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>

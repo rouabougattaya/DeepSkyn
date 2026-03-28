@@ -12,11 +12,13 @@ import { SkinMetric } from '../skinMetric/skin-metric.entity';
 import { UserProfile } from '../userProfile/user-profile.entity';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { IncompatibilityService } from '../routine/incompatibility.service';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([SkinAnalysis, SkinMetric, UserProfile]),
     RecommendationModule,
+    SubscriptionModule,
   ],
   controllers: [AiController],
   providers: [

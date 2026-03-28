@@ -56,8 +56,11 @@ export class MetricsService {
     private readonly metricRepo: Repository<SkinMetric>,
   ) { }
 
-  async getDashboardMetrics(): Promise<DashboardMetrics> {
-    const analyses = await this.analysisRepo.find({ order: { createdAt: 'DESC' } });
+  async getDashboardMetrics(userId?: string): Promise<DashboardMetrics> {
+    const queryWork: any = { order: { createdAt: 'DESC' } };
+    if (userId) queryWork.where = { userId };
+    
+    const analyses = await this.analysisRepo.find(queryWork);
     if (analyses.length === 0) {
       return {
         averageScore: 0, bestScore: 0, worstScore: 0, totalAnalyses: 0,
@@ -86,8 +89,11 @@ export class MetricsService {
     };
   }
 
-  async getTrends(): Promise<TrendData[]> {
-    const allAnalyses = await this.analysisRepo.find({ order: { createdAt: 'DESC' } });
+  async getTrends(userId?: string): Promise<TrendData[]> {
+    const queryWork: any = { order: { createdAt: 'DESC' } };
+    if (userId) queryWork.where = { userId };
+    
+    const allAnalyses = await this.analysisRepo.find(queryWork);
     if (allAnalyses.length < 2) return [];
 
     return [
@@ -97,8 +103,11 @@ export class MetricsService {
     ];
   }
 
-  async getMonthlyData(months: number = 12): Promise<MonthlyData[]> {
-    const all = await this.analysisRepo.find({ order: { createdAt: 'ASC' } });
+  async getMonthlyData(months: number = 12, userId?: string): Promise<MonthlyData[]> {
+    const queryWork: any = { order: { createdAt: 'ASC' } };
+    if (userId) queryWork.where = { userId };
+
+    const all = await this.analysisRepo.find(queryWork);
     const monthlyMap = new Map<string, number[]>();
 
     all.forEach(a => {

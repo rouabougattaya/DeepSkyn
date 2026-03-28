@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { authFetch, getUser } from "@/lib/authSession"
-import { Check, Moon, Sparkles, Sun, ShoppingBag, ArrowUpRight, ArrowDownRight, Minus, History, RefreshCw, AlertCircle } from "lucide-react"
+import { Check, Moon, Sparkles, Sun, ShoppingBag, ArrowUpRight, ArrowDownRight, Minus, History, RefreshCw, AlertCircle, Lock, Crown } from "lucide-react"
 import { updateRoutine } from "@/services/routinePersonalizationService"
+import { apiGet } from "@/services/apiClient"
+import { useNavigate } from "react-router-dom"
 import type { RoutineUpdateResponseDto, TrendDetail } from "@/types/routinePersonalization"
 
 type RoutineProduct = {
@@ -39,6 +41,8 @@ function normalizeExternalUrl(url: unknown): string | null {
 export default function RoutinesPage() {
   const user = getUser()
   const userId = user?.id
+  const navigate = useNavigate()
+  const [currentPlan, setCurrentPlan] = useState<string>('FREE')
 
   const [routine, setRoutine] = useState<RoutineResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,13 +110,20 @@ export default function RoutinesPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await authFetch(`/routine/${userId}`, { method: "GET" })
-        const data = (await res.json()) as RoutineResponse
-        setRoutine(data)
+        // Fetch routine and subscription plan in parallel
+        const [res, subData] = await Promise.all([
+           authFetch(`/routine/${userId}`, { method: "GET" }),
+           apiGet<any>(`/subscription/${userId}`).catch(() => ({ plan: 'FREE' }))
+        ]);
+        
+        const data = (await res.json()) as RoutineResponse;
+        setRoutine(data);
+        setCurrentPlan(subData?.plan || 'FREE');
       } catch {
-        setError("Impossible de charger la routine. Vérifie le backend.")
+        setError("Impossible de charger la routine. Vérifie le backend.");
+        setCurrentPlan('FREE');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
@@ -170,7 +181,37 @@ export default function RoutinesPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 py-10 relative">
+      
+      {/* LOCK OVERLAY FOR FREE USERS */}
+      {currentPlan === 'FREE' && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-10 text-center bg-white/60 backdrop-blur-xl">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-white text-[#0d9488] shadow-2xl ring-1 ring-slate-200">
+            <Lock size={40} />
+          </div>
+          <h1 className="mb-4 text-3xl font-black text-slate-900">
+            Routine Personnalisée <span className="text-[#0d9488]">PRO</span>
+          </h1>
+          <p className="mb-8 max-w-md text-lg font-medium text-slate-500 leading-relaxed">
+            Le Routine Builder intelligent, qui adapte vos soins selon vos analyses IA, 
+            est réservé aux membres PRO. Optimisez votre routine maintenant !
+          </p>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="px-8 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
+            >
+              Retour
+            </button>
+            <button 
+              onClick={() => navigate('/upgrade')}
+              className="flex items-center gap-2 rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#10b981] px-10 py-4 text-lg font-black text-white shadow-xl shadow-teal-500/20 hover:scale-105 transition-all"
+            >
+              <Crown size={22} /> Débloquer maintenant
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-4">
         <div className="relative overflow-hidden rounded-3xl border border-teal-100/80 bg-white/80 backdrop-blur p-7 shadow-sm">
           <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-teal-200/30 blur-2xl" />

@@ -1,22 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { apiPost } from '../../lib/apiClient';
+import type { SharedChatController } from '../../hooks/useSharedChat';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
+interface ChatWidgetProps {
+  chat: SharedChatController;
 }
 
-export function ChatWidget() {
+export function ChatWidget({ chat }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Bonjour ! Je suis votre assistant expert peau DeepSkyn. Comment puis-je vous aider aujourd\'hui ?' }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    sessionId,
+    isInitializing,
+    contextHints,
+    messages,
+    input,
+    isLoading,
+    error,
+    setInput,
+    ensureSession,
+    sendMessage,
+  } = chat;
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -25,58 +28,12 @@ export function ChatWidget() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, contextHints]);
 
   // Handle session creation when chat is opened
   useEffect(() => {
-    if (isOpen && !sessionId && !isInitializing) {
-      const startSession = async () => {
-        setIsInitializing(true);
-        setError(null);
-        try {
-          const res = await apiPost<{ success: boolean; sessionId: string }>('/chat/start');
-          if (res.success) {
-            setSessionId(res.sessionId);
-          }
-        } catch (error) {
-          console.error('Failed to start chat session', error);
-          setError('Impossible de démarrer la session de chat. Veuillez réessayer.');
-        } finally {
-          setIsInitializing(false);
-        }
-      };
-      startSession();
-    }
-  }, [isOpen, sessionId, isInitializing]);
-
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || isLoading || !sessionId) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const res = await apiPost<{ success: boolean; response: string }>('/chat/message', {
-        sessionId,
-        message: userMessage
-      });
-
-      if (res.success) {
-        setMessages(prev => [...prev, { role: 'assistant', content: res.response }]);
-      } else {
-        throw new Error('Failed to get response');
-      }
-    } catch (err) {
-      console.error('Chat error:', err);
-      setError('Une erreur est survenue lors de l\'envoi du message.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (isOpen && !sessionId && !isInitializing) ensureSession();
+  }, [isOpen, sessionId, isInitializing, ensureSession]);
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -121,6 +78,14 @@ export function ChatWidget() {
             ref={scrollRef}
             className="flex-1 bg-gray-50/50 p-4 overflow-y-auto flex flex-col space-y-4"
           >
+            {contextHints.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-700 space-y-1.5">
+                {contextHints.map((hint, index) => (
+                  <p key={`${hint}-${index}`} className="leading-relaxed">{hint}</p>
+                ))}
+              </div>
+            )}
+
             {messages.map((msg, idx) => (
               <div 
                 key={idx} 
@@ -168,7 +133,7 @@ export function ChatWidget() {
 
           {/* Input Area */}
           <form 
-            onSubmit={handleSendMessage}
+            onSubmit={sendMessage}
             className="p-4 bg-white border-t border-gray-100"
           >
             <div className="relative flex items-center gap-2">

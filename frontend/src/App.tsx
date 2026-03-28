@@ -31,6 +31,12 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import './App.css'
 import ProductsPage from './pages/ProductsPage';
+import ChatPage from './pages/ChatPage';
+import UpgradePage from './pages/UpgradePage';
+import PricingPage from './pages/PricingPage';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
+
 
 function Home() {
   return (
@@ -65,6 +71,7 @@ function App() {
         <Route path="/auth/login-face" element={<LoginFacePage />} />
         <Route path="/auth/login-empreinte" element={<LoginFingerprintPage />} />
         <Route path="/products" element={<ProductsPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
 
         {/* Protected Routes inside AppLayout */}
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -84,8 +91,12 @@ function App() {
           <Route path="/analysis/details/:id" element={<SkinAnalysisDetailPage />} />
           <Route path="/analysis/compare" element={<ComparisonPage />} />
           <Route path="/routines" element={<RoutinesPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/ai-demo" element={<AiDemoPage />} />
-          <Route path="/pricing" element={<HomePage />} />
+
+          <Route path="/upgrade" element={<UpgradePage />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancel" element={<PaymentCancel />} />
         </Route>
 
         {/* Admin Routes - Protected with role check */}

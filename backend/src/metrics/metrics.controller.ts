@@ -1,6 +1,10 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { MetricsService, DashboardMetrics, MonthlyData, TrendData } from './metrics.service';
+import { UseGuards, UnauthorizedException } from '@nestjs/common';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '../user/user.entity';
 
 /**
  * ════════════════════════════════════════════════════════════════
@@ -13,25 +17,34 @@ import { MetricsService, DashboardMetrics, MonthlyData, TrendData } from './metr
  *  ├── GET  /dashboard/monthly   → Monthly aggregation for Chart.js
  *  └── POST /dashboard/seed      → Seed demo data (6 months)
  */
-@Public()
+@UseGuards(JwtAccessGuard)
 @Controller('dashboard')
 export class MetricsController {
   constructor(private readonly metricsService: MetricsService) { }
 
   @Get('metrics')
-  async getMetrics(): Promise<DashboardMetrics> {
-    return this.metricsService.getDashboardMetrics();
+  async getMetrics(@CurrentUser() user: User | { id: string }): Promise<DashboardMetrics> {
+    const userId = user?.id;
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.metricsService.getDashboardMetrics(userId);
   }
 
   @Get('trends')
-  async getTrends(): Promise<TrendData[]> {
-    return this.metricsService.getTrends();
+  async getTrends(@CurrentUser() user: User | { id: string }): Promise<TrendData[]> {
+    const userId = user?.id;
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.metricsService.getTrends(userId);
   }
 
   @Get('monthly')
-  async getMonthlyData(@Query('months') months?: string): Promise<MonthlyData[]> {
+  async getMonthlyData(
+    @CurrentUser() user: User | { id: string },
+    @Query('months') months?: string
+  ): Promise<MonthlyData[]> {
+    const userId = user?.id;
+    if (!userId) throw new UnauthorizedException('User ID required');
     const monthCount = months ? parseInt(months, 10) : 12;
-    return this.metricsService.getMonthlyData(monthCount);
+    return this.metricsService.getMonthlyData(monthCount, userId);
   }
 
   @Get('ping')

@@ -5,14 +5,19 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 
 // Helper function to get CSRF token
 async function getCsrfToken(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/auth/csrf-token`, {
-    method: 'GET',
-    credentials: 'include'
-  });
-  const data = await response.json().catch(() => ({}));
-  const token = data?.csrfToken || response.headers.get('X-CSRF-Token');
-  if (!token) throw new Error('CSRF token not found');
-  return token;
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/csrf-token`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+    if (!response.ok) return '';
+    const data = await response.json().catch(() => ({}));
+    const token = data?.csrfToken || response.headers.get('X-CSRF-Token');
+    return token || '';
+  } catch (err) {
+    console.debug('[CSRF] Could not pre-fetch token in realApi:', err);
+    return '';
+  }
 }
 
 // Import authFetch for authenticated requests

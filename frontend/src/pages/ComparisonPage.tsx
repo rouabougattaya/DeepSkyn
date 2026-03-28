@@ -13,7 +13,11 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
+  Lock,
+  Crown,
 } from 'lucide-react';
+import { apiGet } from '../services/apiClient';
+import { getUser } from '../lib/authSession';
 import { comparisonService } from '../services/comparison.service';
 import type {
   CompareAnalysisResult,
@@ -148,6 +152,10 @@ export default function ComparisonPage() {
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [result, setResult] = useState<CompareAnalysisResult | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<string>('FREE');
+
+  const user = getUser();
+  const userId = user?.id;
 
   const hasUrlIds = Boolean(firstIdFromUrl && secondIdFromUrl);
 
@@ -168,6 +176,14 @@ export default function ComparisonPage() {
         if (!cancelled) setAnalysesLoading(false);
       }
     })();
+
+    // Fetch current plan
+    if (userId) {
+      apiGet<any>(`/subscription/${userId}`).then(subData => {
+        setCurrentPlan(subData.plan || 'FREE');
+      }).catch(() => setCurrentPlan('FREE'));
+    }
+
     return () => {
       cancelled = true;
     };
@@ -653,7 +669,63 @@ export default function ComparisonPage() {
         }
       `}</style>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
+        
+        {/* LOCK OVERLAY FOR FREE USERS */}
+        {currentPlan === 'FREE' && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 40,
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: 80, height: 80, borderRadius: 24,
+              background: 'white', display: 'grid', placeItems: 'center',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1)', marginBottom: 24,
+              color: '#0d9488'
+            }}>
+              <Lock size={40} />
+            </div>
+            <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', marginBottom: 16 }}>
+              Comparaison d'Analyses <span style={{ color: '#0d9488' }}>PRO</span>
+            </h1>
+            <p style={{ fontSize: 18, color: '#64748b', maxWidth: 500, lineHeight: 1.6, marginBottom: 32 }}>
+              La comparaison détaillée entre deux analyses et le calcul des tendances 
+              sont réservés aux membres PRO. Suivez vos résultats précisément !
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="px-8 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all font-sans"
+              >
+                Retour
+              </button>
+              <button 
+                onClick={() => navigate('/upgrade')}
+                style={{
+                  background: 'linear-gradient(135deg, #0d9488, #10b981)',
+                  color: 'white', padding: '16px 40px', borderRadius: 20,
+                  fontWeight: 800, border: 'none', cursor: 'pointer',
+                  boxShadow: '0 10px 20px rgba(13, 148, 136, 0.2)',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  transition: 'all 0.3s',
+                  fontFamily: 'Inter, sans-serif'
+                }}
+              >
+                <Crown size={20} /> Débloquer maintenant
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── En-tête ── */}
         <div style={{
           display: 'flex',

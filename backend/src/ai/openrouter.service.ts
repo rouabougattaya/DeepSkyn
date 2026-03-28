@@ -19,7 +19,7 @@ export class OpenRouterService {
     /**
      * Analyse de peau via OpenRouter (The Unified Interface for LLMs)
      */
-    async analyzeSkin(profile: UserSkinProfile): Promise<GlobalScoreResult> {
+    async analyzeSkin(profile: UserSkinProfile, plan: string = 'FREE'): Promise<GlobalScoreResult> {
         if (!this.apiKey) {
             this.logger.error('❌ OPENROUTER_API_KEY manquante');
             throw new Error('AI analysis unavailable - Missing API Key');
@@ -87,7 +87,8 @@ export class OpenRouterService {
           "analysis": {
             "bestCondition": "[Type]",
             "worstCondition": "[Type]",
-            "dominantCondition": "[Type]"
+            "dominantCondition": "[Type]",
+            "expertInsights": ${plan === 'PREMIUM' ? "\"Analyse détaillée niveau dermatologue exclusive au plan Premium (2-3 paragraphes d'expertise technique)\"" : "null"}
           }
         }
       `;
@@ -205,7 +206,7 @@ export class OpenRouterService {
     /**
      * Chatbot response via OpenRouter
      */
-    async chat(message: string, systemPrompt?: string): Promise<string> {
+    async chat(message: string, systemPrompt?: string, plan: string = 'FREE'): Promise<string> {
         if (!this.apiKey) {
             return "Je suis désolé, le service d'IA est actuellement indisponible.";
         }
@@ -215,7 +216,11 @@ export class OpenRouterService {
             const messages: any[] = [];
             
             if (systemPrompt) {
-                messages.push({ role: 'system', content: systemPrompt });
+                let enhancedPrompt = systemPrompt;
+                if (plan === 'PREMIUM') {
+                    enhancedPrompt += " [USER PREMIUM] : Fournis des réponses extrêmement détaillées, expertes et utilise un ton médical précis. Ne limite pas la longueur de tes explications.";
+                }
+                messages.push({ role: 'system', content: enhancedPrompt });
             }
             
             messages.push({ role: 'user', content: message });

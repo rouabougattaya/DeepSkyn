@@ -11,6 +11,7 @@ import { RoutineController } from './routine.controller';
 import { RoutineService } from './routine.service';
 import { RoutinePersonalizationService } from './routine-personalization.service';
 import { IncompatibilityService } from './incompatibility.service';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { IncompatibilityService } from './incompatibility.service';
     ]),
     RecommendationModule,
     InsightsModule,
+    AiModule,
   ],
   controllers: [RoutineController],
   providers: [RoutineService, RoutinePersonalizationService, IncompatibilityService],

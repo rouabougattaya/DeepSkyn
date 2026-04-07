@@ -55,4 +55,10 @@ export class ProductFilterDto {
     @IsOptional()
     @IsIn(['ASC', 'DESC'])
     sortOrder?: 'ASC' | 'DESC';
+
+    /** Max results (defaults to 50) */
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    limit?: number = 50;
 }

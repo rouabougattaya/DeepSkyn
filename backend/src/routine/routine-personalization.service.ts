@@ -113,12 +113,18 @@ export class RoutinePersonalizationService {
         const adjustments = this.buildAdjustmentRules(trends, skinType);
         this.logger.log(`Applied ${adjustments.length} adjustment rules`);
 
-        // 5. Get base recommendations from the existing engine
-        const recommendations = await this.recommendationService.getRecommendationsForSkinState(
-            userId,
-            'personalization',
-            skinType,
-        );
+        // 5. Get base recommendations from the latest analysis
+        let recommendations = latest ? await this.recommendationService.getRecommendationsForAnalysis(latest.id) : [];
+
+        // Fallback if none found
+        if (!recommendations || recommendations.length === 0) {
+            this.logger.log('No recommendations found for latest analysis, using skin state fallback.');
+            recommendations = await this.recommendationService.getRecommendationsForSkinState(
+                userId,
+                'personalization',
+                skinType,
+            );
+        }
 
         // 6. Build personalized AM / PM routines
         const [amRoutine, pmRoutine] = await Promise.all(

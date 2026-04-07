@@ -153,18 +153,20 @@ export class AiAnalysisService {
       if (userId) {
         const sub = await this.subscriptionService.getSubscription(userId);
         plan = sub.plan;
-        
+
         const { allowed } = await this.subscriptionService.checkAnalysisLimit(userId);
         if (!allowed) {
           throw new Error('LIMIT_REACHED');
         }
       }
-      
+
+      console.log(`[analyzeSkinWithLLM] Starting analysis for userId: ${userId}, skinType: ${profile.skinType}`);
       const result = await this.openRouterService.analyzeSkin(profile, plan) as any;
 
-      const hasPhoto = Boolean(profile.imageBase64);
-      const aiWeight = hasPhoto ? 0.7 : 0;
-      const userWeight = hasPhoto ? 0.3 : 1;
+      const hasPhoto = Boolean(profile.imageBase64 || (profile.imagesBase64 && profile.imagesBase64.length > 0));
+      // True image-first behavior: when a photo exists, scores must come from image detection.
+      const aiWeight = hasPhoto ? 1 : 0;
+      const userWeight = hasPhoto ? 0 : 1;
       const combinedInsights: Record<string, {
         aiScore: number | null;
         userScore?: number;
@@ -204,46 +206,86 @@ export class AiAnalysisService {
       conditionMap.forEach(({ field, condition }) => {
         const userScore = profile[field];
         let conditionEntry = result.conditionScores.find((c: any) => c.type === condition);
-        
-        // Create if doesn't exist
+        const numericUserScore = typeof userScore === 'number' ? userScore : undefined;
+        const aiEvaluated = hasPhoto && conditionEntry && conditionEntry.evaluated !== false && typeof conditionEntry.score === 'number';
+        const userDeclared = typeof numericUserScore === 'number';
+        const shouldEvaluate = hasPhoto ? Boolean(aiEvaluated) : userDeclared;
+
+        // Create explicit "non evaluated" entry if absent
         if (!conditionEntry) {
-          conditionEntry = { type: condition, score: 50, severity: 0.5 };
+          conditionEntry = {
+            type: condition,
+            score: null,
+            count: 0,
+            severity: null,
+            evaluated: false,
+            notEvaluatedReason: 'Ni detecte sur image, ni renseigne par utilisateur',
+          };
           result.conditionScores.push(conditionEntry);
         }
 
-        const aiScore = hasPhoto ? (conditionEntry?.score ?? null) : null;
-
-        if (conditionEntry) {
-          const numericUserScore = typeof userScore === 'number' ? userScore : undefined;
-          const baseUser = toGoodScore(condition, numericUserScore);
-          const combinedScore = hasPhoto
-            ? Math.round((aiScore ?? 0) * aiWeight + baseUser * userWeight)
-            : baseUser;
-
-          conditionEntry.score = combinedScore;
-          conditionEntry.severity = Math.max(0, Math.min(1, 1 - combinedScore / 100));
-          combinedInsights[condition] = {
-            aiScore,
-            userScore: typeof userScore === 'number' ? userScore : undefined,
-            combinedScore,
-            weight: { ai: aiWeight, user: userWeight },
-          };
+        if (!shouldEvaluate) {
+          conditionEntry.evaluated = false;
+          conditionEntry.score = null;
+          conditionEntry.severity = null;
+          conditionEntry.count = conditionEntry.count ?? 0;
+          if (hasPhoto) {
+            conditionEntry.notEvaluatedReason = userDeclared
+              ? 'Declare par utilisateur mais non detecte sur la photo'
+              : 'Non detecte sur la photo';
+          } else {
+            conditionEntry.notEvaluatedReason = 'Ni detecte sur image, ni renseigne par utilisateur';
+          }
+          return;
         }
+
+        const aiScore = aiEvaluated ? (conditionEntry?.score ?? null) : null;
+        const baseUser = typeof numericUserScore === 'number' ? toGoodScore(condition, numericUserScore) : null;
+        const combinedScore =
+          typeof aiScore === 'number' && typeof baseUser === 'number'
+            ? Math.round(aiScore * aiWeight + baseUser * userWeight)
+            : typeof aiScore === 'number'
+              ? aiScore
+              : (baseUser as number);
+
+        conditionEntry.evaluated = true;
+        conditionEntry.notEvaluatedReason = null;
+        conditionEntry.score = combinedScore;
+        conditionEntry.severity = Math.max(0, Math.min(1, 1 - combinedScore / 100));
+        conditionEntry.count = conditionEntry.count ?? 0;
+        combinedInsights[condition] = {
+          aiScore,
+          userScore: typeof numericUserScore === 'number' ? numericUserScore : undefined,
+          combinedScore,
+          weight: { ai: aiWeight, user: userWeight },
+        };
       });
 
-      if (result.conditionScores?.length) {
-        const averaged = result.conditionScores.reduce((sum: number, c: any) => sum + (c.score ?? 0), 0) / result.conditionScores.length;
+      const evaluatedConditionScores = (result.conditionScores || []).filter(
+        (c: any) => c.evaluated !== false && typeof c.score === 'number',
+      );
+
+      if (evaluatedConditionScores.length) {
+        const averaged = evaluatedConditionScores.reduce((sum: number, c: any) => sum + (c.score ?? 0), 0) / evaluatedConditionScores.length;
         result.globalScore = Math.round(averaged * 10) / 10;
+      } else {
+        result.globalScore = 0;
       }
 
       console.log(`[analyzeSkinWithLLM] Generated condition scores:`, result.conditionScores?.map(c => ({ type: c.type, score: c.score })));
 
-      if (result.conditionScores?.length) {
-        const sorted = [...result.conditionScores].sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0));
+      if (evaluatedConditionScores.length) {
+        const sorted = [...evaluatedConditionScores].sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0));
         result.analysis = {
           bestCondition: sorted[0]?.type ?? null,
           worstCondition: sorted[sorted.length - 1]?.type ?? null,
           dominantCondition: sorted[sorted.length - 1]?.type ?? null,
+        } as any;
+      } else {
+        result.analysis = {
+          bestCondition: null,
+          worstCondition: null,
+          dominantCondition: null,
         } as any;
       }
 
@@ -259,19 +301,72 @@ export class AiAnalysisService {
       } as any;
       result.combinedInsights = combinedInsights as any;
 
+      // Fill IA skin age estimation
+      if (typeof profile.age === 'number') {
+        try {
+          // If we have photos, we can try to estimate skin age via LLM
+          if (hasPhoto) {
+            const agePrediction = await this.openRouterService.estimateSkinAge(profile);
+            if (Number.isFinite(agePrediction.skinAge)) {
+              result.skinAge = Math.round(agePrediction.skinAge);
+            }
+            if (typeof agePrediction.rationale === 'string' && agePrediction.rationale.trim()) {
+              result.skinAgeRationale = agePrediction.rationale.trim();
+            }
+          }
+
+          // Fallback or adjustment if skinAge is still missing or not estimated by photo
+          if (result.skinAge === undefined || result.skinAge === null) {
+            const baselineAge = profile.age;
+            const normalizedScore = Math.max(0, Math.min(100, result.globalScore ?? 0));
+            const ageAdjustment = (50 - normalizedScore) / 5;
+            result.skinAge = Math.round(baselineAge + ageAdjustment);
+            if (!result.skinAgeRationale) {
+              result.skinAgeRationale = `Age estimé basé sur un score global de ${result.globalScore}/100 et un âge réel de ${profile.age} ans.`;
+            }
+          }
+        } catch (e: any) {
+          console.warn(`[analyzeSkinWithLLM] Skin age estimation error: ${e?.message || e}`);
+          const baselineAge = profile.age;
+          const normalizedScore = Math.max(0, Math.min(100, result.globalScore ?? 0));
+          const ageAdjustment = (50 - normalizedScore) / 5;
+          result.skinAge = Math.round(baselineAge + ageAdjustment);
+        }
+      }
+
       if (userId && result.globalScore > 0) {
         const saved = await this.persistResult(result, 'unified_llm', userId, profile.age);
         if (saved && (saved as any).recommendations) {
           result.recommendations = (saved as any).recommendations;
         }
-      } 
-      
+      }
+
       // Toujours ajouter des recommandations même si pas de userId (pour le démo/guest mode)
       if (!result.recommendations) {
+        const conditionToConcern = (type: string): string => {
+          const normalized = String(type || '').toLowerCase();
+          if (normalized === 'acne') return 'acne';
+          if (normalized === 'blackheads') return 'blackheads';
+          if (normalized === 'enlarged-pores') return 'pores';
+          if (normalized === 'skin redness') return 'redness';
+          if (normalized === 'hydration') return 'dryness'; // Correction: l'IA cherche 'dryness' pour l'hydratation
+          if (normalized === 'wrinkles') return 'wrinkles';
+          if (normalized === 'dark-spots') return 'dark_spots'; // Correction: le script python utilise dark_spots avec '_'
+          if (normalized === 'black_dots') return 'blackheads';
+          return normalized;
+        };
+        const evaluatedConcerns: string[] = Array.from(
+          new Set<string>(
+            evaluatedConditionScores
+              .map((c: any) => conditionToConcern(c.type))
+              .filter((c): c is string => typeof c === 'string' && c.length > 0),
+          ),
+        );
         result.recommendations = await this.recommendationService.getRecommendationsForSkinState(
           userId || 'guest',
           'temporary',
-          profile.skinType || 'Normal'
+          profile.skinType || 'Normal',
+          evaluatedConcerns,
         );
       }
 
@@ -334,7 +429,7 @@ export class AiAnalysisService {
    * Valeur par défaut réaliste pour une métrique manquante (50–80).
    */
   private static defaultMetricValue(): number {
-    return Math.round(50 + Math.random() * 30);
+    return 50;
   }
 
   /**
@@ -348,7 +443,7 @@ export class AiAnalysisService {
   } {
     const findScore = (type: SkinCondition | string) =>
       conditionScores.find(c => String(c.type).toLowerCase() === String(type).toLowerCase())?.score;
-    const def = () => AiAnalysisService.defaultMetricValue();
+    const def = () => 50;
     const result = {
       hydration: findScore(SkinCondition.HYDRATION) ?? def(),
       oil: findScore(SkinCondition.PORES) ?? findScore('oil') ?? def(),
@@ -370,11 +465,11 @@ export class AiAnalysisService {
 
     try {
       const comparisonMetrics = this.getComparisonMetricsFromConditions(result.conditionScores);
-      
+
       // CRITICAL: Use ONLY the age provided by user during analysis
       // NO fallback to birthDate - keep realAge exactly as provided
       const realAge: number | null = userInputAge ?? null;
-      
+
       // Calculate skinAge using realAge as reference point
       // Higher score -> lower skinAge; lower score -> higher skinAge
       const baselineAge = realAge ?? 25;
@@ -415,7 +510,7 @@ export class AiAnalysisService {
         this.metricRepo.create({
           analysisId: savedAnalysis.id,
           metricType: condition.type,
-          score: condition.score ?? AiAnalysisService.defaultMetricValue(),
+          score: condition.evaluated === false ? 0 : (condition.score ?? AiAnalysisService.defaultMetricValue()),
           severityLevel: `Severity ${(condition.severity ?? 0).toFixed(1)}`,
         })
       ));
@@ -425,7 +520,7 @@ export class AiAnalysisService {
       // ✅ NOUVEAU: Générer des recommandations basées sur l'état de la peau
       let inferredSkinType = 'Normal';
       const dominant = result.analysis?.dominantCondition;
-      
+
       if (dominant === SkinCondition.ACNE || dominant === SkinCondition.PORES) {
         inferredSkinType = 'Oily';
       } else if (dominant === SkinCondition.REDNESS) {
@@ -445,6 +540,22 @@ export class AiAnalysisService {
     } catch (error) {
       console.error('❌ Failed to persist AI analysis:', error.message);
       return null;
+    }
+  }
+
+  /**
+   * Predict future skin state using LLM
+   * Used for Digital Twin simulations
+   */
+  async predictFutureSkin(context: string): Promise<any> {
+    try {
+      // Call OpenRouter to generate future skin predictions
+      const prediction = await this.openRouterService.predictFutureSkinState(context);
+      return prediction;
+    } catch (error) {
+      console.error('Future skin prediction failed:', error);
+      // Return empty object - fallback will be handled by caller
+      return {};
     }
   }
 

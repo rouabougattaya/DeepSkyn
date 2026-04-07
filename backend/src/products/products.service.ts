@@ -20,6 +20,7 @@ export class ProductsService {
             minPrice,
             maxPrice,
             isClean,
+            limit = 50,
             sortBy = 'name',
             sortOrder = 'ASC',
         } = dto;
@@ -38,8 +39,8 @@ export class ProductsService {
         }
 
         if (ingredient) {
-            // ingredients is stored as a comma-separated simple-array string
-            qb.andWhere('LOWER(product.clean_ingreds) LIKE :ingredient', {
+            // ingredients is the entity property
+            qb.andWhere('LOWER(product.ingredients) LIKE :ingredient', {
                 ingredient: `%${ingredient.toLowerCase()}%`,
             });
         }
@@ -53,7 +54,7 @@ export class ProductsService {
         }
 
         if (isClean !== undefined) {
-            qb.andWhere('product.is_clean = :isClean', { isClean });
+            qb.andWhere('product.isClean = :isClean', { isClean });
         }
 
         const columnMap: Record<string, string> = {
@@ -63,6 +64,8 @@ export class ProductsService {
         };
 
         qb.orderBy(columnMap[sortBy] ?? 'product.name', sortOrder);
+        
+        qb.limit(limit);
 
         return qb.getMany();
     }
@@ -87,18 +90,20 @@ export class ProductsService {
     async getUniqueIngredients(): Promise<string[]> {
         const rows = await this.productRepository
             .createQueryBuilder('product')
-            .select('product.clean_ingreds', 'ingredients')
-            .where('product.clean_ingreds IS NOT NULL')
+            .select('product.ingredients', 'ingredients')
+            .where('product.ingredients IS NOT NULL')
             .getRawMany<{ ingredients: string }>();
 
         const set = new Set<string>();
         for (const row of rows) {
             if (!row.ingredients) continue;
-            row.ingredients
+            const cleanString = row.ingredients
+                .replace(/[\[\]']/g, '') // Remove brackets and single quotes
                 .split(',')
                 .map((i) => i.trim())
-                .filter(Boolean)
-                .forEach((i) => set.add(i));
+                .filter(Boolean);
+                
+            cleanString.forEach((i) => set.add(i));
         }
 
         return Array.from(set).sort();

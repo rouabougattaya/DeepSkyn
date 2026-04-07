@@ -24,9 +24,14 @@ import { ChatModule } from './chat/chat.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
 import { PlansModule } from './plans/plans.module';
+import { DigitalTwinModule } from './digitalTwin/digital-twin.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
+    NotificationsModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
@@ -65,6 +70,7 @@ import { PlansModule } from './plans/plans.module';
     SubscriptionModule,
     PaymentModule,
     PlansModule,
+    DigitalTwinModule,
   ],
   controllers: [AppController, AnalysisController],
   providers: [

@@ -1,14 +1,61 @@
-import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Param, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AiAnalysisService } from './ai-analysis.service';
+import { ImageValidationService } from './image-validation.service';
+import { RiskPredictionService } from './risk-prediction.service';
+import { SvrRoutineService } from './svr-routine.service';
 import { ConditionWeights, UserSkinProfile } from './detection.interface';
-import { Req } from '@nestjs/common';
+import { SkinRiskInput, SkinRiskResponse } from './skin-risk.dto';
 
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiAnalysisService: AiAnalysisService) { }
+  constructor(
+    private readonly aiAnalysisService: AiAnalysisService,
+    private readonly imageValidationService: ImageValidationService,
+    private readonly riskPredictionService: RiskPredictionService,
+    private readonly svrRoutineService: SvrRoutineService
+  ) { }
+
+  @Get('health/openrouter')
+  @UseGuards(JwtAccessGuard)
+  async checkOpenRouterHealth() {
+    try {
+      console.log('[AiController] Testing OpenRouter health...');
+      const testProfile: UserSkinProfile = {
+        skinType: 'Oily',
+        age: 30,
+        concerns: [],
+        acneLevel: 50,
+        blackheadsLevel: 50,
+        poreSize: 50,
+        rednessLevel: 50,
+        hydrationLevel: 50,
+        wrinklesDepth: 50,
+        sensitivityLevel: 50,
+      };
+
+      // Don't call with images to avoid validation issues
+      const result = await this.aiAnalysisService.analyzeSkinWithLLM(testProfile, 'test');
+
+      return {
+        success: true,
+        message: 'OpenRouter API is working',
+        data: {
+          globalScore: result.globalScore,
+          conditionCount: result.conditionScores?.length || 0
+        }
+      };
+    } catch (error: any) {
+      console.error('[AiController] OpenRouter health check failed:', error.message);
+      return {
+        success: false,
+        message: 'OpenRouter API check failed',
+        error: error.message
+      };
+    }
+  }
 
   @Post('analyze')
   @UseGuards(JwtAccessGuard)
@@ -39,9 +86,57 @@ export class AiController {
         success: true,
         data: result,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         { success: false, error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post('analyze/test-no-images')
+  @UseGuards(JwtAccessGuard)
+  async analyzeTestNoImages(
+    @Body() profile: Partial<UserSkinProfile>,
+    @CurrentUser() user?: any
+  ) {
+    try {
+      const userId = user?.id || user?.userId;
+      console.log('[AiController] Test analyze (no images) called');
+
+      // Force no images
+      const testProfile: UserSkinProfile = {
+        skinType: profile?.skinType || 'Oily',
+        age: profile?.age || 30,
+        concerns: profile?.concerns || [],
+        acneLevel: profile?.acneLevel ?? 50,
+        blackheadsLevel: profile?.blackheadsLevel ?? 50,
+        poreSize: profile?.poreSize ?? 50,
+        rednessLevel: profile?.rednessLevel ?? 50,
+        hydrationLevel: profile?.hydrationLevel ?? 50,
+        wrinklesDepth: profile?.wrinklesDepth ?? 50,
+        sensitivityLevel: profile?.sensitivityLevel ?? 50,
+      };
+
+      console.log('[AiController] Calling analyzeSkinWithLLM without images...');
+      const result = await this.aiAnalysisService.analyzeSkinWithLLM(testProfile, userId);
+      console.log('[AiController] Test analysis completed successfully');
+
+      return {
+        success: true,
+        message: 'Test analysis without images succeeded',
+        data: result,
+      };
+    } catch (error: any) {
+      console.error('[AiController] Test analyze error:', error.message);
+      console.error('[AiController] Error stack:', error.stack);
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+          errorType: error.constructor.name,
+          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        },
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
@@ -56,15 +151,64 @@ export class AiController {
     try {
       const userId = user?.id || user?.userId;
       console.log(`[AiController] analyzeUnified called | userId: ${userId}`);
+      console.log(`[AiController] Profile received:`, {
+        skinType: profile.skinType,
+        age: profile.age,
+        hasImageBase64: !!profile.imageBase64,
+        hasImagesBase64: !!profile.imagesBase64,
+        imagesCount: profile.imagesBase64?.length || 0,
+      });
 
+      if (profile.imagesBase64 && profile.imagesBase64.length > 0) {
+        console.log(`[AiController] Validating ${profile.imagesBase64.length} images...`);
+        for (let idx = 0; idx < profile.imagesBase64.length; idx++) {
+          const img = profile.imagesBase64[idx];
+          try {
+            console.log(`[AiController] Validating image ${idx + 1}...`);
+            const validation = await this.imageValidationService.validateImageBeforeAnalysis(img);
+            console.log(`[AiController] Image ${idx + 1} validation result:`, validation);
+            if (!validation.isValid) {
+              throw new Error('NOT_A_FACE');
+            }
+          } catch (imgErr: any) {
+            console.error(`[AiController] Image ${idx + 1} validation error:`, imgErr.message);
+            throw imgErr;
+          }
+        }
+      } else if (profile.imageBase64) {
+        console.log(`[AiController] Validating single image...`);
+        try {
+          const validation = await this.imageValidationService.validateImageBeforeAnalysis(profile.imageBase64);
+          console.log(`[AiController] Image validation result:`, validation);
+          if (!validation.isValid) {
+            throw new Error('NOT_A_FACE');
+          }
+        } catch (imgErr: any) {
+          console.error(`[AiController] Image validation error:`, imgErr.message);
+          throw imgErr;
+        }
+      } else {
+        console.log(`[AiController] No images provided - proceeding with form data only`);
+      }
+
+      console.log(`[AiController] Image validation passed, calling analyzeSkinWithLLM...`);
       const result = await this.aiAnalysisService.analyzeSkinWithLLM(profile, userId);
+      console.log(`[AiController] Analysis completed successfully`);
 
       return {
         success: true,
         data: result,
       };
-    } catch (error) {
-      console.error('[AiController] Error in analyzeUnified:', error.message, error.stack);
+    } catch (error: any) {
+      if (error.message && error.message.includes('NOT_A_FACE')) {
+        console.error('[AiController] NOT_A_FACE error caught');
+        throw new HttpException(
+          { success: false, message: "Veuillez fournir une photo d'un visage humain valide." },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+      console.error('[AiController] Error in analyzeUnified:', error.message);
+      console.error('[AiController] Full error stack:', error.stack);
       throw new HttpException(
         { success: false, error: error.message, stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined },
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -102,7 +246,7 @@ export class AiController {
         data: result,
         seed: seedNum,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -140,7 +284,7 @@ export class AiController {
         data: result,
         testType,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -165,7 +309,7 @@ export class AiController {
         success: true,
         data: debugData,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -207,5 +351,55 @@ export class AiController {
         },
       },
     };
+  }
+
+  @Post('skin-risk')
+  @UseGuards(JwtAccessGuard)
+  async predictSkinRisk(
+    @Body() riskInput: SkinRiskInput,
+    @CurrentUser() user?: any
+  ): Promise<{ success: boolean; data: SkinRiskResponse }> {
+    try {
+      const userId = user?.id || user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID is required for risk prediction', HttpStatus.UNAUTHORIZED);
+      }
+
+      const riskAnalysis = await this.riskPredictionService.predictSkinRisks(riskInput);
+
+      return {
+        success: true,
+        data: riskAnalysis,
+      };
+    } catch (error: any) {
+      console.error('[AiController] Error in predictSkinRisk:', error.message);
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post('svr-routine')
+  @Public() // Allow for now to test easily, as requested
+  async generateSvrRoutine(
+    @Body() profile: UserSkinProfile
+  ) {
+    try {
+      console.log(`[AiController] Generating SVR routine for profile: ${profile.skinType}, age: ${profile.age}`);
+
+      const result = await this.svrRoutineService.generateRoutine(profile);
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error: any) {
+      console.error('[AiController] Error in generateSvrRoutine:', error.message);
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }

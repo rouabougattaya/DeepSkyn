@@ -25,6 +25,7 @@ export interface DashboardMetrics {
   percentile25: number;
   percentile75: number;
   movingAverage5: number;
+  latestAnalysisId?: string;
 }
 
 export interface MonthlyData {
@@ -66,6 +67,7 @@ export class MetricsService {
         averageScore: 0, bestScore: 0, worstScore: 0, totalAnalyses: 0,
         trendDirection: 'stable', trendPercentage: 0, standardDeviation: 0,
         medianScore: 0, percentile25: 0, percentile75: 0, movingAverage5: 0,
+        latestAnalysisId: undefined,
       };
     }
 
@@ -86,6 +88,7 @@ export class MetricsService {
       percentile25: this.round(this.percentile(scores, 25)),
       percentile75: this.round(this.percentile(scores, 75)),
       movingAverage5: this.round(this.mean(scores.slice(0, 5))),
+      latestAnalysisId: analyses[0]?.id,
     };
   }
 

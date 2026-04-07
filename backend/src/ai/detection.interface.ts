@@ -1,4 +1,5 @@
 import { SkinCondition } from './skin-condition.enum';
+import { IsEnum, IsInt, IsArray, IsString, IsOptional, Min, Max } from 'class-validator';
 
 export interface RawDetection {
   class: string;
@@ -15,9 +16,11 @@ export interface SkinMetric {
 
 export interface ConditionScore {
   type: SkinCondition;
-  score: number;
+  score: number | null;
   count: number;
-  severity: number;
+  severity: number | null;
+  evaluated?: boolean;
+  notEvaluatedReason?: string | null;
 }
 
 export interface ConditionWeights {
@@ -36,6 +39,8 @@ export interface GlobalScoreResult {
   globalScore: number;
   conditionScores: ConditionScore[];
   totalDetections: number;
+  skinAge?: number;
+  skinAgeRationale?: string;
   analysis: {
     bestCondition: SkinCondition | null;
     worstCondition: SkinCondition | null;
@@ -51,27 +56,32 @@ export interface GlobalScoreResult {
   }>;
 }
 
-import { IsEnum, IsInt, IsArray, IsString, IsOptional, Min, Max } from 'class-validator';
-
 export class UserSkinProfile {
   @IsEnum(['Oily', 'Dry', 'Combination', 'Sensitive', 'Normal'])
-  skinType: 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
+  skinType!: 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
 
   @IsInt()
   @Min(1)
   @Max(120)
-  age: number;
+  age!: number;
 
   @IsEnum(['Male', 'Female', 'Other'])
-  gender: 'Male' | 'Female' | 'Other';
+  @IsOptional()
+  gender?: 'Male' | 'Female' | 'Other';
 
   @IsArray()
   @IsString({ each: true })
-  concerns: string[];
+  @IsOptional()
+  concerns?: string[];
 
   @IsString()
   @IsOptional()
   imageBase64?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  imagesBase64?: string[];
 
   @IsInt()
   @Min(0)

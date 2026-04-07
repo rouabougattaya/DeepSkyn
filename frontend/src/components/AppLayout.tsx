@@ -7,14 +7,22 @@ import { useSharedChat } from "../hooks/useSharedChat"
 
 export function AppLayout() {
   const [isCoachOpen, setIsCoachOpen] = useState(false)
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const sharedChat = useSharedChat()
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
       <div className="flex pt-16">
-        <Sidebar isCoachOpen={isCoachOpen} onOpenCoach={() => setIsCoachOpen(true)} />
-        <div className="flex-1 min-h-[calc(100vh-64px)] lg:ml-64">
+        <Sidebar 
+          isCoachOpen={isCoachOpen} 
+          onOpenCoach={() => setIsCoachOpen(true)}
+          isCollapsed={desktopCollapsed}
+          onCollapsedChange={setDesktopCollapsed}
+        />
+        <div className={`flex-1 min-h-[calc(100vh-64px)] transition-all duration-300 ease-in-out ${
+          desktopCollapsed ? 'lg:ml-20' : 'lg:ml-64'
+        }`}>
           <Outlet />
         </div>
       </div>

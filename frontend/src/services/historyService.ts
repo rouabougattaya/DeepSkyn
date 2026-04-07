@@ -98,7 +98,7 @@ export const historyService = {
       // Mettre à jour le score utilisateur avec les données réelles de l'IA
       this.updateUserScoreSimple(data.status, data.used2FA, data.aiScore, data.aiDetails);
 
-      console.log('✅ Session enregistrée avec AI Score:', data.aiScore);
+      console.log('✅ Session enregistrée', data.aiScore !== undefined ? `avec AI Score: ${data.aiScore}` : '(AI Score non disponible)');
     } catch (error) {
       console.error('❌ Error recording session:', error);
     }

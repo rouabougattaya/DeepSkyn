@@ -48,6 +48,7 @@ export default function ProductsPage() {
 
     // ── Mobile sidebar ──────────────────────────────────────────────────────────
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
     // Debounce ref for the search field
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -86,6 +87,7 @@ export default function ProductsPage() {
             isClean: cleanOnly || undefined,
             sortBy: sort.field,
             sortOrder: sort.dir,
+            limit: 100, // Augmenter la limite pour voir plus de produits avec images
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -215,8 +217,15 @@ export default function ProductsPage() {
         <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50">
             <Navbar />
             <div className="flex pt-16">
-                {user && <Sidebar />}
-                <div className={`flex-1 ${user ? "lg:ml-64" : ""}`}>
+                {user && (
+                    <Sidebar 
+                        isCollapsed={isSidebarCollapsed} 
+                        onCollapsedChange={setIsSidebarCollapsed} 
+                    />
+                )}
+                <div className={`flex-1 transition-all duration-300 ease-in-out ${
+                    user ? (isSidebarCollapsed ? "lg:ml-20" : "lg:ml-64") : ""
+                }`}>
                     <div className="max-w-7xl mx-auto px-4 py-10">
 
                         {/* ── Page header ──────────────────────────────────────────────────── */}

@@ -139,6 +139,9 @@ export function AdminUsersTable({
                       Rôle
                     </th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                      Plan
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
                       Date création
                     </th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
@@ -179,6 +182,21 @@ export function AdminUsersTable({
                         >
                           {user.role}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {(() => {
+                          const plan = (user as any).plan || 'FREE';
+                          const planColors: Record<string, string> = {
+                            FREE: 'bg-slate-100 text-slate-600',
+                            PRO: 'bg-teal-100 text-teal-700',
+                            PREMIUM: 'bg-purple-100 text-purple-700',
+                          };
+                          return (
+                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${planColors[plan] || planColors.FREE}`}>
+                              {plan}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {formatDate(user.createdAt)}
@@ -247,6 +265,18 @@ export function AdminUsersTable({
 
                   {/* Info supplémentaire */}
                   <div className="mt-3 ml-13 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Plan:</span>
+                      {(() => {
+                        const plan = (user as any).plan || 'FREE';
+                        const planColors: Record<string, string> = {
+                          FREE: 'bg-slate-100 text-slate-600',
+                          PRO: 'bg-teal-100 text-teal-700',
+                          PREMIUM: 'bg-purple-100 text-purple-700',
+                        };
+                        return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-bold ${planColors[plan] || planColors.FREE}`}>{plan}</span>;
+                      })()}
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Rôle:</span>
                       <span

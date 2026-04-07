@@ -33,19 +33,26 @@ export default function ProductCard({ product }: ProductCardProps) {
     const badgeClass = typeColor(product.type);
     const [failedImg, setFailedImg] = useState(false);
 
+    // Tentative de récupération d'une image depuis SVR si ce n'est pas déjà présent
+    // ou utilisation d'une image par défaut basée sur le nom si possible
+    const finalImageUrl = product.imageUrl || (product.name.toLowerCase().includes('svr') ? `https://logo.clearbit.com/svr.com` : null);
+
     return (
         <div className="group flex flex-col rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
             {/* Image or gradient placeholder */}
-            <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-teal-50 to-indigo-50 flex items-center justify-center">
-                {product.imageUrl && !failedImg ? (
+            <div className="relative h-40 w-full overflow-hidden bg-white flex items-center justify-center p-4">
+                {finalImageUrl && !failedImg ? (
                     <img
-                        src={product.imageUrl}
+                        src={finalImageUrl}
                         alt={product.name}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
                         onError={() => setFailedImg(true)}
                     />
                 ) : (
-                    <span className="text-4xl select-none">🧴</span>
+                    <div className="flex flex-col items-center gap-2">
+                        <span className="text-4xl select-none">🧴</span>
+                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{product.type || 'Soin'}</span>
+                    </div>
                 )}
 
                 {/* isClean badge */}

@@ -29,6 +29,7 @@ import RoutinesPage from './pages/RoutinesPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
+import SkinDigitalTwinPage from './pages/SkinDigitalTwinPage'
 import './App.css'
 import ProductsPage from './pages/ProductsPage';
 import ChatPage from './pages/ChatPage';
@@ -90,6 +91,7 @@ function App() {
           <Route path="/analysis/history" element={<SkinHistoryPage />} />
           <Route path="/analysis/details/:id" element={<SkinAnalysisDetailPage />} />
           <Route path="/analysis/compare" element={<ComparisonPage />} />
+          <Route path="/analysis/digital-twin/:analysisId" element={<SkinDigitalTwinPage />} />
           <Route path="/routines" element={<RoutinesPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/ai-demo" element={<AiDemoPage />} />

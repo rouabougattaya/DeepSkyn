@@ -6,7 +6,7 @@ import {
     Bandage, CircleDot, HeartPulse,
     CircleCheck, AlertTriangle, BarChart3,
     Upload, X, Download, Volume2, VolumeX,
-    Send, Loader2, Bot, ArrowUpCircle, Lock, ArrowRight, Printer
+    Send, Loader2, Bot, ArrowUpCircle, Lock
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -18,7 +18,10 @@ import type { SubscriptionData } from '../services/paymentService';
 
 import type { GlobalScoreResult, ConditionScore, UserSkinProfile } from '../types/aiAnalysis';
 import { SkinProfileForm } from '../components/analysis/SkinProfileForm';
+import { SvrRoutinePanel } from '../components/analysis/SvrRoutinePanel';
 import { DEFAULT_QUESTIONNAIRE, type SkinQuestionnaireData } from '../types/skinQuestionnaire';
+import { comparisonService } from '../services/comparison.service';
+import TimelineView from '../components/insights/TimelineView';
 
 /* ─────────────────────────── Constants ─────────────────────────── */
 
@@ -73,6 +76,18 @@ const CONDITION_META: Record<string, {
         gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
         description: 'Formation de microcomédons'
     },
+    'Hydration': {
+        label: 'Hydratation', icon: Waves, color: '#0ea5e9',
+        bg: 'rgba(14,165,233,0.05)', border: 'rgba(14,165,233,0.15)',
+        gradient: 'linear-gradient(135deg, #ecfeff 0%, #e0f2fe 100%)',
+        description: 'Niveau d’hydratation et confort cutané'
+    },
+    'Wrinkles': {
+        label: 'Rides', icon: AlertTriangle, color: '#d97706',
+        bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
+        gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+        description: 'Ridules et rides visibles'
+    },
 };
 
 const BLEND_LABELS: Record<string, { label: string; helper: string }> = {
@@ -80,6 +95,8 @@ const BLEND_LABELS: Record<string, { label: string; helper: string }> = {
     'Blackheads': { label: 'Points noirs', helper: 'Visuel + auto-évaluation' },
     'Enlarged-Pores': { label: 'Pores', helper: 'Mix AI + ressenti' },
     'Skin Redness': { label: 'Rougeurs', helper: 'Observation + vécu' },
+    'Hydration': { label: 'Hydratation', helper: 'Questionnaire + signal visuel' },
+    'Wrinkles': { label: 'Rides', helper: 'Photo + perception utilisateur' },
 };
 
 
@@ -140,7 +157,15 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
         gradient: '', description: ''
     };
 
-    const scoreColor = condition.score >= 75 ? '#10b981' : condition.score >= 50 ? '#f59e0b' : '#ef4444';
+    const isEvaluated = typeof condition.score === 'number';
+    const scoreValue = isEvaluated ? (condition.score as number) : 0;
+    const scoreColor = !isEvaluated
+        ? '#64748b'
+        : scoreValue >= 75
+            ? '#10b981'
+            : scoreValue >= 50
+                ? '#f59e0b'
+                : '#ef4444';
     const Icon = meta.icon;
 
     return (
@@ -160,32 +185,49 @@ function ConditionBar({ condition }: { condition: ConditionScore }) {
                     </div>
                     <div>
                         <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{meta.label}</div>
-                        <div style={{ color: '#64748b', fontSize: 11 }}>
-                            {condition.count} détection{condition.count > 1 ? 's' : ''} · sévérité {(condition.severity * 100).toFixed(0)}%
-                        </div>
+                        {isEvaluated ? (
+                            <div style={{ color: '#64748b', fontSize: 11 }}>
+                                {condition.count} détection{condition.count > 1 ? 's' : ''} · sévérité {((condition.severity ?? 0) * 100).toFixed(0)}%
+                            </div>
+                        ) : (
+                            <div style={{ color: '#64748b', fontSize: 11 }}>
+                                {condition.notEvaluatedReason || 'Non evalue'}
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div style={{
                     fontSize: 22, fontWeight: 800, color: scoreColor,
                     textShadow: `0 0 12px ${scoreColor}60`
                 }}>
-                    {Math.round(condition.score)}
+                    {isEvaluated ? Math.round(scoreValue) : '—'}
                 </div>
             </div>
 
             {/* Progress bar */}
-            <div style={{
-                height: 6, background: '#e2e8f0',
-                borderRadius: 99, overflow: 'hidden'
-            }}>
+            {isEvaluated ? (
                 <div style={{
-                    height: '100%', width: `${condition.score}%`,
-                    background: `linear-gradient(90deg, ${scoreColor}80, ${scoreColor})`,
-                    borderRadius: 99,
-                    boxShadow: `0 0 8px ${scoreColor}90`,
-                    transition: 'width 1.2s cubic-bezier(0.22, 1, 0.36, 1)'
-                }} />
-            </div>
+                    height: 6, background: '#e2e8f0',
+                    borderRadius: 99, overflow: 'hidden'
+                }}>
+                    <div style={{
+                        height: '100%', width: `${scoreValue}%`,
+                        background: `linear-gradient(90deg, ${scoreColor}80, ${scoreColor})`,
+                        borderRadius: 99,
+                        boxShadow: `0 0 8px ${scoreColor}90`,
+                        transition: 'width 1.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                    }} />
+                </div>
+            ) : (
+                <div style={{
+                    fontSize: 11,
+                    color: '#64748b',
+                    padding: '6px 0 0 0',
+                    fontWeight: 600
+                }}>
+                    Non evalue (aucune information disponible)
+                </div>
+            )}
         </div>
     );
 }
@@ -201,13 +243,16 @@ export default function SkinAnalysisPage() {
     const [scanPhase, setScanPhase] = useState<'idle' | 'capturing' | 'processing' | 'scoring' | 'done'>('idle');
     const [questionnaire, setQuestionnaire] = useState<SkinQuestionnaireData>(DEFAULT_QUESTIONNAIRE);
     const [currentPlan, setCurrentPlan] = useState<string>('FREE');
+    const [timelineData, setTimelineData] = useState<{ date: string; score: number }[]>([]);
+    const [timelineLoading, setTimelineLoading] = useState(false);
+    const [timelineError, setTimelineError] = useState<string | null>(null);
 
     useEffect(() => {
         const user = getUser();
         if (user?.id) {
             apiGet<SubscriptionData>(`/subscription/${user.id}`)
                 .then(s => setCurrentPlan(s.plan))
-                .catch(() => {});
+                .catch(() => { });
         }
     }, []);
 
@@ -216,6 +261,7 @@ export default function SkinAnalysisPage() {
         age: 25,
         gender: 'Female',
         concerns: [],
+        imagesBase64: [],
         acneLevel: 50,
         blackheadsLevel: 50,
         poreSize: 50,
@@ -227,6 +273,75 @@ export default function SkinAnalysisPage() {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
+
+    const buildAnalysisSummary = useCallback((r: GlobalScoreResult | null) => {
+        if (!r) return '';
+        const evaluated = (r.conditionScores || []).filter(c => c?.evaluated !== false && typeof c?.score === 'number') as ConditionScore[];
+        if (evaluated.length === 0) {
+            return "Aucune condition n'a pu être évaluée. Ajoutez un selfie (recommandé) ou renseignez vos niveaux (acné, pores, rougeurs, hydratation, rides) pour obtenir un diagnostic fiable et des solutions adaptées.";
+        }
+
+        const sorted = [...evaluated].sort((a, b) => (a.score as number) - (b.score as number));
+        const allProblems = sorted.map(c => CONDITION_META[c.type]?.label || c.type);
+        const userDeclaredNotDetected = (r.conditionScores || [])
+            .filter(c =>
+                c?.evaluated === false &&
+                typeof c?.notEvaluatedReason === 'string' &&
+                c.notEvaluatedReason.toLowerCase().includes('declare'),
+            )
+            .map(c => CONDITION_META[c.type]?.label || c.type);
+        const score = typeof r.globalScore === 'number' ? Math.round(r.globalScore) : null;
+
+        const solutions: string[] = [];
+        const addIfPresent = (condType: string, text: string) => {
+            if (evaluated.some(c => c.type === condType)) solutions.push(text);
+        };
+        addIfPresent('Acne', "Acné : routine douce + actifs ciblés (BHA/azélaïque) progressivement, sans sur-nettoyer.");
+        addIfPresent('Blackheads', "Points noirs : exfoliation chimique régulière (BHA) et hydratation légère pour éviter l'effet rebond.");
+        addIfPresent('Enlarged-Pores', "Pores : niacinamide + contrôle du sébum, et protection solaire quotidienne pour préserver la texture.");
+        addIfPresent('Skin Redness', "Rougeurs : apaiser la barrière cutanée, éviter les irritants et privilégier des formules sans parfum.");
+        addIfPresent('Hydration', "Hydratation : renforcer la barrière (humectants + émollients) et limiter les exfoliants trop fréquents.");
+        addIfPresent('Wrinkles', "Rides : SPF quotidien + actifs anti-âge introduits progressivement (rétinoïde/peptides).");
+
+        const header = score !== null ? `Score global estimé : ${score}/100.` : `Analyse réalisée.`;
+        const focus = allProblems.length ? `Conditions analysées : ${allProblems.join(', ')}.` : '';
+        const mismatch = userDeclaredNotDetected.length
+            ? `Déclarées mais non détectées visuellement : ${userDeclaredNotDetected.join(', ')}.`
+            : '';
+        const plan = solutions.length ? `Plan recommandé : ${solutions.join(' ')}` : '';
+        return `${header} ${focus} ${mismatch} ${plan}`.trim();
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchTimeline = async () => {
+            const user = getUser();
+            if (!user?.id) return;
+            if (currentPlan === 'FREE') return;
+
+            try {
+                setTimelineLoading(true);
+                setTimelineError(null);
+                const resp = await comparisonService.getUserAnalyses(1, 12);
+                if (!mounted) return;
+                const history = (resp.data || [])
+                    .map((a: any) => ({
+                        date: new Date(a.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+                        score: a.skinScore,
+                    }))
+                    .reverse();
+                setTimelineData(history);
+            } catch (e: any) {
+                if (!mounted) return;
+                setTimelineError(e?.message || "Impossible de charger l'historique.");
+            } finally {
+                if (mounted) setTimelineLoading(false);
+            }
+        };
+
+        fetchTimeline();
+        return () => { mounted = false; };
+    }, [currentPlan]);
 
     // Chat states
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
@@ -243,15 +358,15 @@ export default function SkinAnalysisPage() {
         const headers = ['Condition', 'Score', 'Detections', 'Severity'];
         const rows = result.conditionScores.map(c => [
             c.type,
-            c.score,
+            typeof c.score === 'number' ? c.score : 'Non evalue',
             c.count || 0,
-            (c.severity * 100).toFixed(0) + '%'
+            typeof c.severity === 'number' ? (c.severity * 100).toFixed(0) + '%' : 'N/A'
         ]);
-        
-        let csvContent = "data:text/csv;charset=utf-8," 
+
+        let csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(",") + "\n"
             + rows.map(e => e.join(",")).join("\n");
-            
+
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -271,7 +386,7 @@ export default function SkinAnalysisPage() {
 
     const speakAnalysis = useCallback(() => {
         if (!result || !window.speechSynthesis) return;
-        
+
         if (isSpeaking) {
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
@@ -285,29 +400,49 @@ export default function SkinAnalysisPage() {
             Le point critique identifié est ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'non déterminé'}. 
             Prenez soin de vous avec une routine adaptée.
         `;
-        
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'fr-FR';
         utterance.onend = () => setIsSpeaking(false);
-        
+
         setIsSpeaking(true);
         window.speechSynthesis.speak(utterance);
     }, [result, isSpeaking]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        const currentCount = profile.imagesBase64?.length || 0;
+        const remaining = 5 - currentCount;
+        const filesToAdd = files.slice(0, remaining);
+
+        filesToAdd.forEach(file => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setProfile(prev => ({ ...prev, imageBase64: reader.result as string }));
+                const base64 = reader.result as string;
+                setProfile(prev => ({
+                    ...prev,
+                    imagesBase64: [...(prev.imagesBase64 || []), base64],
+                    // Also set imageBase64 to the first one for backward compatibility if needed
+                    imageBase64: prev.imageBase64 || base64
+                }));
             };
             reader.readAsDataURL(file);
-        }
+        });
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const removeImage = () => {
-        setProfile(prev => ({ ...prev, imageBase64: undefined }));
-        if (fileInputRef.current) fileInputRef.current.value = '';
+    const removeImage = (index: number) => {
+        setProfile(prev => {
+            const newImages = (prev.imagesBase64 || []).filter((_, i) => i !== index);
+            return {
+                ...prev,
+                imagesBase64: newImages,
+                imageBase64: newImages.length > 0 ? newImages[0] : undefined
+            };
+        });
     };
 
     useEffect(() => {
@@ -331,8 +466,8 @@ export default function SkinAnalysisPage() {
             setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
         } catch (err: any) {
             console.error('Chat error:', err);
-            const msg = err.message?.includes('LIMIT_REACHED') 
-                ? "🔒 Limite journalière de messages atteinte (Plan FREE). Passez au plan PRO pour discuter sans limites !" 
+            const msg = err.message?.includes('LIMIT_REACHED')
+                ? "🔒 Limite journalière de messages atteinte (Plan FREE). Passez au plan PRO pour discuter sans limites !"
                 : "Désolé, j'ai rencontré une erreur. Réessaye plus tard.";
             setChatMessages(prev => [...prev, { role: 'assistant', content: msg }]);
         } finally {
@@ -369,6 +504,10 @@ export default function SkinAnalysisPage() {
             setResult(analysisResult);
             setAnalysisCount(c => c + 1);
 
+            // Global shared analysis state for downstream modules (products/routine/dashboard)
+            sessionStorage.setItem('skinAnalysisResult', JSON.stringify(analysisResult));
+            localStorage.setItem('skinAnalysisResult', JSON.stringify(analysisResult));
+
             // Signal to dashboard that analysis was completed
             sessionStorage.setItem('analysisCompleted', Date.now().toString());
 
@@ -381,8 +520,10 @@ export default function SkinAnalysisPage() {
         } catch (err: any) {
             console.error('Analysis error:', err);
             const errorMsg = err.message?.includes('LIMIT_REACHED')
-                ? "🚫 Limite d'analyses mensuelles atteinte (Plan FREE). Débloquez le plan PRO pour continuer vos analyses !"
-                : `Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur.'}`;
+                ? "LIMIT_REACHED"
+                : err.message?.includes('visage humain')
+                    ? err.message
+                    : `Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur.'}`;
             setError(errorMsg);
             setScanPhase('idle');
         } finally {
@@ -390,13 +531,24 @@ export default function SkinAnalysisPage() {
         }
     }, [profile]);
 
+    /**
+     * Réinitialise l'analyse pour permettre une nouvelle saisie.
+     */
+    const resetAnalysis = useCallback(() => {
+        setResult(null);
+        setLoading(false);
+        setScanPhase('idle');
+        setError(null);
+        setChatMessages([]);
+    }, []);
+
 
 
     const globalScoreColor = result
         ? result.globalScore >= 75 ? '#10b981' : result.globalScore >= 50 ? '#f59e0b' : '#ef4444'
         : '#0d9488';
 
-    const hasPhoto = Boolean(profile.imageBase64);
+    const hasPhoto = Boolean(profile.imagesBase64 && profile.imagesBase64.length > 0);
 
     const scanLabels: Record<string, string> = {
         capturing: 'Capture de l\'image...',
@@ -677,148 +829,208 @@ export default function SkinAnalysisPage() {
                 {/* ── Main Grid ── */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gridTemplateColumns: result ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
                     gap: 20
                 }}>
 
-                    {/* ── LEFT: Controls ── */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* ── LEFT: Controls (Cachés si résultats présents) ── */}
+                    {!result && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                        <div className="glass-card fade-in" style={{ padding: 24 }}>
-                            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                Profil de Peau
-                            </h2>
-                            <SkinProfileForm
-                                profile={profile}
-                                setProfile={setProfile}
-                                questionnaire={questionnaire}
-                                setQuestionnaire={setQuestionnaire}
-                                disabled={loading}
-                            />
-                        </div>
+                            <div className="glass-card fade-in" style={{ padding: 24 }}>
+                                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+                                    Profil de Peau
+                                </h2>
+                                <SkinProfileForm
+                                    profile={profile}
+                                    setProfile={setProfile}
+                                    questionnaire={questionnaire}
+                                    setQuestionnaire={setQuestionnaire}
+                                    disabled={loading}
+                                />
+                            </div>
 
-                        {/* Upload + Scan */}
-                        <div className="glass-card" style={{ padding: 24 }}>
-                            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-                                Ajouter une image
-                            </h2>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleImageUpload}
-                                accept="image/*"
-                                className="hidden"
-                            />
-                            <div style={{
-                                position: 'relative',
-                                background: '#f1f5f9',
-                                borderRadius: 16,
-                                border: '1px solid #e2e8f0',
-                                overflow: 'hidden'
-                            }}>
-                                {profile.imageBase64 ? (
-                                    <div style={{ position: 'relative' }}>
-                                        <img
-                                            src={profile.imageBase64}
-                                            alt="Preview"
-                                            style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }}
-                                        />
+                            {/* Upload + Scan */}
+                            <div className="glass-card" style={{ padding: 24 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+                                        Ajouter des photos
+                                    </h2>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: (profile.imagesBase64?.length || 0) >= 5 ? '#ef4444' : '#0d9488', backgroundColor: (profile.imagesBase64?.length || 0) >= 5 ? '#fef2f2' : '#f0fdf4', padding: '2px 8px', borderRadius: '99px' }}>
+                                        {profile.imagesBase64?.length || 0}/5 images
+                                    </span>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleImageUpload}
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                />
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12 }}>
+                                    {profile.imagesBase64?.map((img, idx) => (
+                                        <div key={idx} style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', height: 100, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                                            <img
+                                                src={img}
+                                                alt={`Preview ${idx + 1}`}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
+                                            <button
+                                                onClick={() => removeImage(idx)}
+                                                className="absolute top-1 right-1 p-1 bg-white/90 backdrop-blur-sm rounded-full text-red-500 shadow-md hover:bg-red-50 transition-colors"
+                                                type="button"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                            {idx === 0 && (
+                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(13,148,136,0.8)', color: 'white', fontSize: '8px', textAlign: 'center', fontWeight: 'bold', padding: '2px 0' }}>
+                                                    PRINCIPALE
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {(profile.imagesBase64?.length || 0) < 5 && (
                                         <button
-                                            onClick={removeImage}
-                                            className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full text-red-500 shadow-lg hover:bg-red-50 transition-colors"
                                             type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={loading}
+                                            style={{
+                                                height: 100,
+                                                background: '#f8fafc',
+                                                border: '2px dashed #e2e8f0',
+                                                borderRadius: 12,
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 8,
+                                                transition: 'all 0.2s',
+                                                cursor: loading ? 'not-allowed' : 'pointer'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!loading) {
+                                                    e.currentTarget.style.borderColor = '#0d9488';
+                                                    e.currentTarget.style.background = '#f0fdf4';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!loading) {
+                                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                                    e.currentTarget.style.background = '#f8fafc';
+                                                }
+                                            }}
                                         >
-                                            <X size={16} />
+                                            <Upload size={18} style={{ color: '#94a3b8' }} />
+                                            <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>Ajouter</span>
                                         </button>
-                                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-[2px] text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                                            <CheckCircle size={12} className="text-teal-300" />
-                                            Image prête pour l'analyse IA
-                                        </div>
-                                        {loading && <div className="scan-line" style={{ top: 0 }} />}
+                                    )}
+                                </div>
+
+                                {loading && (
+                                    <div className="mt-4 text-sm text-teal-700 font-semibold flex items-center gap-2">
+                                        <RefreshCw size={14} className="animate-spin" />
+                                        {scanLabels[scanPhase]}
                                     </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={loading}
-                                        className="w-full h-[220px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all hover:bg-slate-100 hover:border-slate-300 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-teal-500 group-hover:scale-110 transition-all shadow-sm">
-                                            <Upload size={20} />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-sm font-semibold text-slate-600">Ajouter une photo</p>
-                                            <p className="text-[10px] text-slate-400 mt-1">Selfie clair recommande</p>
-                                        </div>
-                                    </button>
+                                )}
+
+                                {hasPhoto && !loading && (
+                                    <div className="mt-4 p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-2">
+                                        <CheckCircle size={14} className="text-teal-500" />
+                                        <span className="text-[11px] font-bold text-teal-700 uppercase tracking-widest">
+                                            Photos prêtes pour l'analyse IA multi-angles
+                                        </span>
+                                    </div>
                                 )}
                             </div>
-                            {loading && (
-                                <div className="mt-3 text-sm text-teal-700 font-semibold flex items-center gap-2">
-                                    <RefreshCw size={14} className="animate-spin" />
-                                    {scanLabels[scanPhase]}
+
+                            {/* Analyze Button */}
+                            <button
+                                className="analyze-btn"
+                                onClick={runAnalysis}
+                                disabled={loading || !profile.age || profile.age < 1 || profile.age > 120}
+                                title={!profile.age ? 'Please enter your age' : ''}
+                            >
+                                {loading ? (
+                                    <>
+                                        <RefreshCw size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                                        {scanLabels[scanPhase]}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap size={18} />
+                                        Lancer l'analyse IA
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Error */}
+                            {error && (
+                                <div style={{
+                                    background: error.includes('LIMIT_REACHED') || error.includes('visage humain') ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+                                    border: error.includes('LIMIT_REACHED') || error.includes('visage humain') ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(239,68,68,0.2)',
+                                    borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start'
+                                }}>
+                                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                        <AlertCircle size={18} style={{ color: error.includes('LIMIT_REACHED') || error.includes('visage humain') ? '#f59e0b' : '#ef4444', flexShrink: 0 }} />
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: error.includes('LIMIT_REACHED') || error.includes('visage humain') ? '#b45309' : '#b91c1c', margin: 0 }}>
+                                            {error.includes('LIMIT_REACHED')
+                                                ? 'Limite mensuelle atteinte'
+                                                : error.includes('visage humain')
+                                                    ? 'Image non reconnue'
+                                                    : 'Erreur d\'analyse'}
+                                        </p>
+                                    </div>
+                                    <p style={{ fontSize: 12, color: error.includes('LIMIT_REACHED') || error.includes('visage humain') ? '#92400e' : '#fca5a5', lineHeight: 1.5, margin: 0 }}>
+                                        {error.includes('LIMIT_REACHED')
+                                            ? 'Vous avez atteint le nombre maximal d\'analyses pour votre plan actuel ce mois-ci.'
+                                            : error}
+                                    </p>
+                                    {error.includes('LIMIT_REACHED') && (
+                                        <Link
+                                            to="/upgrade"
+                                            style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                                backgroundColor: '#f59e0b', color: 'white',
+                                                padding: '8px 16px', borderRadius: '10px',
+                                                fontSize: '12px', fontWeight: '700', textDecoration: 'none',
+                                                boxShadow: '0 4px 12px rgba(245,158,11,0.3)', transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <ArrowUpCircle size={14} /> Passer au plan supérieur
+                                        </Link>
+                                    )}
                                 </div>
                             )}
                         </div>
-
-                        {/* Analyze Button */}
-                        <button
-                            className="analyze-btn"
-                            onClick={runAnalysis}
-                            disabled={loading || !profile.age || profile.age < 1 || profile.age > 120}
-                            title={!profile.age ? 'Please enter your age' : ''}
-                        >
-                            {loading ? (
-                                <>
-                                    <RefreshCw size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                                    {scanLabels[scanPhase]}
-                                </>
-                            ) : (
-                                <>
-                                    <Zap size={18} />
-                                    Lancer l'analyse IA
-                                </>
-                            )}
-                        </button>
-
-                        {/* Error */}
-                        {error && (
-                            <div style={{
-                                background: error.includes('LIMIT_REACHED') ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', 
-                                border: error.includes('LIMIT_REACHED') ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(239,68,68,0.2)',
-                                borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start'
-                            }}>
-                                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                                    <AlertCircle size={18} style={{ color: error.includes('LIMIT_REACHED') ? '#f59e0b' : '#ef4444', flexShrink: 0 }} />
-                                    <p style={{ fontSize: 13, fontWeight: 700, color: error.includes('LIMIT_REACHED') ? '#b45309' : '#b91c1c', margin: 0 }}>
-                                        {error.includes('LIMIT_REACHED') ? 'Limite mensuelle atteinte' : 'Erreur d\'analyse'}
-                                    </p>
-                                </div>
-                                <p style={{ fontSize: 12, color: error.includes('LIMIT_REACHED') ? '#92400e' : '#fca5a5', lineHeight: 1.5, margin: 0 }}>
-                                    {error.includes('LIMIT_REACHED') 
-                                      ? 'Vous avez atteint le nombre maximal d\'analyses pour votre plan actuel ce mois-ci.' 
-                                      : error}
-                                </p>
-                                {error.includes('LIMIT_REACHED') && (
-                                    <Link 
-                                      to="/upgrade" 
-                                      style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                                        backgroundColor: '#f59e0b', color: 'white',
-                                        padding: '8px 16px', borderRadius: '10px',
-                                        fontSize: '12px', fontWeight: '700', textDecoration: 'none',
-                                        boxShadow: '0 4px 12px rgba(245,158,11,0.3)', transition: 'all 0.2s'
-                                      }}
-                                    >
-                                        <ArrowUpCircle size={14} /> Passer au plan supérieur
-                                    </Link>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    )}
 
                     {/* ── RIGHT: Results ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                        {result && (
+                            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-2 fade-in">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-teal-50 p-2.5 rounded-xl text-teal-600">
+                                        <CheckCircle size={20} />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="font-bold text-slate-800 leading-tight">Analyse terminée</h3>
+                                        <p className="text-slate-500 text-xs">Retrouvez plus bas vos scores et conseils personnalisés</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={resetAnalysis}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95 text-sm"
+                                >
+                                    <RefreshCw size={16} className="text-teal-600" />
+                                    Nouvelle analyse
+                                </button>
+                            </div>
+                        )}
 
                         {!result ? (
                             <div className="glass-card" style={{
@@ -885,6 +1097,24 @@ export default function SkinAnalysisPage() {
                                         <ScoreRing score={result.globalScore} size={130} />
 
                                         <div style={{ flex: 1 }}>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                                                gap: 8,
+                                                marginBottom: 12,
+                                            }}>
+                                                <div style={{ padding: '8px 10px', borderRadius: 10, background: '#ecfeff', border: '1px solid #bae6fd' }}>
+                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>Age reel</div>
+                                                    <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>{profile.age}</div>
+                                                </div>
+                                                <div style={{ padding: '8px 10px', borderRadius: 10, background: '#f0fdfa', border: '1px solid #99f6e4' }}>
+                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>Skin age IA</div>
+                                                    <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
+                                                        {typeof result.skinAge === 'number' ? result.skinAge : 'N/A'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             {[
                                                 { label: 'Meilleur', value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
                                                 { label: 'Point critique', value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
@@ -944,11 +1174,10 @@ export default function SkinAnalysisPage() {
                                         </button>
                                         <button
                                             onClick={speakAnalysis}
-                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 ${
-                                                isSpeaking 
-                                                ? 'bg-red-50 border border-red-100 text-red-600' 
+                                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 ${isSpeaking
+                                                ? 'bg-red-50 border border-red-100 text-red-600'
                                                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                                            }`}
+                                                }`}
                                         >
                                             {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} className="text-orange-500" />}
                                             {isSpeaking ? 'Arrêter l\'écoute' : 'Écouter l\'analyse'}
@@ -1020,7 +1249,11 @@ export default function SkinAnalysisPage() {
                                     )}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {result.conditionScores
-                                            .sort((a, b) => a.score - b.score)
+                                            .sort((a, b) => {
+                                                const sa = typeof a.score === 'number' ? a.score : Number.POSITIVE_INFINITY;
+                                                const sb = typeof b.score === 'number' ? b.score : Number.POSITIVE_INFINITY;
+                                                return sa - sb;
+                                            })
                                             .map(condition => (
                                                 <ConditionBar key={condition.type} condition={condition} />
                                             ))
@@ -1049,8 +1282,10 @@ export default function SkinAnalysisPage() {
                                         {result.conditionScores.map(condition => {
                                             const meta = CONDITION_META[condition.type];
                                             if (!meta) return null;
-                                            const severity = condition.score < 50 ? 'Sévère' : condition.score < 75 ? 'Modéré' : 'Contrôlé';
-                                            const sevColor = condition.score < 50 ? '#ef4444' : condition.score < 75 ? '#f59e0b' : '#10b981';
+                                            const hasScore = typeof condition.score === 'number';
+                                            const scoreValue = hasScore ? (condition.score as number) : 0;
+                                            const severity = !hasScore ? 'Non evalue' : scoreValue < 50 ? 'Sévère' : scoreValue < 75 ? 'Modéré' : 'Contrôlé';
+                                            const sevColor = !hasScore ? '#64748b' : scoreValue < 50 ? '#ef4444' : scoreValue < 75 ? '#f59e0b' : '#10b981';
                                             const Icon = meta.icon;
 
                                             return (
@@ -1069,7 +1304,9 @@ export default function SkinAnalysisPage() {
                                                     </div>
                                                     <div style={{ flex: 1 }}>
                                                         <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{meta.label}</div>
-                                                        <div style={{ fontSize: 11, color: '#64748b' }}>{meta.description}</div>
+                                                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                                                            {hasScore ? meta.description : (condition.notEvaluatedReason || 'Aucune information exploitable')}
+                                                        </div>
                                                     </div>
                                                     <span className="tag" style={{
                                                         background: `${sevColor}10`, color: sevColor,
@@ -1100,87 +1337,14 @@ export default function SkinAnalysisPage() {
                                             <CheckCircle size={14} /> Sommaire de l'analyse
                                         </h3>
                                         <p className="text-lg font-medium leading-relaxed italic">
-                                            "Votre peau montre des signes de vitalité. Maintenez votre routine actuelle pour préserver ces résultats."
+                                            {buildAnalysisSummary(result)}
                                         </p>
                                     </div>
                                 </div>
 
-                                 {/* Product Recommendations */}
-                                <div id="recommendations-section" className="glass-card fade-in" style={{ padding: 24, border: '2px solid #0d9488' }}>
-                                    {currentPlan === 'FREE' ? (
-                                        <div className="text-center py-12">
-                                            <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                <Lock size={32} className="text-teal-600" />
-                                            </div>
-                                            <h3 className="text-xl font-black text-slate-900 mb-2">Recommandations PRO</h3>
-                                            <p className="text-slate-500 mb-6 max-w-xs mx-auto">Passez au plan PRO pour débloquer vos suggestions de produits personnalisées basées sur l'IA.</p>
-                                            <button onClick={() => navigate('/upgrade')} className="px-8 py-3 bg-teal-600 text-white rounded-xl font-bold">
-                                                Débloquer maintenant
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                    <Sparkles className="text-teal-600" size={20} />
-                                                    <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                                                        Tes Recommandations Skincare
-                                                    </h2>
-                                                </div>
-                                                <Link
-                                                    to="/routines"
-                                                    style={{
-                                                        background: '#0d9488',
-                                                        color: 'white',
-                                                        padding: '8px 12px',
-                                                        borderRadius: 10,
-                                                        fontSize: 12,
-                                                        fontWeight: 800,
-                                                        textDecoration: 'none',
-                                                    }}
-                                                >
-                                                    Voir ta routine AM/PM
-                                                </Link>
-                                            </div>
-
-                                            {!result.recommendations || result.recommendations.length === 0 ? (
-                                                <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>
-                                                    <Info size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-                                                    <p>Analyse en cours...</p>
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-                                                    {result.recommendations.map((product, idx) => (
-                                                        <div key={idx} style={{
-                                                            background: 'white',
-                                                            border: '1px solid #e2e8f0',
-                                                            borderRadius: 16,
-                                                            padding: 16,
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: 8,
-                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                                                        }}>
-                                                            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: '#0d9488' }}>
-                                                                {product.type}
-                                                            </div>
-                                                            <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>
-                                                                {product.name}
-                                                            </div>
-                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                                                                <span style={{ fontWeight: 800 }}>£{product.price.toFixed(2)}</span>
-                                                            </div>
-                                                            {normalizeExternalUrl(product.url) && (
-                                                                <a href={normalizeExternalUrl(product.url) as string} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, textAlign: 'center', background: '#0d9488', borderRadius: 10, padding: '8px 0', fontSize: 12, color: 'white', textDecoration: 'none' }}>
-                                                                    Acheter
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                {/* ── SVR Skincare Routine Panel ── */}
+                                <div id="recommendations-section">
+                                    <SvrRoutinePanel profile={profile} currentPlan={currentPlan} displayMode="products" />
                                 </div>
 
                                 {/* Progress Tracking Section */}
@@ -1197,7 +1361,7 @@ export default function SkinAnalysisPage() {
                                             </Link>
                                         </div>
                                     )}
-                                    
+
                                     <div className={currentPlan === 'FREE' ? 'opacity-20 pointer-events-none' : ''}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1207,31 +1371,45 @@ export default function SkinAnalysisPage() {
                                                 </h2>
                                             </div>
                                         </div>
-                                        {/* Mock chart content for visual reference */}
-                                        <div className="space-y-6">
-                                            <div className="h-48 w-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex items-center justify-center">
-                                                <Activity className="text-slate-300 w-12 h-12 animate-pulse" />
+                                        {timelineError && (
+                                            <div style={{
+                                                padding: 12,
+                                                borderRadius: 12,
+                                                border: '1px solid rgba(239,68,68,0.2)',
+                                                background: 'rgba(239,68,68,0.05)',
+                                                color: '#dc2626',
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                            }}>
+                                                {timelineError}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 h-24 flex items-center justify-center font-bold text-slate-400">GRAPH 1</div>
-                                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 h-24 flex items-center justify-center font-bold text-slate-400">GRAPH 2</div>
-                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: 8 }}>
+                                            {timelineLoading ? (
+                                                <div className="h-48 w-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex items-center justify-center">
+                                                    <Loader2 className="animate-spin text-slate-400" size={28} />
+                                                </div>
+                                            ) : (
+                                                <TimelineView data={timelineData} height={260} showTitle={false} />
+                                            )}
+                                        </div>
+
+                                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                                            <Link
+                                                to="/history"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                                                style={{ textDecoration: 'none' }}
+                                            >
+                                                <BarChart3 size={14} className="text-teal-600" />
+                                                Voir l'historique complet
+                                            </Link>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 👇 BOUTON VERS TA PAGE PRODUITS 👇 */}
-                                <div className="mt-4 text-center">
-                                    <Link
-                                        to="/products"
-                                        className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md"
-                                        style={{ textDecoration: 'none' }}
-                                    >
-                                        🛍️ Parcourir tous les produits
-                                    </Link>
-                                </div>
 
-                                { /* AI Chat Section */ }
+                                { /* AI Chat Section */}
                                 <div className="glass-card fade-in overflow-hidden" style={{ border: '2px solid #0d9488', marginTop: 32, boxShadow: '0 12px 40px rgba(13,148,136,0.15)' }}>
                                     <div className="bg-teal-600 p-4 text-white flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -1254,10 +1432,10 @@ export default function SkinAnalysisPage() {
                                         ) : (
                                             chatMessages.map((msg, i) => (
                                                 <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                                                    <div style={{ 
-                                                        maxWidth: '85%', 
-                                                        padding: '12px 16px', 
-                                                        borderRadius: 20, 
+                                                    <div style={{
+                                                        maxWidth: '85%',
+                                                        padding: '12px 16px',
+                                                        borderRadius: 20,
                                                         fontSize: 14,
                                                         background: msg.role === 'user' ? '#0d9488' : 'white',
                                                         color: msg.role === 'user' ? 'white' : '#1e293b',
@@ -1273,18 +1451,18 @@ export default function SkinAnalysisPage() {
                                         )}
                                         {chatLoading && (
                                             <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                                <div style={{ 
-                                                    background: 'white', 
-                                                    border: '1px solid #e2e8f0', 
-                                                    padding: '12px 16px', 
-                                                    borderRadius: 20, 
+                                                <div style={{
+                                                    background: 'white',
+                                                    border: '1px solid #e2e8f0',
+                                                    padding: '12px 16px',
+                                                    borderRadius: 20,
                                                     borderTopLeftRadius: 4,
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    gap: 12, 
-                                                    color: '#94a3b8', 
-                                                    fontSize: 14, 
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)' 
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 12,
+                                                    color: '#94a3b8',
+                                                    fontSize: 14,
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                                                 }}>
                                                     <Loader2 size={16} className="animate-spin" style={{ color: '#0d9488' }} />
                                                     L'IA réfléchit...
@@ -1301,12 +1479,12 @@ export default function SkinAnalysisPage() {
                                                 value={chatInput}
                                                 onChange={(e) => setChatInput(e.target.value)}
                                                 placeholder="Comment traiter mes pores dilatés ?"
-                                                style={{ 
-                                                    flex: 1, 
-                                                    background: '#f8fafc', 
-                                                    border: '1px solid #e2e8f0', 
-                                                    borderRadius: 12, 
-                                                    padding: '10px 16px', 
+                                                style={{
+                                                    flex: 1,
+                                                    background: '#f8fafc',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: 12,
+                                                    padding: '10px 16px',
                                                     fontSize: 14,
                                                     outline: 'none'
                                                 }}
@@ -1315,11 +1493,11 @@ export default function SkinAnalysisPage() {
                                             <button
                                                 type="submit"
                                                 disabled={chatLoading || !chatInput.trim()}
-                                                style={{ 
-                                                    background: '#0d9488', 
-                                                    color: 'white', 
-                                                    padding: '10px 16px', 
-                                                    borderRadius: 12, 
+                                                style={{
+                                                    background: '#0d9488',
+                                                    color: 'white',
+                                                    padding: '10px 16px',
+                                                    borderRadius: 12,
                                                     border: 'none',
                                                     cursor: 'pointer',
                                                     opacity: (chatLoading || !chatInput.trim()) ? 0.5 : 1,
@@ -1376,15 +1554,6 @@ export default function SkinAnalysisPage() {
                                         ))}
                                     </div>
 
-                                    <button
-                                        className="analyze-btn"
-                                        onClick={runAnalysis}
-                                        disabled={loading}
-                                        style={{ marginTop: 16, background: 'rgba(255,255,255,0.05)', boxShadow: 'none', color: '#f1f5f9', border: '1px solid rgba(255,255,255,0.1)' }}
-                                    >
-                                        <RefreshCw size={16} />
-                                        Restart analysis
-                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1433,12 +1602,12 @@ export default function SkinAnalysisPage() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 15, borderLeft: '4px solid #0d9488', paddingLeft: 12 }}>Diagnostic Expert</h2>
                             <div style={{ marginBottom: 20 }}>
                                 <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, marginBottom: 15 }}>
-                                    {currentPlan === 'FREE' 
+                                    {currentPlan === 'FREE'
                                         ? 'Le diagnostic expert détaillé est réservé aux membres PRO et PREMIUM. Passez au plan supérieur pour obtenir une analyse approfondie de vos résultats.'
                                         : `L'analyse multi-dimensionnelle révèle un aspect optimal concernant la condition ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}. Cependant, une attention particulière est recommandée pour ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'} qui présente le score le plus bas de la série.`
                                     }
@@ -1472,18 +1641,22 @@ export default function SkinAnalysisPage() {
                             <tbody>
                                 {result.conditionScores.map(c => {
                                     const meta = CONDITION_META[c.type];
-                                    const scoreColor = c.score >= 75 ? '#10b981' : c.score >= 50 ? '#f59e0b' : '#ef4444';
-                                    const status = c.score >= 75 ? 'Contrôlé' : c.score >= 50 ? 'Modéré' : 'Sévère';
+                                    const hasScore = typeof c.score === 'number';
+                                    const scoreValue = hasScore ? (c.score as number) : 0;
+                                    const scoreColor = !hasScore ? '#64748b' : scoreValue >= 75 ? '#10b981' : scoreValue >= 50 ? '#f59e0b' : '#ef4444';
+                                    const status = !hasScore ? 'Non evalue' : scoreValue >= 75 ? 'Contrôlé' : scoreValue >= 50 ? 'Modéré' : 'Sévère';
                                     return (
                                         <tr key={c.type} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                             <td style={{ padding: '12px 8px', fontSize: 14, fontWeight: 700 }}>{meta?.label || c.type}</td>
-                                            <td style={{ padding: '12px 8px', textAlign: 'center', fontSize: 14, fontWeight: 800, color: scoreColor }}>{Math.round(c.score)}/100</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'center', fontSize: 14, fontWeight: 800, color: scoreColor }}>
+                                                {hasScore ? `${Math.round(scoreValue)}/100` : 'Non evalue'}
+                                            </td>
                                             <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                                                 <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: `${scoreColor}10`, color: scoreColor, border: `1px solid ${scoreColor}20` }}>
                                                     {status}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '12px 8px', fontSize: 12, color: '#64748b' }}>{meta?.description}</td>
+                                            <td style={{ padding: '12px 8px', fontSize: 12, color: '#64748b' }}>{hasScore ? meta?.description : (c.notEvaluatedReason || 'Aucune information disponible')}</td>
                                         </tr>
                                     );
                                 })}
@@ -1510,13 +1683,13 @@ export default function SkinAnalysisPage() {
                     {/* Footer / Disclaimer */}
                     <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #eee', textAlign: 'center' }}>
                         <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>
-                            Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn. 
+                            Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn.
                             Cette analyse n'est pas un diagnostic médical et ne remplace pas l'avis d'un dermatologue professionnel.
                         </p>
                         <p style={{ fontSize: 12, fontWeight: 700, color: '#0d9488', marginTop: 8 }}>www.deepskyn.app</p>
                     </div>
                 </div>
             )}
-        </div>
+        </div> 
     );
 }

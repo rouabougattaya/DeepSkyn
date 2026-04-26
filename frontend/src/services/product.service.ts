@@ -24,6 +24,7 @@ export interface ProductFilterParams {
     isClean?: boolean;
     sortBy?: 'price' | 'rating' | 'name';
     sortOrder?: 'ASC' | 'DESC';
+    limit?: number;
 }
 
 function buildQuery(params: ProductFilterParams): string {
@@ -36,6 +37,7 @@ function buildQuery(params: ProductFilterParams): string {
     if (params.isClean !== undefined) qs.set('isClean', String(params.isClean));
     if (params.sortBy) qs.set('sortBy', params.sortBy);
     if (params.sortOrder) qs.set('sortOrder', params.sortOrder);
+    if (params.limit !== undefined) qs.set('limit', String(params.limit));
     return qs.toString() ? `?${qs.toString()}` : '';
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { getUser, authFetch } from '@/lib/authSession';
 import {
     ArrowLeft,
     Sparkles,
@@ -75,10 +76,28 @@ export default function SkinAnalysisDetailPage() {
     const [analysis, setAnalysis] = useState<ComparedAnalysisItem | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentPlan, setCurrentPlan] = useState<string>('FREE');
     const navigate = useNavigate();
+
+    const isPro = currentPlan?.toUpperCase() === 'PRO' || currentPlan?.toUpperCase() === 'PREMIUM';
 
     useEffect(() => {
         if (!id) return;
+
+        const loadUserPlan = async () => {
+            try {
+                const currentUser = getUser();
+                if (currentUser) {
+                    const res = await authFetch(`/subscription/${currentUser.id}`);
+                    if (res.ok) {
+                        const subData = await res.json();
+                        setCurrentPlan(subData?.plan || 'FREE');
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load plan:', err);
+            }
+        };
 
         const fetchAnalysis = async () => {
             try {
@@ -92,6 +111,7 @@ export default function SkinAnalysisDetailPage() {
             }
         };
 
+        loadUserPlan();
         fetchAnalysis();
     }, [id]);
 
@@ -196,6 +216,24 @@ export default function SkinAnalysisDetailPage() {
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Digital Twin Button */}
+                            <button
+                                onClick={() => {
+                                    if (isPro) {
+                                        navigate(`/analysis/digital-twin/${analysis.id}`);
+                                    } else {
+                                        navigate('/upgrade');
+                                    }
+                                }}
+                                className={`w-full font-bold py-4 px-6 rounded-3xl shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${isPro
+                                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-purple-500/30'
+                                    : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-pink-500/30'
+                                    }`}
+                            >
+                                <Sparkles className="w-5 h-5" />
+                                {isPro ? 'Explore Your Digital Twin (Future Skin)' : 'Upgrade to PRO for Digital Twin'}
+                            </button>
                         </div>
                     </div>
                 </div>

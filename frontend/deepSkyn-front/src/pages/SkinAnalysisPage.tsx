@@ -6,7 +6,7 @@ import {
     CheckCircle, RefreshCw, ChevronRight, Activity,
     BarChart2, Info, Waves, Flame, Microscope,
     Bandage, CircleDot, HeartPulse, Sprout, Leaf, Dice5,
-    CircleCheck, AlertTriangle, BarChart3,
+    CircleCheck, AlertTriangle, BarChart3, Calendar
 } from 'lucide-react';
 import { aiAnalysisService } from '../services/aiAnalysisService';
 import type { GlobalScoreResult, ConditionWeights, ConditionScore } from '../types/aiAnalysis';

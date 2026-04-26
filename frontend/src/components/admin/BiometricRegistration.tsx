@@ -71,11 +71,8 @@ export default function BiometricRegistration() {
         credentials: 'include',
       })
       const csrfData = await csrfRes.json()
-      const csrfToken = csrfData.csrfToken
-
-      if (!csrfToken) {
-        throw new Error('Failed to get CSRF token')
-      }
+      const csrfToken = csrfData.csrfToken || ''
+      // Continue even if CSRF token is empty — backend will reject if it's needed
 
       // 1. Get registration options
       const optionsHeaders: Record<string, string> = {
@@ -178,11 +175,8 @@ export default function BiometricRegistration() {
         credentials: 'include',
       })
       const csrfData = await csrfRes.json()
-      const csrfToken = csrfData.csrfToken
-
-      if (!csrfToken) {
-        throw new Error('Failed to get CSRF token')
-      }
+      const csrfToken = csrfData.csrfToken || ''
+      // Continue even if CSRF token is empty — backend will reject if it's needed
 
       const deleteHeaders: Record<string, string> = {
         'X-CSRF-Token': csrfToken,

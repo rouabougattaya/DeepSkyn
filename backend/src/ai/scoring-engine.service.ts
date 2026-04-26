@@ -90,7 +90,8 @@ export class ScoringEngineService {
     
     for (const conditionScore of conditionScores) {
       const weight = this.getWeightForCondition(conditionScore.type, normalizedWeights);
-      totalScore += conditionScore.score * weight;
+      const scoreValue = typeof conditionScore.score === 'number' ? conditionScore.score : 0;
+      totalScore += scoreValue * weight;
       totalWeight += weight;
     }
     
@@ -160,14 +161,18 @@ export class ScoringEngineService {
     }
 
     // Meilleure condition (score le plus élevé)
-    const bestCondition = conditionScores.reduce((best, current) => 
-      current.score > best.score ? current : best
-    ).type;
+    const bestCondition = conditionScores.reduce((best, current) => {
+      const currentScore = typeof current.score === 'number' ? current.score : Number.NEGATIVE_INFINITY;
+      const bestScore = typeof best.score === 'number' ? best.score : Number.NEGATIVE_INFINITY;
+      return currentScore > bestScore ? current : best;
+    }).type;
 
     // Pire condition (score le plus bas)
-    const worstCondition = conditionScores.reduce((worst, current) => 
-      current.score < worst.score ? current : worst
-    ).type;
+    const worstCondition = conditionScores.reduce((worst, current) => {
+      const currentScore = typeof current.score === 'number' ? current.score : Number.POSITIVE_INFINITY;
+      const worstScore = typeof worst.score === 'number' ? worst.score : Number.POSITIVE_INFINITY;
+      return currentScore < worstScore ? current : worst;
+    }).type;
 
     // Condition dominante (plus de détections)
     const dominantCondition = conditionScores.reduce((dominant, current) => 

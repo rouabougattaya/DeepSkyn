@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import Papa from 'papaparse';
 import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
@@ -23,11 +23,16 @@ export class RecommendationService {
   /**
    * Implémentation du moteur de recommandation basé sur le modèle Python et la DATASET réelle
    */
-  async getRecommendationsForSkinState(userId: string, analysisId: string, skinType: string): Promise<any[]> {
+  async getRecommendationsForSkinState(
+    userId: string,
+    analysisId: string,
+    skinType: string,
+    concerns: string[] = [],
+  ): Promise<any[]> {
     this.logger.log(`Génération de recommandations pour userId=${userId}, type=${skinType} (via Dataset Python)`);
 
     if (this.pythonDisabled) {
-      return this.getDatabaseFallback(userId, analysisId, skinType);
+      return this.getDatabaseFallback(userId, analysisId, skinType, concerns);
     }
 
     const { exec } = require('child_process');
@@ -40,11 +45,14 @@ export class RecommendationService {
     this.logger.debug(`Paths - Script: ${scriptPath}, Data: ${dataPath}`);
     const pythonPath = process.env.PYTHON_PATH || 'python';
 
+    // On prépare les préoccupations (concerns) comme argument
+    const concernsArg = (concerns && concerns.length > 0) ? concerns.join(',') : '';
+
     // Si on a la dataset réelle, on utilise le script Python
     if (fs.existsSync(dataPath)) {
-      this.logger.log(`Dataset trouvée. Exécution de ${scriptPath}`);
+      this.logger.log(`Dataset trouvée. Exécution de ${scriptPath} avec skinType=${skinType} et concerns=[${concernsArg}]`);
       return new Promise((resolve, reject) => {
-        exec(`"${pythonPath}" "${scriptPath}" ${skinType}`, { cwd: process.cwd() }, (error, stdout, stderr) => {
+        exec(`"${pythonPath}" "${scriptPath}" ${skinType} "${concernsArg}"`, { cwd: process.cwd() }, (error, stdout, stderr) => {
           if (error) {
             const stderrText = String(stderr ?? '');
             this.logger.error(`Erreur EXEC Python: ${error.message} | STDERR: ${stderrText}`);
@@ -52,7 +60,7 @@ export class RecommendationService {
               this.logger.warn('Python désactivé: dependency pandas manquante. Passage direct au fallback DB.');
               this.pythonDisabled = true;
             }
-            this.getDatabaseFallback(userId, analysisId, skinType).then(resolve).catch(reject);
+            this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve).catch(reject);
             return;
           }
 
@@ -65,14 +73,14 @@ export class RecommendationService {
                 this.logger.warn('Python désactivé suite à l erreur (pandas).');
                 this.pythonDisabled = true;
               }
-              this.getDatabaseFallback(userId, analysisId, skinType).then(resolve);
+              this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
             } else {
               this.logger.log(`✅ ${results.length} recommandations générées via Python.`);
               resolve(results);
             }
-          } catch (e) {
-            this.logger.error(`Erreur Parsing STDOUt: ${stdout} | Erreur: ${e.message}`);
-            this.getDatabaseFallback(userId, analysisId, skinType).then(resolve);
+          } catch (e: any) {
+            this.logger.error(`Erreur Parsing STDOUt: ${stdout} | Erreur: ${e?.message || e}`);
+            this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
           }
         });
       });
@@ -81,15 +89,111 @@ export class RecommendationService {
     }
 
     // Sinon, on garde le comportement actuel (Database Fallback)
-    return this.getDatabaseFallback(userId, analysisId, skinType);
+    return this.getDatabaseFallback(userId, analysisId, skinType, concerns);
   }
+
+  async saveFinalRecommendations(
+    userId: string,
+    analysisId: string,
+    recommendations: Array<any>,
+    explanation?: string,
+    aiConfidenceScore?: number,
+  ): Promise<void> {
+    if (!userId || !analysisId || !recommendations?.length) {
+      return;
+    }
+
+    const recommendation = await this.recommendationRepository.save({
+      userId,
+      analysisId,
+      explanation: explanation ?? null,
+      aiConfidenceScore: typeof aiConfidenceScore === 'number' ? aiConfidenceScore : null,
+    } as Recommendation);
+
+    const itemEntities: RecommendationItem[] = [];
+    for (let index = 0; index < recommendations.length; index++) {
+      const rec = recommendations[index];
+      const productId = await this.resolveProductId(rec);
+      if (!productId) continue;
+
+      itemEntities.push(
+        this.itemRepository.create({
+          recommendationId: recommendation.id,
+          productId,
+          ranking: index + 1,
+          reason: typeof rec?.reason === 'string' ? rec.reason : null,
+        }),
+      );
+    }
+
+    if (itemEntities.length > 0) {
+      await this.itemRepository.save(itemEntities);
+    }
+  }
+
+  async getRecommendationsForAnalysis(analysisId: string): Promise<any[]> {
+    if (!analysisId) return [];
+
+    const recommendation = await this.recommendationRepository.findOne({
+      where: { analysisId },
+      order: { generatedAt: 'DESC' },
+    });
+
+    return this.getRecommendationsFromRecord(recommendation);
+  }
+
+  async getLatestFinalRecommendationsForUser(userId: string): Promise<any[]> {
+    if (!userId) return [];
+
+    const latest = await this.recommendationRepository.findOne({
+      where: { userId },
+      order: { generatedAt: 'DESC' },
+    });
+
+    return this.getRecommendationsFromRecord(latest);
+  }
+
+  /**
+   * Helper shared par getRecommendationsForAnalysis et getLatestFinalRecommendationsForUser
+   */
+  private async getRecommendationsFromRecord(recommendation: Recommendation | null): Promise<any[]> {
+    if (!recommendation) return [];
+
+    const items = await this.itemRepository.find({
+      where: { recommendationId: recommendation.id },
+      order: { ranking: 'ASC' },
+    });
+
+    if (!items.length) return [];
+
+    const products = await this.productRepository.find({
+      where: { id: In(items.map((i) => i.productId)) },
+    });
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    return items
+      .map((item) => {
+        const product = productById.get(item.productId);
+        if (!product) return null;
+        return {
+          ...product,
+          reason: item.reason ?? undefined,
+          ranking: item.ranking,
+          recommendationId: recommendation.id,
+          analysisId: recommendation.analysisId,
+        };
+      })
+      .filter(Boolean);
+  }
+
 
   /**
    * Fallback base de données (si dataset absente ou erreur)
    */
-  private async getDatabaseFallback(userId: string, analysisId: string, skinType: string): Promise<any[]> {
+  private async getDatabaseFallback(userId: string, analysisId: string, skinType: string, concerns: string[] = []): Promise<any[]> {
     const mappedType = skinType.toLowerCase();
-    
+    const normalizedConcerns = concerns.map((c) => String(c || '').toLowerCase()).filter(Boolean);
+
     // Try 1: Find products with matching skinType
     let matchedProducts = await this.productRepository.find({
       where: { skinType: mappedType },
@@ -120,20 +224,90 @@ export class RecommendationService {
       return `https://${trimmed}`;
     };
 
-    const valid = matchedProducts
+    const scoredProducts = matchedProducts
       .map((p) => {
-        const url = normalizeUrl((p as any).url);
-        return { p, url };
+        const productConcerns = ((p as any).targetIssues || [])
+          .map((issue: string) => String(issue || '').toLowerCase());
+        const concernOverlap = normalizedConcerns.filter((c) => productConcerns.includes(c)).length;
+        const ratingScore = typeof (p as any).rating === 'number' ? Number((p as any).rating) : 0;
+        return {
+          p,
+          score: concernOverlap * 3 + ratingScore,
+        };
       })
-      .filter(({ url }) => !!url)
-      .slice(0, 6)
-      .map(({ p, url }) => ({
-        ...p,
-        url,
-      }));
+      .sort((a, b) => b.score - a.score);
 
-    // ... la suite de la logique de sauvegarde recommendationId ...
+    // Group by basic categories to ensure routine variety
+    const categorized = {
+      cleanser: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('cleanser')),
+      serum: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('serum')),
+      moisturizer: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('moisturizer')),
+      sunscreen: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('sunscreen')),
+      other: scoredProducts.filter(item =>
+        !['cleanser', 'serum', 'moisturizer', 'sunscreen'].some(cat => (item.p.type || '').toLowerCase().includes(cat))
+      )
+    };
+
+    const finalSelection: any[] = [];
+    const usedIds = new Set<string>();
+
+    const pickRandomFromTop = (list: any[], count: number = 1, topN: number = 3) => {
+      if (!list.length) return;
+      const pool = list.slice(0, topN);
+      for (let i = 0; i < count && pool.length > 0; i++) {
+        const idx = Math.floor(Math.random() * pool.length);
+        const item = pool.splice(idx, 1)[0];
+        if (!usedIds.has(item.p.id)) {
+          finalSelection.push(item);
+          usedIds.add(item.p.id);
+        }
+      }
+    };
+
+    // Pick 1 from each main category
+    pickRandomFromTop(categorized.cleanser);
+    pickRandomFromTop(categorized.serum);
+    pickRandomFromTop(categorized.moisturizer);
+    pickRandomFromTop(categorized.sunscreen);
+
+    // Fill the rest (up to 6) from "other" or remaining top scored
+    const remainingPool = scoredProducts.filter(item => !usedIds.has(item.p.id));
+    pickRandomFromTop(remainingPool, 6 - finalSelection.length, 10);
+
+    const valid = finalSelection
+      .map(({ p }) => {
+        const url = normalizeUrl((p as any).url);
+        if (!url) return null;
+
+        // Generate a reason
+        const type = (p.type || 'Skincare').toLowerCase();
+        let reason = "Recommandé pour votre routine quotidienne.";
+        if (type.includes('cleanser')) reason = "Nettoyant doux pour purifier sans agresser.";
+        if (type.includes('serum')) reason = "Sérum concentré pour traiter vos préoccupations ciblées.";
+        if (type.includes('moisturizer')) reason = "Hydratant essentiel pour protéger votre barrière cutanée.";
+        if (type.includes('sunscreen')) reason = "Protection solaire indispensable pour prévenir le vieillissement.";
+
+        return {
+          ...p,
+          url,
+          reason
+        };
+      })
+      .filter(Boolean);
+
     return valid;
+  }
+
+  private async resolveProductId(rec: any): Promise<string | null> {
+    if (typeof rec?.id === 'string' && rec.id.trim()) {
+      return rec.id;
+    }
+
+    const name = typeof rec?.name === 'string' ? rec.name.trim() : '';
+    if (!name) return null;
+
+    const byName = await this.productRepository.findOne({ where: { name } });
+    return byName?.id ?? null;
   }
 
   /**

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepskyn-frontend
+  namespace: deepskyn
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: deepskyn-frontend
+  template:
+    metadata:
+      labels:
+        app: deepskyn-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/your-org/deepskyn-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: deepskyn
+  labels:
+    app: deepskyn-frontend
+spec:
+  selector:
+    app: deepskyn-frontend
+  ports:
+    - port: 80
+      targetPort: 80

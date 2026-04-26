@@ -161,7 +161,7 @@ export class AuthService {
         riskScore: parsed.riskScore ?? 0.1,
         reason: parsed.reason ?? 'Analysis completed'
       };
-    } catch (error) {
+    } catch (error: any) {
       console.warn('⚠️ Gemini abuse analysis failed:', error.message || error);
       return { riskScore: 0.1, reason: 'AI Analysis Unavailable' };
     }
@@ -390,7 +390,7 @@ export class AuthService {
 
     try {
       await this.sessionService.createSession(user.id, tokens.refreshToken, req);
-    } catch (sessionError) {
+    } catch (sessionError: any) {
       this.logger.error(`Failed to create session for user ${user.id}:`, sessionError.message);
       // We don't necessarily want to fail the whole login if session creation fails, 
       // but if we depend on it for some features, we might.
@@ -947,7 +947,7 @@ export class AuthService {
           role: user.role,
         },
       };
-    } catch (err) {
+    } catch (err: any) {
       throw new BadRequestException(err.message || 'Biometric login failed');
     }
   }

@@ -1,0 +1,59 @@
+name: CD Backend
+
+on:
+  workflow_run:
+    workflows: ['CI Backend']
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy-backend:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set image tag
+        id: vars
+        run: |
+          FULL_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "IMAGE_TAG=${FULL_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/deepskyn-backend:${{ steps.vars.outputs.IMAGE_TAG }}
+            ghcr.io/${{ github.repository_owner }}/deepskyn-backend:latest
+
+      - name: Setup kubectl
+        if: ${{ secrets.KUBE_CONFIG_DATA != '' }}
+        uses: azure/setup-kubectl@v4
+
+      - name: Deploy to Kubernetes (optional)
+        if: ${{ secrets.KUBE_CONFIG_DATA != '' }}
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+          IMAGE_TAG: ${{ steps.vars.outputs.IMAGE_TAG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/postgres.yaml
+          sed "s|ghcr.io/your-org/deepskyn-backend:latest|ghcr.io/${{ github.repository_owner }}/deepskyn-backend:${IMAGE_TAG}|g" k8s/backend.yaml | kubectl apply -f -

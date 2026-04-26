@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../user/user.entity';
+import { Subscription } from '../subscription/subscription.entity';
 import { AdminUpdateUserDto, UpdateRoleDto, PaginationDto, CreateAdminDto } from './dto';
 
 const SALT_ROUNDS = 12;
@@ -12,6 +13,8 @@ export class AdminService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(Subscription)
+    private readonly subscriptionRepo: Repository<Subscription>,
   ) {}
 
   /**
@@ -22,15 +25,9 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
+    if (role) where.role = role;
 
-    if (role) {
-      where.role = role;
-    }
-
-    if (search) {
-      // Recherche par email, firstName ou lastName
-      where.email = ILike(`%${search}%`);
-    }
+    const { ILike } = await import('typeorm');
 
     const [users, total] = await this.usersRepo.findAndCount({
       where: search
@@ -41,25 +38,37 @@ export class AdminService {
           ]
         : where,
       select: [
-        'id',
-        'email',
-        'firstName',
-        'lastName',
-        'role',
-        'isEmailVerified',
-        'isPremium',
-        'isTwoFAEnabled',
-        'authMethod',
-        'createdAt',
-        'updatedAt',
+        'id', 'email', 'firstName', 'lastName', 'role',
+        'isEmailVerified', 'isPremium', 'isTwoFAEnabled',
+        'authMethod', 'createdAt', 'updatedAt',
       ],
       order: { [sortBy]: sortOrder },
       skip,
       take: limit,
     });
 
+    // Fetch subscriptions for these users separately (avoids uuid vs varchar cast issues)
+    const userIds = users.map((u) => u.id);
+    const subscriptions = userIds.length > 0
+      ? await this.subscriptionRepo
+          .createQueryBuilder('sub')
+          .select(['sub.userId', 'sub.plan'])
+          .where('sub.userId IN (:...ids)', { ids: userIds })
+          .getRawMany()
+      : [];
+
+    const subMap: Record<string, string> = {};
+    for (const s of subscriptions) {
+      subMap[s.sub_userId] = s.sub_plan;
+    }
+
+    const data = users.map((u) => ({
+      ...u,
+      plan: subMap[u.id] ?? 'FREE',
+    }));
+
     return {
-      data: users,
+      data,
       meta: {
         total,
         page,

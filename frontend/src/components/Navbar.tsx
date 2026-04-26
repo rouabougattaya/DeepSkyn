@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LogOut, Settings, User as UserIcon, LayoutDashboard, Sparkles } from "lucide-react"
+import { Menu, X, LogOut, Settings, LayoutDashboard, Sparkles } from "lucide-react"
 import { getUser, logout } from "@/lib/authSession"
 import { simpleAuthService } from "@/services/authService-simple"
 
@@ -62,7 +62,7 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {!user ? (
               <>
-                <Link to="/ai-demo">
+                <Link to="/analysis">
                   <Button size="sm" className="bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 shadow-md">
                     Start Analysis
                   </Button>
@@ -77,21 +77,17 @@ export function Navbar() {
             ) : (
               <>
                 <Link
-                  to="/ai-demo"
+                  to="/analysis"
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 text-white text-sm font-semibold shadow hover:from-teal-700 hover:to-emerald-600 transition-all"
                 >
                   <Sparkles className="w-4 h-4" /> Launch Analysis
                 </Link>
-           
-                 
-               
                 <Link
-                  to="/profile"
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Profile"
+                  to="/dashboard"
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Dashboard"
                 >
-                  <UserIcon className="w-4 h-4" />
-                  {user.firstName} {user.lastName}
+                  <LayoutDashboard className="w-4 h-4 text-gray-600 hover:text-gray-900" />
                 </Link>
                 <Link
                   to="/settings"
@@ -147,7 +143,7 @@ export function Navbar() {
                   </Link>
                 ))}
                 <div className="pt-3 grid grid-cols-1 gap-2">
-                  <Link to="/ai-demo" onClick={() => setIsOpen(false)}>
+                  <Link to="/analysis" onClick={() => setIsOpen(false)}>
                     <Button className="w-full bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600">Start Analysis</Button>
                   </Link>
                   <Link to="/auth/login" onClick={() => setIsOpen(false)}>
@@ -160,7 +156,7 @@ export function Navbar() {
               </>
             ) : (
               <>
-                {[{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, { href: "/profile", label: "Profile", icon: UserIcon }, { href: "/settings", label: "Settings", icon: Settings }].map((item) => {
+                {[{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, { href: "/settings", label: "Settings", icon: Settings }].map((item) => {
                   const Icon = item.icon;
                   return (
                     <Link
@@ -177,7 +173,7 @@ export function Navbar() {
                   );
                 })}
                 <div className="pt-2 grid grid-cols-1 gap-2">
-                  <Link to="/ai-demo" onClick={() => setIsOpen(false)}>
+                  <Link to="/analysis" onClick={() => setIsOpen(false)}>
                     <Button className="w-full bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600">Launch Analysis</Button>
                   </Link>
                   <Button

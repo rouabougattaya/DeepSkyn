@@ -1,8 +1,10 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ProductFilterDto } from './dto/product-filter.dto';
+import { Public } from '../auth/decorators/public.decorator';
 // JwtAccessGuard is applied globally via APP_GUARD in AuthModule — no need to repeat it here.
 
+@Public()
 @Controller('products')
 export class ProductsController {
     constructor(private readonly productsService: ProductsService) { }

@@ -25,6 +25,7 @@ export interface DashboardMetrics {
   percentile25: number;
   percentile75: number;
   movingAverage5: number;
+  latestAnalysisId?: string;
 }
 
 export interface MonthlyData {
@@ -57,8 +58,8 @@ export class MetricsService {
   ) { }
 
   async getDashboardMetrics(userId?: string): Promise<DashboardMetrics> {
-    const queryWork: any = { order: { createdAt: 'DESC' } };
-    if (userId) queryWork.where = { userId };
+    const queryWork: any = { order: { createdAt: 'DESC' }, where: { status: 'COMPLETED' } };
+    if (userId) queryWork.where = { ...queryWork.where, userId };
     
     const analyses = await this.analysisRepo.find(queryWork);
     if (analyses.length === 0) {
@@ -66,6 +67,7 @@ export class MetricsService {
         averageScore: 0, bestScore: 0, worstScore: 0, totalAnalyses: 0,
         trendDirection: 'stable', trendPercentage: 0, standardDeviation: 0,
         medianScore: 0, percentile25: 0, percentile75: 0, movingAverage5: 0,
+        latestAnalysisId: undefined,
       };
     }
 
@@ -86,12 +88,13 @@ export class MetricsService {
       percentile25: this.round(this.percentile(scores, 25)),
       percentile75: this.round(this.percentile(scores, 75)),
       movingAverage5: this.round(this.mean(scores.slice(0, 5))),
+      latestAnalysisId: analyses[0]?.id,
     };
   }
 
   async getTrends(userId?: string): Promise<TrendData[]> {
-    const queryWork: any = { order: { createdAt: 'DESC' } };
-    if (userId) queryWork.where = { userId };
+    const queryWork: any = { order: { createdAt: 'DESC' }, where: { status: 'COMPLETED' } };
+    if (userId) queryWork.where = { ...queryWork.where, userId };
     
     const allAnalyses = await this.analysisRepo.find(queryWork);
     if (allAnalyses.length < 2) return [];
@@ -104,8 +107,8 @@ export class MetricsService {
   }
 
   async getMonthlyData(months: number = 12, userId?: string): Promise<MonthlyData[]> {
-    const queryWork: any = { order: { createdAt: 'ASC' } };
-    if (userId) queryWork.where = { userId };
+    const queryWork: any = { order: { createdAt: 'ASC' }, where: { status: 'COMPLETED' } };
+    if (userId) queryWork.where = { ...queryWork.where, userId };
 
     const all = await this.analysisRepo.find(queryWork);
     const monthlyMap = new Map<string, number[]>();

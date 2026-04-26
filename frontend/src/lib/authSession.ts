@@ -223,7 +223,7 @@ export const authFetch = async (url: string, options: RequestInit = {}): Promise
         const newAccess = getAccessToken()
         if (newAccess) {
           (headers as Record<string, string>)["Authorization"] = `Bearer ${newAccess}`
-          res = await fetch(url, { ...options, headers, credentials: 'include' })
+          res = await fetch(finalUrl, { ...options, headers, credentials: 'include' })
         }
       } else {
         clearSession()

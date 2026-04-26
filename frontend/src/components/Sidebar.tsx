@@ -15,6 +15,9 @@ import {
   Lock,
   MapPin,
   LogOut,
+  Menu,
+  X,
+  FlaskConical,
 } from "lucide-react";
 import { getUser, logout, authFetch } from "@/lib/authSession";
 import { simpleAuthService } from "@/services/authService-simple";
@@ -24,8 +27,9 @@ const groups = [
     title: "Main",
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-      { href: "/ai-demo", label: "Skin Analysis", icon: Sparkles },
+      { href: "/analysis", label: "Skin Analysis", icon: Sparkles },
       { href: "/routines", label: "My Routines", icon: CalendarCheck },
+      { href: "/analysis/recommendations", label: "Recommandations IA", icon: FlaskConical },
       { href: "/products", label: "Products", icon: ShoppingBag },
     ],
   },
@@ -68,10 +72,12 @@ const groups = [
 interface SidebarProps {
   onOpenCoach?: () => void;
   isCoachOpen?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  isCollapsed?: boolean;
 }
 
-export function Sidebar({ onOpenCoach, isCoachOpen = false }: SidebarProps) {
-  const [open, setOpen] = useState(false);
+export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, isCollapsed = false }: SidebarProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const user = getUser();
   const [status, setStatus] = useState<any>(null);
@@ -95,199 +101,235 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false }: SidebarProps) {
     await logout();
   };
 
-  return (
-    <aside className="border-r border-slate-200 bg-white text-slate-900 hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:top-16 lg:bottom-0 lg:z-30">
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {groups.map((group) => (
-          <div key={group.title} className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 px-2">{group.title}</p>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isCoachItem = item.label === 'AI Skin Coach';
-                const active = isCoachItem ? isCoachOpen : isActive(item.href);
+  const handleToggleCollapse = () => {
+    onCollapsedChange?.(!isCollapsed);
+  };
 
-                if (isCoachItem) {
+  return (
+    <>
+      {/* Desktop Sidebar with Collapse */}
+      <aside className={`hidden lg:flex lg:flex-col border-r border-slate-200 bg-white text-slate-900 fixed top-16 bottom-0 z-30 transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'lg:w-20' : 'lg:w-64'
+      }`}>
+        
+        {/* Header with Toggle */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200">
+          {!isCollapsed && <h3 className="text-sm font-bold text-slate-900">Navigation</h3>}
+          <button
+            onClick={handleToggleCollapse}
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors ml-auto"
+            aria-label="Toggle sidebar"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isCollapsed ? <Menu size={18} /> : <X size={18} />}
+          </button>
+        </div>
+
+        {/* Navigation Groups */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+          {groups.map((group) => (
+            <div key={group.title} className="space-y-2">
+              {!isCollapsed && (
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 px-2">{group.title}</p>
+              )}
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isCoachItem = item.label === 'AI Skin Coach';
+                  const active = isCoachItem ? isCoachOpen : isActive(item.href);
+
+                  if (isCoachItem) {
+                    return (
+                      <button
+                        key={item.href + item.label}
+                        type="button"
+                        onClick={onOpenCoach}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${active
+                          ? "bg-teal-50 text-teal-700 border border-teal-100"
+                          : "text-slate-700 hover:bg-slate-100"}`}
+                        title={isCollapsed ? item.label : undefined}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      </button>
+                    );
+                  }
+
                   return (
-                    <button
+                    <Link
                       key={item.href + item.label}
-                      type="button"
-                      onClick={onOpenCoach}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
+                      to={item.href}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${active
                         ? "bg-teal-50 text-teal-700 border border-teal-100"
                         : "text-slate-700 hover:bg-slate-100"}`}
+                      title={isCollapsed ? item.label : undefined}
                     >
-                      <Icon className="w-4 h-4" />
-                      <span className="truncate">{item.label}</span>
-                    </button>
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
                   );
-                }
-
-                return (
-                  <Link
-                    key={item.href + item.label}
-                    to={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
-                      ? "bg-teal-50 text-teal-700 border border-teal-100"
-                      : "text-slate-700 hover:bg-slate-100"}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {/* 📊 USAGE INDICATOR */}
-        {status && status.chat && status.analysis && (
-          <div className="mx-2 mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-             <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                <span>Usage {status.plan}</span>
-                <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
-             </div>
-             <div className="space-y-3">
-                <div className="space-y-1.5">
-                   <div className="flex justify-between text-[11px] font-semibold">
-                      <span className="text-slate-600">Messages Chat</span>
-                      <span className="text-slate-900">{status.chat.used}/{status.chat.limit}</span>
-                   </div>
-                   <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-teal-500 transition-all duration-500" 
-                        style={{ width: `${Math.min(100, (status.chat.used / status.chat.limit) * 100)}%` }} 
-                      />
-                   </div>
-                </div>
-                <div className="space-y-1.5">
-                   <div className="flex justify-between text-[11px] font-semibold">
-                      <span className="text-slate-600">Analyses Peau</span>
-                      <span className="text-slate-900">{status.analysis.used}/{status.analysis.limit}</span>
-                   </div>
-                   <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-teal-500 transition-all duration-500" 
-                        style={{ width: `${Math.min(100, (status.analysis.used / status.analysis.limit) * 100)}%` }} 
-                      />
-                   </div>
-                </div>
-             </div>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-slate-200 px-4 py-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 grid place-items-center font-semibold">
-            {user?.firstName?.[0] || "U"}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-900 truncate">{user?.firstName || user?.name || "User"}</p>
-            <p className="text-xs text-slate-500 truncate">Plan : {status?.plan || "FREE"}</p>
-          </div>
+          {/* Usage Indicator */}
+          {status && status.chat && status.analysis && !isCollapsed && (
+            <div className="mx-1 mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+               <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                  <span>Usage {status.plan}</span>
+                  <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
+               </div>
+               <div className="space-y-3">
+                  <div className="space-y-1.5">
+                     <div className="flex justify-between text-[11px] font-semibold">
+                        <span className="text-slate-600">Messages Chat</span>
+                        <span className="text-slate-900">{status.chat.used}/{status.chat.limit}</span>
+                     </div>
+                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-teal-500 transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (status.chat.used / status.chat.limit) * 100)}%` }} 
+                        />
+                     </div>
+                  </div>
+                  <div className="space-y-1.5">
+                     <div className="flex justify-between text-[11px] font-semibold">
+                        <span className="text-slate-600">Analyses Peau</span>
+                        <span className="text-slate-900">{status.analysis.used}/{status.analysis.limit}</span>
+                     </div>
+                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-teal-500 transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (status.analysis.used / status.analysis.limit) * 100)}%` }} 
+                        />
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-        >
-          <LogOut className="w-4 h-4" /> Sign Out
-        </button>
-      </div>
 
-      {/* Mobile toggle */}
+        {/* Footer */}
+        <div className="border-t border-slate-200 px-3 py-4">
+          {!isCollapsed && (
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 grid place-items-center font-semibold flex-shrink-0">
+                {user?.firstName?.[0] || "U"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900 truncate">{user?.firstName || user?.name || "User"}</p>
+                <p className="text-xs text-slate-500 truncate">Plan : {status?.plan || "FREE"}</p>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+            title={isCollapsed ? "Sign Out" : undefined}
+          >
+            <LogOut className="w-4 h-4" /> 
+            {!isCollapsed && <span>Sign Out</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar with Drawer */}
       <div className="lg:hidden fixed bottom-4 right-4 z-50">
         <button
-          onClick={() => setOpen(!open)}
-          className="rounded-full bg-teal-600 text-white p-3 shadow-lg"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="rounded-full bg-gradient-to-r from-teal-600 to-teal-500 text-white p-3 shadow-lg hover:shadow-xl transition-shadow"
           aria-label="Toggle navigation"
+          title="Toggle menu"
         >
-          {open ? <CloseIcon /> : <MenuIcon />}
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {open && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setOpen(false)}>
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setMobileOpen(false)}>
           <div
-            className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-xl border-r border-slate-200 p-4 overflow-y-auto"
+            className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl border-r border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-left duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <span className="text-sm font-bold text-slate-900">Navigation</span>
-              <button onClick={() => setOpen(false)} className="p-2 rounded-lg hover:bg-slate-100">
-                <CloseIcon />
+              <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <X size={18} />
               </button>
             </div>
-            {groups.map((group) => (
-              <div key={group.title} className="space-y-2 mb-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 px-2">{group.title}</p>
-                <div className="space-y-1">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isCoachItem = item.label === 'AI Skin Coach';
-                    const active = isCoachItem ? isCoachOpen : isActive(item.href);
+            
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+              {groups.map((group) => (
+                <div key={group.title} className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 px-2">{group.title}</p>
+                  <div className="space-y-1">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isCoachItem = item.label === 'AI Skin Coach';
+                      const active = isCoachItem ? isCoachOpen : isActive(item.href);
 
-                    if (isCoachItem) {
+                      if (isCoachItem) {
+                        return (
+                          <button
+                            key={item.href + item.label}
+                            type="button"
+                            onClick={() => {
+                              setMobileOpen(false);
+                              onOpenCoach?.();
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${active
+                              ? "bg-teal-50 text-teal-700 border border-teal-100"
+                              : "text-slate-700 hover:bg-slate-100"}`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span className="truncate">{item.label}</span>
+                          </button>
+                        );
+                      }
+
                       return (
-                        <button
+                        <Link
                           key={item.href + item.label}
-                          type="button"
-                          onClick={() => {
-                            setOpen(false);
-                            onOpenCoach?.();
-                          }}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
+                          to={item.href}
+                          onClick={() => setMobileOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${active
                             ? "bg-teal-50 text-teal-700 border border-teal-100"
                             : "text-slate-700 hover:bg-slate-100"}`}
                         >
                           <Icon className="w-4 h-4" />
                           <span className="truncate">{item.label}</span>
-                        </button>
+                        </Link>
                       );
-                    }
-
-                    return (
-                      <Link
-                        key={item.href + item.label}
-                        to={item.href}
-                        onClick={() => setOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${active
-                          ? "bg-teal-50 text-teal-700 border border-teal-100"
-                          : "text-slate-700 hover:bg-slate-100"}`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="border-t border-slate-200 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 grid place-items-center font-semibold flex-shrink-0">
+                  {user?.firstName?.[0] || "U"}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{user?.firstName || user?.name || "User"}</p>
+                  <p className="text-xs text-slate-500 truncate">Plan : {status?.plan || "FREE"}</p>
                 </div>
               </div>
-            ))}
-            <button
-              onClick={handleLogout}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
+              <button
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleLogout();
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </aside>
-  );
-}
-
-function MenuIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
+    </>
   );
 }

@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { User } from '../user/user.entity';
 
-@Entity()
+@Entity('session_opaque')
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   id: string;

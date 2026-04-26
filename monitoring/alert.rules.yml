@@ -1,0 +1,29 @@
+groups:
+  - name: deepskyn-alerts
+    rules:
+      - alert: BackendDown
+        expr: probe_success{instance="http://host.docker.internal:3001/api/auth/health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Backend API unavailable
+          description: Backend health endpoint is not reachable for more than 1 minute.
+
+      - alert: FrontendDown
+        expr: probe_success{instance="http://host.docker.internal:5173"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Frontend unavailable
+          description: Frontend endpoint is not reachable for more than 1 minute.
+
+      - alert: HighNodeCpu
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High host CPU usage
+          description: CPU usage is above 85 percent for more than 5 minutes.

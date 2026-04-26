@@ -123,7 +123,7 @@ Event Data:
 
 Return ONLY a valid JSON object:
 {
-  "riskLevel": "low | medium | high",
+  "riskLevel": "high | medium | low",
   "explanation": "short explanation in one sentence",
   "recommendedAction": "none | notify | temporary_lock"
 }`;
@@ -140,6 +140,52 @@ Return ONLY a valid JSON object:
       this.logger.error('❌ Erreur parsing JSON Gemini activity risk:', e.message);
     }
     return null;
+  }
+
+  async generateSmartNotification(data: {
+    routine: string;
+    skinCondition: string;
+    weather: any;
+    timeOfDay: string;
+  }): Promise<any> {
+    if (!this.model) return null;
+
+    const prompt = `You are a smart skincare assistant.
+    
+Input Data:
+- User routine: ${data.routine}
+- Skin condition: ${data.skinCondition}
+- Weather data: ${JSON.stringify(data.weather)}
+- Time of day: ${data.timeOfDay}
+
+Task:
+1. Generate a personalized notification message.
+2. Adapt message based on skin condition and environment.
+3. Keep message short and engaging.
+4. Suggest an action for the user based on the inputs.
+
+Return ONLY a valid JSON object in this format:
+{
+  "title": "short engaging title",
+  "message": "the personalized short message",
+  "priority": "low" | "medium" | "high" 
+}`;
+
+    const text = await this.generateContent(prompt);
+    if (!text) return null;
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+         return JSON.parse(jsonMatch[0].trim());
+      }
+    } catch(e) {
+      this.logger.error('❌ Erreur parsing JSON Gemini smart notification:', e.message);
+    }
+    return {
+      title: "Skincare Reminder",
+      message: "Time for your skincare routine!",
+      priority: "medium"
+    };
   }
 
   private getDefaultAnalysis() {

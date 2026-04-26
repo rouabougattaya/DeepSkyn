@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepskyn-backend
+  labels:
+    app: deepskyn-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: deepskyn-backend
+  template:
+    metadata:
+      labels:
+        app: deepskyn-backend
+    spec:
+      containers:
+      - name: deepskyn-backend
+        image: your-docker-registry/deepskyn-backend:TAG_VERSION
+        ports:
+        - containerPort: 3001
+        envFrom:
+        - secretRef:
+            name: backend-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepskyn-backend-service
+spec:
+  selector:
+    app: deepskyn-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3001
+  type: ClusterIP

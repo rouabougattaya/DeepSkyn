@@ -10,6 +10,7 @@ export interface DashboardMetrics {
   percentile25: number;
   percentile75: number;
   movingAverage5: number;
+  latestAnalysisId?: string;
 }
 
 export interface MonthlyData {

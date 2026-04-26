@@ -63,6 +63,7 @@ async function bootstrap() {
     '/api/plans',
     '/api/ai/analyze',            // Ajouté pour test
     '/api/ai/analyze/unified',    // Ajouté pour test
+    '/api/ai/svr-routine',        // Nouveau
     '/api/chat/message',          // Ajouté pour test
     '/api/chat/history',
   ];

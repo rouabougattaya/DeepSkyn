@@ -1,143 +1,168 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { authFetch, getUser } from "@/lib/authSession"
-import { Check, Moon, Sparkles, Sun, ShoppingBag, ArrowUpRight, ArrowDownRight, Minus, History, RefreshCw, AlertCircle, Lock, Crown } from "lucide-react"
+import { Sparkles, ArrowUpRight, ArrowDownRight, Minus, Lock, Crown, RefreshCw, FileText, Download } from "lucide-react"
 import { updateRoutine } from "@/services/routinePersonalizationService"
 import { apiGet } from "@/services/apiClient"
 import { useNavigate } from "react-router-dom"
 import type { RoutineUpdateResponseDto, TrendDetail } from "@/types/routinePersonalization"
+import { SvrRoutinePanel } from "../components/analysis/SvrRoutinePanel"
+import { skinAgeInsightsService, type SkinAgeInsightResponse } from "@/services/skinAgeInsightsService"
+import { generateClinicalReport } from "@/utils/reportGenerator"
 
-type RoutineProduct = {
-  id: string
-  name: string
-  type: string
-  price: number
-  url: string | null
-}
 
-type RoutineStep = {
-  stepOrder: number
-  stepName: "Cleanser" | "Serum" | "Moisturizer"
-  notes?: string
-  adjustmentReason?: string
-  product: RoutineProduct
-}
 
-type RoutineResponse = {
-  morning: { steps: RoutineStep[] }
-  night: { steps: RoutineStep[] }
-}
+type RoutineResponse = any
 
-function normalizeExternalUrl(url: unknown): string | null {
-  if (typeof url !== "string") return null
-  const trimmed = url.trim()
-  if (!trimmed || trimmed === "#") return null
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
-  if (trimmed.startsWith("//")) return `https:${trimmed}`
-  return `https://${trimmed}`
-}
 
 export default function RoutinesPage() {
   const user = getUser()
   const userId = user?.id
   const navigate = useNavigate()
   const [currentPlan, setCurrentPlan] = useState<string>('FREE')
-
-  const [routine, setRoutine] = useState<RoutineResponse | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const storageKey = userId ? `routine_completed_${userId}_${todayKey}` : null
-
-  const [completed, setCompleted] = useState<Record<string, boolean>>({})
-  const [panel, setPanel] = useState<"all" | "morning" | "night">("all")
-
-  const stepKey = (routineType: "morning" | "night", stepOrder: number, productId: string) =>
-    `${routineType}_${stepOrder}_${productId}`
 
   const [personalizing, setPersonalizing] = useState(false)
   const [personalizationResult, setPersonalizationResult] = useState<RoutineUpdateResponseDto | null>(null)
   const [history, setHistory] = useState<RoutineUpdateResponseDto[]>([])
+  const [completedSteps, setCompletedSteps] = useState<string[]>([])
+  const [latestAnalysis, setLatestAnalysis] = useState<any>(null)
+  const [skinAgeInsight, setSkinAgeInsight] = useState<SkinAgeInsightResponse | null>(null)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [fullRoutineData, setFullRoutineData] = useState<any>(null)
 
   const historyKey = userId ? `routine_history_${userId}` : null
+  const completedKey = userId ? `routine_completed_${userId}` : null
 
-  const allSteps = routine ? [...routine.morning.steps, ...routine.night.steps] : []
-
-  const completedCount = routine
-    ? routine.morning.steps.reduce(
-        (acc, s) => acc + (completed[stepKey("morning", s.stepOrder, s.product.id)] ? 1 : 0),
-        0,
-      ) +
-      routine.night.steps.reduce(
-        (acc, s) => acc + (completed[stepKey("night", s.stepOrder, s.product.id)] ? 1 : 0),
-        0,
-      )
-    : 0
-
-  const totalSteps = routine ? allSteps.length : 0
-  const progressPct = totalSteps ? Math.round((completedCount / totalSteps) * 100) : 0
-
-  useEffect(() => {
-    if (!storageKey) return
-    try {
-      const raw = localStorage.getItem(storageKey)
-      setCompleted(raw ? (JSON.parse(raw) as Record<string, boolean>) : {})
-    } catch {
-      setCompleted({})
-    }
-  }, [storageKey])
 
   useEffect(() => {
     if (!historyKey) return
     try {
       const raw = localStorage.getItem(historyKey)
-      setHistory(raw ? (JSON.parse(raw) as RoutineUpdateResponseDto[]) : [])
+      const parsed = raw ? (JSON.parse(raw) as RoutineUpdateResponseDto[]) : []
+      setHistory(parsed)
+      if (parsed.length > 0 && !personalizationResult) {
+        setPersonalizationResult(parsed[0])
+      }
     } catch {
       setHistory([])
     }
   }, [historyKey])
 
   useEffect(() => {
+    if (!completedKey) return
+    const raw = localStorage.getItem(completedKey)
+    if (raw) {
+      try {
+        setCompletedSteps(JSON.parse(raw))
+      } catch (e) {
+        console.error("Failed to parse completed steps", e)
+      }
+    }
+  }, [completedKey])
+
+  const toggleStep = (stepId: string) => {
+    if (!completedKey) return
+    setCompletedSteps(prev => {
+      const next = prev.includes(stepId) 
+        ? prev.filter(id => id !== stepId) 
+        : [...prev, stepId]
+      localStorage.setItem(completedKey, JSON.stringify(next))
+      return next
+    })
+  }
+
+  useEffect(() => {
     if (!userId) {
       setError("Veuillez vous connecter pour voir votre routine.")
-      setLoading(false)
       return
     }
 
     const run = async () => {
-      setLoading(true)
-      setError(null)
       try {
-        // Fetch routine and subscription plan in parallel
-        const [res, subData] = await Promise.all([
-           authFetch(`/routine/${userId}`, { method: "GET" }),
-           apiGet<any>(`/subscription/${userId}`).catch(() => ({ plan: 'FREE' }))
-        ]);
-        
-        const data = (await res.json()) as RoutineResponse;
-        setRoutine(data);
+        // Fetch subscription first to correctly resolve PRO access
+        const subData = await apiGet<any>(`/subscription/${userId}`).catch(() => ({ plan: 'FREE' }));
         setCurrentPlan(subData?.plan || 'FREE');
-      } catch {
-        setError("Impossible de charger la routine. Vérifie le backend.");
-        setCurrentPlan('FREE');
-      } finally {
-        setLoading(false);
+
+        // Then fetch routine
+        const res = await authFetch(`/routine/${userId}`, { method: "GET" });
+        if (!res.ok) {
+          throw new Error("Routine fetch failed");
+        }
+        await res.json() as RoutineResponse;
+      } catch (err: any) {
+        console.error("Routine page error:", err);
+      }
+    }
+
+    const fetchLatestAnalysis = async () => {
+      try {
+        const res = await authFetch(`/analysis/user?limit=1`, { method: "GET" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.data && data.data.length > 0) {
+          const latestId = data.data[0].id;
+          const fullRes = await authFetch(`/analysis/${latestId}`, { method: "GET" });
+          if (fullRes.ok) {
+             const fullAnalysis = await fullRes.json();
+             setLatestAnalysis(fullAnalysis);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch latest analysis", err);
+      }
+    };
+
+    const fetchInsights = async () => {
+      try {
+        const insightRes = await skinAgeInsightsService.getInsights(userId).catch(() => null);
+        setSkinAgeInsight(insightRes);
+      } catch (err) {
+        console.error("Failed to fetch insights", err);
       }
     }
 
     run()
-  }, [userId])
+    fetchLatestAnalysis()
+    fetchInsights()
+  }, [userId, personalizing])
 
-  const toggleStep = (routineType: "morning" | "night", stepOrder: number, productId: string) => {
-    const key = stepKey(routineType, stepOrder, productId)
-    setCompleted((prev) => {
-      const next = { ...prev, [key]: !prev[key] }
-      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next))
-      return next
-    })
-  }
+  // Listen for analysis completion and automatically update routine
+  useEffect(() => {
+    if (!userId || currentPlan !== 'PRO' || personalizing) return;
+
+    const handleAnalysisCompleted = async () => {
+      // Check both sessionStorage and localStorage for analysis completion signal
+      const sessionCompleted = sessionStorage.getItem('analysisCompleted');
+      const storageCompleted = localStorage.getItem('analysisJustCompleted');
+      
+      if (sessionCompleted || storageCompleted) {
+        // Clear the signals
+        sessionStorage.removeItem('analysisCompleted');
+        localStorage.removeItem('analysisJustCompleted');
+        
+        // Auto-update routine
+        console.log('Auto-updating routine after new analysis...');
+        await handleUpdateRoutine();
+      }
+    }
+
+    // Check on mount
+    handleAnalysisCompleted();
+
+    // Set up interval to check for analysis completion every 2 seconds
+    const interval = setInterval(handleAnalysisCompleted, 2000);
+    
+    // Also listen for storage changes from other tabs
+    window.addEventListener('storage', handleAnalysisCompleted);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleAnalysisCompleted);
+    };
+  }, [userId, currentPlan, personalizing])
+
 
   const handleUpdateRoutine = async () => {
     if (!userId) return
@@ -145,9 +170,8 @@ export default function RoutinesPage() {
     setError(null)
     try {
       const result = await updateRoutine({ forceRegenerate: true })
-      setRoutine(result.routine as any)
       setPersonalizationResult(result)
-      
+
       // Save to history
       const newHistory = [{ ...result, createdAt: new Date().toISOString() }, ...history].slice(0, 10)
       setHistory(newHistory)
@@ -156,6 +180,29 @@ export default function RoutinesPage() {
       setError(err?.message || "Erreur lors de la mise à jour de la routine.")
     } finally {
       setPersonalizing(false)
+    }
+  }
+
+  const handleDownloadReport = async () => {
+    if (!userId || !personalizationResult) return;
+    setIsGeneratingPdf(true);
+    try {
+      await generateClinicalReport({
+        user: user,
+        plan: currentPlan,
+        routine: {
+          ...personalizationResult,
+          morning: fullRoutineData?.morning || [],
+          night: fullRoutineData?.night || []
+        },
+        insight: skinAgeInsight,
+        analysis: latestAnalysis,
+        products: fullRoutineData?.recommendedProducts || []
+      });
+    } catch (err) {
+      console.error("PDF Generation failed:", err);
+    } finally {
+      setIsGeneratingPdf(false);
     }
   }
 
@@ -182,7 +229,7 @@ export default function RoutinesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 py-10 relative">
-      
+
       {/* LOCK OVERLAY FOR FREE USERS */}
       {currentPlan === 'FREE' && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-10 text-center bg-white/60 backdrop-blur-xl">
@@ -193,17 +240,17 @@ export default function RoutinesPage() {
             Routine Personnalisée <span className="text-[#0d9488]">PRO</span>
           </h1>
           <p className="mb-8 max-w-md text-lg font-medium text-slate-500 leading-relaxed">
-            Le Routine Builder intelligent, qui adapte vos soins selon vos analyses IA, 
+            Le Routine Builder intelligent, qui adapte vos soins selon vos analyses IA,
             est réservé aux membres PRO. Optimisez votre routine maintenant !
           </p>
           <div className="flex gap-4">
-            <button 
+            <button
               onClick={() => navigate('/dashboard')}
               className="px-8 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
             >
               Retour
             </button>
-            <button 
+            <button
               onClick={() => navigate('/upgrade')}
               className="flex items-center gap-2 rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#10b981] px-10 py-4 text-lg font-black text-white shadow-xl shadow-teal-500/20 hover:scale-105 transition-all"
             >
@@ -223,6 +270,11 @@ export default function RoutinesPage() {
                 <Sparkles size={14} />
                 Routine Builder
               </div>
+              {error && (
+                <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
 
               <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">Ta routine AM / PM</h1>
               <p className="mt-1 text-sm text-slate-600">
@@ -230,64 +282,19 @@ export default function RoutinesPage() {
               </p>
             </div>
 
-            <div className="md:w-[340px]">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-sm font-semibold text-slate-800">
-                  Progression
-                  <span className="ml-2 inline-flex items-center rounded-full bg-teal-50 border border-teal-100 px-2 py-0.5 text-xs font-bold text-teal-700">
-                    {progressPct}%
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500">{completedCount}/{totalSteps} étapes</div>
-              </div>
-              <div className="mt-3 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-teal-500 to-cyan-500"
-                  style={{ width: `${progressPct}%`, transition: "width 350ms ease" }}
-                />
-              </div>
-
-              <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-1">
-                    <button
-                      onClick={() => setPanel("all")}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-xs font-bold transition ${
-                        panel === "all" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      Tout
-                    </button>
-                    <button
-                      onClick={() => setPanel("morning")}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-xs font-bold transition ${
-                        panel === "morning"
-                          ? "bg-teal-600 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      AM
-                    </button>
-                    <button
-                      onClick={() => setPanel("night")}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-xs font-bold transition ${
-                        panel === "night" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      PM
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleUpdateRoutine}
-                  disabled={personalizing}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-700 disabled:opacity-50 transition"
-                >
-                  {personalizing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-                  Mettre à jour
-                </button>
-              </div>
+            <div className="flex gap-3">
+               <button
+                 onClick={handleDownloadReport}
+                 disabled={isGeneratingPdf || !personalizationResult}
+                 className="flex items-center gap-2 rounded-2xl border border-teal-200 bg-white px-5 py-3 text-sm font-bold text-teal-700 shadow-sm hover:bg-teal-50 disabled:opacity-50 transition-all"
+               >
+                 {isGeneratingPdf ? (
+                   <RefreshCw size={18} className="animate-spin" />
+                 ) : (
+                   <FileText size={18} />
+                 )}
+                 Clinical PDF Report
+               </button>
             </div>
           </div>
         </div>
@@ -295,217 +302,61 @@ export default function RoutinesPage() {
         {personalizationResult && (
           <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="rounded-3xl border border-indigo-100 bg-indigo-50/50 p-6 backdrop-blur">
-              <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="text-indigo-600" size={20} />
-                    <h2 className="text-lg font-black text-slate-900">Analyse & Ajustements</h2>
-                    <span className="ml-auto rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                      Peau {personalizationResult.inferredSkinType}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <TrendCard label="Hydratation" detail={personalizationResult.trends.hydration} />
-                    <TrendCard label="Sébum" detail={personalizationResult.trends.oil} />
-                    <TrendCard label="Acné" detail={personalizationResult.trends.acne} />
-                    <TrendCard label="Rides" detail={personalizationResult.trends.wrinkles} />
-                  </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="text-indigo-600" size={20} />
+                  <h2 className="text-lg font-black text-slate-900">Analyse & Ajustements</h2>
+                  <span className="ml-auto rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                    Peau {personalizationResult.inferredSkinType}
+                  </span>
                 </div>
 
-                <div className="lg:w-1/3 border-t lg:border-t-0 lg:border-l border-indigo-100 pt-6 lg:pt-0 lg:pl-6">
-                  <div className="text-sm font-bold text-slate-800 mb-3">Règles appliquées :</div>
-                  <ul className="space-y-3">
-                    {personalizationResult.adjustments.map((adj, i) => (
-                      <li key={i} className="flex gap-3">
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                          <Check size={12} strokeWidth={3} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-extrabold text-slate-900">{adj.action}</p>
-                          <p className="text-[10px] text-slate-500">{adj.reason}</p>
-                        </div>
-                      </li>
-                    ))}
-                    {personalizationResult.adjustments.length === 0 && (
-                      <li className="text-xs italic text-slate-500">Aucun ajustement majeur nécessaire.</li>
-                    )}
-                  </ul>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <TrendCard label="Hydratation" detail={personalizationResult.trends.hydration} />
+                  <TrendCard label="Sébum" detail={personalizationResult.trends.oil} />
+                  <TrendCard label="Acné" detail={personalizationResult.trends.acne} />
+                  <TrendCard label="Rides" detail={personalizationResult.trends.wrinkles} />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="mt-6">
-          {loading && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">Chargement...</div>
-          )}
-          {!loading && error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700 shadow-sm">{error}</div>
-          )}
-          {!loading && !error && !routine && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">
-              Aucune routine disponible pour le moment.
-            </div>
-          )}
+        {/* ══ SECTION: PRODUITS RECOMMANDÉS SVR (DYNAMIC AI) ══ */}
+        <div className="mt-8 mb-8">
 
-          {!loading && routine && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {(["morning", "night"] as const).map((type) => {
-                if (panel !== "all" && panel !== type) return null
 
-                const title = type === "morning" ? "Matin (AM)" : "Soir (PM)"
-                const Icon = type === "morning" ? Sun : Moon
-                const steps = routine[type].steps
-                const doneForPanel = steps.reduce((acc, s) => acc + (completed[stepKey(type, s.stepOrder, s.product.id)] ? 1 : 0), 0)
-
-                return (
-                  <div
-                    key={type}
-                    className="rounded-3xl border border-teal-100/70 bg-white/80 backdrop-blur p-5 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-4 mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700">
-                          <Icon size={18} />
-                        </div>
-                        <div>
-                          <div className="text-sm font-extrabold text-slate-900">{title}</div>
-                          <div className="text-xs text-slate-500">{doneForPanel}/{steps.length} étapes faites</div>
-                        </div>
-                      </div>
-                      <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600">
-                        3 étapes
-                      </div>
-                    </div>
-
-                    <ol className="relative">
-                      {steps.map((s, idx) => {
-                        const key = stepKey(type, s.stepOrder, s.product.id)
-                        const isDone = !!completed[key]
-                        const productHref = normalizeExternalUrl(s.product.url)
-
-                        return (
-                          <li key={key} className="relative pl-12 pb-4 last:pb-0">
-                            {idx !== steps.length - 1 && (
-                              <div className="absolute left-[18px] top-[44px] bottom-[-6px] w-px bg-gradient-to-b from-teal-200 to-slate-200" />
-                            )}
-
-                            <div className="absolute left-0 top-0 flex h-9 w-9 items-center justify-center rounded-2xl border shadow-sm">
-                              <button
-                                type="button"
-                                aria-label={`Toggle step ${s.stepOrder}`}
-                                onClick={() => toggleStep(type, s.stepOrder, s.product.id)}
-                                className={`h-9 w-9 rounded-2xl border transition ${
-                                  isDone
-                                    ? "bg-gradient-to-br from-teal-600 to-cyan-500 border-teal-600 text-white"
-                                    : "bg-white border-teal-200 text-teal-700 hover:bg-teal-50"
-                                }`}
-                              >
-                                {isDone ? <Check size={18} /> : <span className="text-xs font-extrabold">{s.stepOrder}</span>}
-                              </button>
-                            </div>
-
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="text-sm font-extrabold text-slate-900">
-                                    {s.stepName}
-                                  </div>
-                                  <div className="mt-1 text-xs font-bold text-slate-500">{s.product.type}</div>
-                                </div>
-                                <div className="text-xs font-bold text-slate-600 bg-white/80 border border-slate-200 rounded-full px-2 py-1">
-                                  £{s.product.price.toFixed(2)}
-                                </div>
-                              </div>
-
-                              <div className="mt-2 text-sm font-semibold text-slate-800">{s.product.name}</div>
-
-                              {s.adjustmentReason && (
-                                <div className="mt-2 flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-2 py-1.5 text-[10px] font-bold text-indigo-700">
-                                  <AlertCircle size={12} />
-                                  {s.adjustmentReason}
-                                </div>
-                              )}
-
-                              {productHref ? (
-                                <a
-                                  href={productHref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-teal-600 text-white px-3 py-2 text-xs font-extrabold shadow-sm hover:brightness-105 transition"
-                                >
-                                  <ShoppingBag size={14} />
-                                  Acheter
-                                </a>
-                              ) : (
-                                <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-100 text-slate-500 px-3 py-2 text-xs font-extrabold border border-slate-200">
-                                  <ShoppingBag size={14} />
-                                  Lien indisponible
-                                </div>
-                              )}
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ol>
-                  </div>
-                )
-              })}
+          {personalizationResult && (
+            <div className="mt-2">
+              <SvrRoutinePanel
+                key={`${personalizationResult.personalizationId}-${latestAnalysis?.id || 'loading'}`}
+                profile={{
+                  skinType: (personalizationResult.inferredSkinType || latestAnalysis?.aiRawResponse?.globalAnalysis?.dominantCondition || 'Normal') as any,
+                  age: Number(localStorage.getItem('userAge')) || latestAnalysis?.realAge || latestAnalysis?.skinAge || 30,
+                  gender: (localStorage.getItem('userGender') || 'Female') as 'Female' | 'Male' | 'Other',
+                  concerns: personalizationResult.adjustments?.map(adj => adj.reason) || latestAnalysis?.aiRawResponse?.conditionScores?.filter((c:any) => c.score && c.score > 40).map((c:any) => c.type) || [],
+                  acneLevel: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'acne')?.score || personalizationResult.trends?.acne?.current || 0,
+                  wrinklesDepth: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'wrinkles')?.score || personalizationResult.trends?.wrinkles?.current || 0,
+                  hydrationLevel: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'hydration')?.score || personalizationResult.trends?.hydration?.current || 100,
+                  blackheadsLevel: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'blackheads')?.score || 0,
+                  poreSize: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'pores')?.score || personalizationResult.trends?.oil?.current || 0,
+                  rednessLevel: latestAnalysis?.aiRawResponse?.conditionScores?.find((c:any) => c.type === 'redness')?.score || 0,
+                  sensitivityLevel: 50,
+                }}
+                currentPlan={currentPlan}
+                displayMode="routine"
+                completedSteps={completedSteps}
+                onToggleStep={toggleStep}
+                onRoutineLoad={setFullRoutineData}
+              />
             </div>
           )}
         </div>
 
-        <div className="mt-12">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
-              <History size={16} />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Historique des personnalisations</h2>
-          </div>
-
-          <div className="space-y-4">
-            {history.map((item, i) => (
-              <div key={item.personalizationId + i} className="group relative rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-teal-200 transition">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-2 w-2 rounded-full ${item.trends.globalScoreTrend === 'improving' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    <div>
-                      <div className="text-xs font-black text-slate-900">
-                        {new Date(item.createdAt || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                        {item.analysisCount} analyses prises en compte • Type {item.inferredSkinType}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-1">
-                      {item.adjustments.slice(0, 3).map((_, idx) => (
-                        <div key={idx} className="h-5 w-5 rounded-full border-2 border-white bg-indigo-100" />
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-600">
-                      {item.adjustments.length} ajustements
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {history.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-                <p className="text-sm font-medium text-slate-500">Aucun historique disponible. Cliquez sur "Mettre à jour" pour commencer.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="mt-12 text-center text-xs text-slate-400">
           Astuce: une routine simple et répétée donne de meilleurs résultats qu’une routine trop complexe.
         </div>
       </div>
     </div>
   )
 }
-

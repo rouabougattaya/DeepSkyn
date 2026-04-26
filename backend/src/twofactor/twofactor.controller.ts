@@ -187,9 +187,14 @@ export class TwoFactorController {
   @Get('status')
   @UseGuards(JwtAccessGuard)
   async getTwoFaStatus(@CurrentUser() user: User) {
+    const fullUser = await this.userRepository.findOne({
+      where: { id: user.id },
+      select: ['isTwoFAEnabled'],
+    });
+    
     return {
       success: true,
-      isTwoFAEnabled: user.isTwoFAEnabled,
+      isTwoFAEnabled: fullUser?.isTwoFAEnabled || false,
     };
   }
 }

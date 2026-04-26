@@ -44,12 +44,12 @@ export function WeatherAdaptiveWidget() {
     return (
       <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
         <div className="flex items-center gap-2 text-red-500 mb-2">
-           <AlertCircle size={16} />
-           <span className="text-xs font-bold uppercase tracking-wider">Erreur Météo</span>
+          <AlertCircle size={16} />
+          <span className="text-xs font-bold uppercase tracking-wider">Erreur Météo</span>
         </div>
         <p className="text-xs text-gray-500 mb-4">{error}</p>
-        <button 
-          onClick={fetchData} 
+        <button
+          onClick={fetchData}
           className="text-[10px] font-bold text-teal-600 hover:text-teal-700 underline"
         >
           Réessayer
@@ -87,38 +87,38 @@ export function WeatherAdaptiveWidget() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex gap-4">
             <div className="flex flex-col items-center">
-               <div className="text-xl font-black text-gray-800">{Math.round(data.temp)}°</div>
-               <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
-                 <Thermometer size={8} /> Temp
-               </div>
+              <div className="text-xl font-black text-gray-800">{Math.round(data.temp)}°</div>
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+                <Thermometer size={8} /> Temp
+              </div>
             </div>
             <div className="w-[1px] bg-gray-100"></div>
             <div className="flex flex-col items-center">
-               <div className="text-xl font-black text-gray-800">{data.humidity}%</div>
-               <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
-                 <Droplets size={8} /> Humid
-               </div>
+              <div className="text-xl font-black text-gray-800">{data.humidity}%</div>
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+                <Droplets size={8} /> Humid
+              </div>
             </div>
             <div className="w-[1px] bg-gray-100"></div>
             <div className="flex flex-col items-center">
-               <div className="text-xl font-black text-gray-800">{data.uvIndex}</div>
-               <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
-                 <Sun size={8} /> UV
-               </div>
+              <div className="text-xl font-black text-gray-800">{data.uvIndex}</div>
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+                <Sun size={8} /> UV
+              </div>
             </div>
           </div>
         </div>
 
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
           <div className="flex items-start gap-3">
-             <span className="text-2xl pt-1">{advice.icon}</span>
-             <div>
-                <h4 className="text-sm font-bold text-gray-800 mb-1">{advice.title}</h4>
-                <p className="text-xs text-gray-500 leading-relaxed mb-2">{advice.advice}</p>
-                <div className="py-1.5 px-3 bg-white rounded-lg border border-teal-100 text-[11px] font-bold text-teal-700 shadow-sm inline-block">
-                   {advice.recommendation}
-                </div>
-             </div>
+            <span className="text-2xl pt-1">{advice.icon}</span>
+            <div>
+              <h4 className="text-sm font-bold text-gray-800 mb-1">{advice.title}</h4>
+              <p className="text-xs text-gray-500 leading-relaxed mb-2">{advice.advice}</p>
+              <div className="py-1.5 px-3 bg-white rounded-lg border border-teal-100 text-[11px] font-bold text-teal-700 shadow-sm inline-block">
+                {advice.recommendation}
+              </div>
+            </div>
           </div>
         </div>
       </div>

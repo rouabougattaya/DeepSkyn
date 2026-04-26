@@ -1,15 +1,15 @@
 import { Controller, Get, Delete, Param, UseGuards, Req, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { SessionService } from './session.service';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 
 @Controller('auth/sessions')
-@UseGuards(AuthGuard('jwt')) // ← Ça devrait maintenant fonctionner
+@UseGuards(JwtAccessGuard)
 export class SessionController {
   constructor(private sessionService: SessionService) {}
 
   @Get()
   async getSessions(@Req() req) {
-    const userId = req.user.userId; // ← req.user est maintenant peuplé par JwtStrategy
+    const userId = req.user.id;
     const sessions = await this.sessionService.getUserSessions(userId);
     
     const refreshToken = req.cookies?.refreshToken || 
@@ -29,7 +29,7 @@ export class SessionController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeSession(@Param('id') sessionId: string, @Req() req) {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     if (!sessionId) {
       throw new BadRequestException('Session ID manquant');
     }
@@ -40,7 +40,7 @@ export class SessionController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeAllOtherSessions(@Req() req) {
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const refreshToken =
       req.cookies?.refreshToken || req.headers['x-refresh-token'];

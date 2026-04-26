@@ -234,6 +234,69 @@ export default function ComparisonPage() {
     });
   };
 
+  /**
+   * Génère un paragraphe explicatif dynamique en français basé sur les résultats.
+   */
+  const getExplanatoryText = () => {
+    if (!result || !result.differences) return null;
+
+    const { globalTrend, differences } = result;
+    const hydration = differences.find((d) => d.metric === 'hydration');
+    const acne = differences.find((d) => d.metric === 'acne');
+    const wrinkles = differences.find((d) => d.metric === 'wrinkles');
+
+    const sections: string[] = [];
+
+    // Hydratation
+    if (hydration) {
+      if (hydration.trend === 'improvement') {
+        sections.push(
+          `Votre hydratation a augmenté de ${Math.abs(hydration.delta).toFixed(
+            1
+          )} points, ce qui est excellent pour la barrière cutanée !`
+        );
+      } else if (hydration.trend === 'regression') {
+        sections.push(
+          `Votre hydratation a baissé de ${Math.abs(hydration.delta).toFixed(
+            1
+          )} points, ce qui peut fragiliser votre peau.`
+        );
+      }
+    }
+
+    // Acné / Rides
+    if (acne && acne.trend === 'improvement') {
+      sections.push('Votre acné montre des signes de diminution, bravo !');
+    } else if (acne && acne.trend === 'regression') {
+      sections.push(
+        "On observe une petite poussée d'acné, restez régulier sur le nettoyage."
+      );
+    }
+
+    if (wrinkles && wrinkles.trend === 'regression') {
+      sections.push('En revanche, vos rides ont légèrement augmenté.');
+    } else if (wrinkles && wrinkles.trend === 'improvement') {
+      sections.push('Vos rides se sont estompées, continuez vos soins anti-âge.');
+    }
+
+    // Conseil final selon la tendance globale
+    if (globalTrend === 'improvement') {
+      sections.push(
+        'Votre peau est sur la bonne voie, restez constant dans vos efforts !'
+      );
+    } else if (globalTrend === 'regression') {
+      sections.push(
+        'Votre peau a besoin de plus de soin en ce moment, pensez à ajuster votre routine.'
+      );
+    } else {
+      sections.push(
+        'Votre peau est stable, continuez ainsi pour maintenir ces résultats.'
+      );
+    }
+
+    return sections.join(' ');
+  };
+
   return (
     <div className="comparison-root">
       <style>{`
@@ -979,6 +1042,17 @@ export default function ComparisonPage() {
               <p className="summary-text">
                 {result.summaryText ?? 'Comparison completed.'}
               </p>
+
+              {/* Paragraphe explicatif dynamique */}
+              <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3 fade-in">
+                <span className="text-xl" role="img" aria-label="light-bulb">
+                  💡
+                </span>
+                <p className="text-slate-700 text-sm leading-relaxed">
+                  <strong className="text-slate-900">À retenir :</strong>{' '}
+                  {getExplanatoryText()}
+                </p>
+              </div>
               <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <CheckCircle size={16} style={{ color: '#10b981', marginRight: 6 }} />
                 <span style={{ fontSize: 12, color: '#64748b' }}>

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Like, Repository } from 'typeorm';
 import { Routine } from './routine.entity';
@@ -7,6 +7,7 @@ import { Product } from '../products/entities/product.entity';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 import { RecommendationService } from '../recommendation/recommendation.service';
 import { IncompatibilityService } from './incompatibility.service';
+import { OpenRouterService } from '../ai/openrouter.service';
 
 export type RoutineStepName = 'Cleanser' | 'Serum' | 'Moisturizer';
 
@@ -49,6 +50,8 @@ function normalizeType(type: unknown): string {
 
 @Injectable()
 export class RoutineService {
+  private readonly logger = new Logger(RoutineService.name);
+
   constructor(
     @InjectRepository(Routine)
     private readonly routineRepository: Repository<Routine>,
@@ -60,24 +63,70 @@ export class RoutineService {
     private readonly skinAnalysisRepository: Repository<SkinAnalysis>,
     private readonly recommendationService: RecommendationService,
     private readonly incompatibilityService: IncompatibilityService,
+    private readonly openRouterService: OpenRouterService,
   ) { }
 
   async getOrGenerateRoutine(userId: string): Promise<RoutineResponseDto> {
-    // Récupérer la dernière analyse complétée pour adapter le builder
+    // 1. Récupérer la dernière analyse complétée
     const lastAnalysis = await this.skinAnalysisRepository.findOne({
       where: { userId, status: 'COMPLETED' },
       order: { createdAt: 'DESC' },
     });
 
+    if (!lastAnalysis) {
+      this.logger.warn(`Aucune analyse trouvée pour l'utilisateur ${userId}. Génération d'une routine générique.`);
+    }
+
     const skinType = inferSkinTypeFromAnalysis(lastAnalysis);
     const skinTypeLower = skinType === 'Normal' ? null : skinType.toLowerCase();
+    
+    // 2. Récupérer les recommandations liées à CETTE analyse spécifique
+    // Si pas de recommendations pour cette analyse, on en génère de nouvelles
+    let recommendations: any[] = [];
+    if (lastAnalysis) {
+      recommendations = await this.recommendationService.getRecommendationsForAnalysis(lastAnalysis.id);
+    }
 
-    // Générer des recommandations à partir du skinType inféré
-    const recommendations = await this.recommendationService.getRecommendationsForSkinState(
-      userId,
-      'routine_temp',
-      skinType,
-    );
+    // Fallback si aucune recommandation trouvée pour l'analyse
+    if (!recommendations || recommendations.length === 0) {
+      this.logger.log(`Pas de recommandations enregistrées pour l'analyse ${lastAnalysis?.id}. Utilisation des dernières recommandations globales.`);
+      recommendations = await this.recommendationService.getLatestFinalRecommendationsForUser(userId);
+    }
+
+    // Second fallback : génération à la volée si vraiment rien de stocké
+    if (!recommendations || recommendations.length === 0) {
+      this.logger.log(`Génération de recommandations à la volée pour la routine (Type: ${skinType})`);
+      recommendations = await this.recommendationService.getRecommendationsForSkinState(
+          userId,
+          lastAnalysis?.id || 'routine_temp',
+          skinType,
+        );
+    }
+
+    this.logger.log(`Base de ${recommendations.length} produits pour générer la routine.`);
+
+    let aiRoutine: any = null;
+    if (recommendations.length > 0) {
+      try {
+        aiRoutine = await this.openRouterService.generateRoutineFromRecommendations({
+          recommendations,
+          analysisResult: {
+            skinType,
+            hydration: lastAnalysis?.hydration ?? null,
+            acne: lastAnalysis?.acne ?? null,
+            wrinkles: lastAnalysis?.wrinkles ?? null,
+            oil: lastAnalysis?.oil ?? null,
+            skinScore: lastAnalysis?.skinScore ?? null,
+            skinAge: lastAnalysis?.skinAge ?? null,
+          },
+        });
+        this.logger.log(`Routine IA générée avec succès.`);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.error(`Erreur lors de la génération de la routine par l'IA: ${errorMessage}`);
+        aiRoutine = null;
+      }
+    }
 
     // Persist routines
     // Note: on régénère à chaque appel pour rester cohérent avec l'analyse la plus récente.
@@ -101,6 +150,23 @@ export class RoutineService {
         return items[idx];
       };
 
+      const fromAi = type === 'AM' ? aiRoutine?.morning : aiRoutine?.night;
+      if (Array.isArray(fromAi) && fromAi.length > 0) {
+        return fromAi
+          .map((step: any, index: number) => {
+            const matched = (recommendations || []).find((r: any) => r?.name === step?.productName);
+            if (!matched) return null;
+
+            return {
+              stepOrder: index + 1,
+              stepName: (step?.stepName || 'Serum') as RoutineStepName,
+              rec: matched,
+              notes: [step?.instruction, step?.reason].filter(Boolean).join(' '),
+            };
+          })
+          .filter(Boolean);
+      }
+
       const cleaners = (recommendations || []).filter((p: any) => {
         const t = normalizeType(p?.type).toLowerCase();
         return t.includes('cleanser');
@@ -120,9 +186,9 @@ export class RoutineService {
       const moisturizerRec = type === 'AM' ? pickNth(moisturizers, 0) : pickNth(moisturizers, 1);
 
       return [
-        { stepOrder: 1, stepName: 'Cleanser' as const, rec: cleanserRec },
-        { stepOrder: 2, stepName: 'Serum' as const, rec: serumRec },
-        { stepOrder: 3, stepName: 'Moisturizer' as const, rec: moisturizerRec },
+        { stepOrder: 1, stepName: 'Cleanser' as const, rec: cleanserRec, notes: 'Utiliser en premiere etape pour nettoyer la peau.' },
+        { stepOrder: 2, stepName: 'Serum' as const, rec: serumRec, notes: 'Appliquer sur peau propre avant la creme.' },
+        { stepOrder: 3, stepName: 'Moisturizer' as const, rec: moisturizerRec, notes: 'Sceller l hydratation en derniere etape.' },
       ];
     };
 
@@ -190,17 +256,19 @@ export class RoutineService {
       });
     };
 
+    const allowFallbackProduct = recommendations.length === 0;
+
     const buildAndSaveSteps = async (routineId: string, steps: any[]) => {
       const resolved = await Promise.all(
         steps.map(async (s) => {
           const productFromRec = await resolveProduct(s.rec);
-          const product = productFromRec ?? (await findFallbackProduct(s.stepName as RoutineStepName));
+          const product = productFromRec ?? (allowFallbackProduct ? (await findFallbackProduct(s.stepName as RoutineStepName)) : null);
           if (!product) return null; // still possible if DB is empty/unseeded
           const step = this.routineStepRepository.create({
             routineId,
             productId: product.id,
             stepOrder: s.stepOrder,
-            notes: s.stepName,
+            notes: s.notes || s.stepName,
           });
           return step;
         }),

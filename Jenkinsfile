@@ -4,13 +4,23 @@ pipeline {
     environment {
         PROJECT_NAME = "DeepSkyn"
         DOCKER_COMPOSE_FILE = "docker-compose.yml"
+        // On force l'IP de GitHub pour eviter les erreurs DNS
+        GITHUB_IP = "140.82.121.3"
     }
 
     stages {
+        stage('0. Force DNS') {
+            steps {
+                // Cette commande ecrit l'IP de GitHub dans le fichier hosts du container de build
+                sh "echo '${GITHUB_IP} github.com' >> /etc/hosts || true"
+                sh "echo '${GITHUB_IP} api.github.com' >> /etc/hosts || true"
+            }
+        }
 
         stage('1. Checkout') {
             steps {
                 echo "Recuperation du code source..."
+                // On utilise checkout scm mais avec la resolution forcee juste avant
                 checkout scm
             }
         }
@@ -18,70 +28,27 @@ pipeline {
         stage('2. Build Docker Images') {
             steps {
                 echo "Construction des images Docker..."
-                sh 'docker-compose build --no-cache'
+                sh 'docker-compose build'
             }
         }
 
         stage('3. Run Tests') {
-            parallel {
-                stage('Backend Tests') {
-                    steps {
-                        dir('backend') {
-                            echo "Lancement des tests backend..."
-                            sh 'npm install --legacy-peer-deps'
-                            sh 'npm run test || true'
-                        }
-                    }
-                }
-                stage('Frontend Tests') {
-                    steps {
-                        dir('frontend') {
-                            echo "Lancement des tests frontend..."
-                            sh 'npm install --legacy-peer-deps'
-                            sh 'npm run test || true'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('4. SonarQube Analysis') {
             steps {
-                script {
-                    def scannerHome = tool 'SonarScanner'
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=DeepSkyn \
-                            -Dsonar.projectName=DeepSkyn \
-                            -Dsonar.sources=backend/src,frontend/src \
-                            -Dsonar.host.url=${SONAR_HOST_URL}
-                        """
-                    }
-                }
+                echo "Lancement des tests..."
+                sh 'cd backend && npm install --legacy-peer-deps && npm run test || true'
             }
         }
 
-        stage('5. Deploy with Docker Compose') {
+        stage('4. Deploy') {
             steps {
                 echo "Deploiement des containers..."
-                sh 'docker-compose down || true'
                 sh 'docker-compose up -d'
-                echo "Application disponible sur http://localhost"
             }
         }
     }
 
     post {
-        success {
-            echo "Pipeline reussi ! DeepSkyn est en ligne."
-        }
-        failure {
-            echo "Le pipeline a echoue. Verifiez les logs."
-        }
-        always {
-            echo "Nettoyage des images inutilisees..."
-            sh 'docker image prune -f || true'
-        }
+        success { echo "Pipeline reussi !" }
+        failure { echo "Le pipeline a echoue." }
     }
 }

@@ -1,10 +1,12 @@
 // frontend/src/pages/SessionsPage.tsx
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { sessionService } from '../services/session.service';
 import type { Session } from '../services/session.service';
 import { Smartphone, Shield, AlertTriangle, Clock, Monitor, Smartphone as MobileIcon } from 'lucide-react'; // ← AJOUTE LES ICÔNES
 
 export const SessionsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export const SessionsPage: React.FC = () => {
       const data = await sessionService.getSessions();
       setSessions(data);
     } catch (error) {
-      setError('Error while loading sessions');
+      setError(t('common.error'));
       console.error('Error loading sessions:', error);
     } finally {
       setLoading(false);
@@ -35,7 +37,7 @@ export const SessionsPage: React.FC = () => {
   };
 
   const handleRevokeAll = async () => {
-    if (window.confirm('Are you sure you want to revoke all other sessions?')) {
+    if (window.confirm(t('sessions.confirm_revoke_all', { defaultValue: 'Are you sure you want to revoke all other sessions?' }))) {
       try {
         await sessionService.revokeAllSessions();
         setSessions(sessions.filter(s => s.isCurrent));
@@ -51,19 +53,19 @@ export const SessionsPage: React.FC = () => {
         return {
           class: 'bg-red-100 text-red-700 border-red-200',
           icon: <AlertTriangle className="w-4 h-4" />,
-          label: 'High risk'
+          label: t('sessions.risk.high')
         };
       case 'medium':
         return {
           class: 'bg-yellow-100 text-yellow-700 border-yellow-200',
           icon: <AlertTriangle className="w-4 h-4" />,
-          label: 'Medium risk'
+          label: t('sessions.risk.medium')
         };
       default:
         return {
           class: 'bg-green-100 text-green-700 border-green-200',
           icon: <Shield className="w-4 h-4" />,
-          label: 'Low risk'
+          label: t('sessions.risk.low')
         };
     }
   };
@@ -79,7 +81,7 @@ export const SessionsPage: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading sessions...</p>
+          <p className="text-slate-600">{t('sessions.loading', { defaultValue: 'Loading sessions...' })}</p>
         </div>
       </div>
     );
@@ -95,7 +97,7 @@ export const SessionsPage: React.FC = () => {
             onClick={loadSessions}
             className="mt-4 px-6 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
           >
-            Retry
+            {t('common.retry', { defaultValue: 'Retry' })}
           </button>
         </div>
       </div>
@@ -109,10 +111,10 @@ export const SessionsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
-              My active sessions
+              {t('sessions.title')}
             </h1>
             <p className="text-slate-500">
-              Manage your connected devices with DeepSkyn
+              {t('sessions.subtitle')}
             </p>
           </div>
 
@@ -122,7 +124,7 @@ export const SessionsPage: React.FC = () => {
               className="px-6 py-3 bg-white hover:bg-red-50 text-red-600 font-medium rounded-xl border border-red-200 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
             >
               <Shield className="w-4 h-4" />
-              Revoke all other sessions
+              {t('sessions.revoke_all')}
             </button>
           )}
         </div>
@@ -132,8 +134,8 @@ export const SessionsPage: React.FC = () => {
           {sessions.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
               <Smartphone className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 text-lg">No active sessions found</p>
-              <p className="text-slate-400 text-sm mt-2">Log in from another device to see your sessions</p>
+              <p className="text-slate-500 text-lg">{t('sessions.empty')}</p>
+              <p className="text-slate-400 text-sm mt-2">{t('sessions.empty_hint')}</p>
             </div>
           ) : (
             sessions.map(session => {
@@ -154,11 +156,11 @@ export const SessionsPage: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-3 mb-2">
                           <h3 className="font-semibold text-slate-900">
-                            {session.fingerprint.browser || 'Unknown browser'} on {session.fingerprint.os || 'Unknown system'}
+                            {session.fingerprint.browser || t('sessions.unknown_browser', { defaultValue: 'Unknown browser' })} on {session.fingerprint.os || t('sessions.unknown_system', { defaultValue: 'Unknown system' })}
                           </h3>
                           {session.isCurrent && (
                             <span className="px-3 py-1 bg-[#0d9488]/10 text-[#0d9488] text-xs font-medium rounded-full border border-[#0d9488]/20">
-                              Current session
+                              {t('sessions.current_session')}
                             </span>
                           )}
                         </div>
@@ -166,11 +168,11 @@ export const SessionsPage: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                           <div className="flex items-center gap-2 text-slate-600">
                             <Clock className="w-4 h-4 text-slate-400" />
-                            <span>Last activity: {new Date(session.lastActivity).toLocaleString()}</span>
+                            <span>{t('sessions.last_activity', { defaultValue: 'Last activity' })}: {new Date(session.lastActivity).toLocaleString()}</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-600">
                             <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">
-                              IP: {session.fingerprint.ip}
+                              {t('sessions.ip', { defaultValue: 'IP' })}: {session.fingerprint.ip}
                             </span>
                           </div>
                         </div>
@@ -200,7 +202,7 @@ export const SessionsPage: React.FC = () => {
                           onClick={() => handleRevoke(session.id)}
                           className="px-5 py-2.5 bg-white hover:bg-red-50 text-red-600 font-medium rounded-xl border border-red-200 transition-all hover:shadow-md text-sm"
                         >
-                          Revoke
+                          {t('sessions.revoke')}
                         </button>
                       )}
                     </div>
@@ -215,8 +217,7 @@ export const SessionsPage: React.FC = () => {
         <div className="mt-8 p-4 bg-white rounded-xl border border-slate-200 flex items-center gap-3">
           <Shield className="w-5 h-5 text-[#0d9488] flex-shrink-0" />
           <p className="text-sm text-slate-600">
-            Sessions are automatically deleted after 7 days of inactivity.
-            You can manually revoke any session at any time.
+            {t('sessions.footer_info', { defaultValue: 'Sessions are automatically deleted after 7 days of inactivity. You can manually revoke any session at any time.' })}
           </p>
         </div>
       </div>

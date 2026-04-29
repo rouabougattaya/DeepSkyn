@@ -1,0 +1,7 @@
+pipeline {
+    agent any
+    stages {
+        stage('Build & Push') { steps { sh "docker build -t backend:{name}-latest ./backend" } }
+        stage('Deploy') { steps { sh "kubectl set image deployment/backend-{name} backend=backend:{name}-latest" } }
+    }
+}

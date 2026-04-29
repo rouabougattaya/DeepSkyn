@@ -12,8 +12,10 @@ import {
     FlaskConical,
     Loader2
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function SkinRecommendationsPage() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const user = getUser();
@@ -111,7 +113,7 @@ export default function SkinRecommendationsPage() {
                 }
             }
 
-            setLoadError('Aucun profil trouvé. Veuillez lancer une analyse cutanée d\'abord.');
+            setLoadError(t('recommendations.error_load', { defaultValue: 'Aucun profil trouvé. Veuillez lancer une analyse cutanée d\'abord.' }));
             setLoading(false);
         };
 
@@ -130,7 +132,7 @@ export default function SkinRecommendationsPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <Loader2 className="w-10 h-10 text-teal-500 animate-spin" />
-                <p className="text-slate-500 font-medium italic">Récupération de votre profil IA...</p>
+                <p className="text-slate-500 font-medium italic">{t('recommendations.loading_profile', { defaultValue: 'Récupération de votre profil IA...' })}</p>
             </div>
         );
     }
@@ -149,17 +151,17 @@ export default function SkinRecommendationsPage() {
                             className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-teal-600 transition-colors mb-3"
                         >
                             <ArrowLeft size={14} />
-                            Retour à l'analyse
+                            {t('recommendations.back_to_analysis', { defaultValue: 'Retour à l\'analyse' })}
                         </button>
                         <div className="inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-teal-800">
                             <FlaskConical size={13} />
-                            Sélection IA Personnalisée
+                            {t('recommendations.ai_selection_tag', { defaultValue: 'Sélection IA Personnalisée' })}
                         </div>
                         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
-                            Produits Recommandés
+                            {t('recommendations.title', { defaultValue: 'Produits Recommandés' })}
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            Conseils et soins SVR optimisés pour votre état actuel.
+                            {t('recommendations.subtitle', { defaultValue: 'Conseils et soins SVR optimisés pour votre état actuel.' })}
                         </p>
                     </div>
 
@@ -169,7 +171,7 @@ export default function SkinRecommendationsPage() {
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-teal-200 bg-white text-teal-700 font-bold text-sm hover:bg-teal-50 transition-all shadow-sm active:scale-95"
                         >
                             <Sparkles size={15} />
-                            Voir ma routine
+                            {t('recommendations.view_routine', { defaultValue: 'Voir ma routine' })}
                         </button>
                     </div>
                 </div>
@@ -181,15 +183,15 @@ export default function SkinRecommendationsPage() {
                     <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center shadow-inner">
                         <AlertCircle size={28} className="text-amber-500" />
                     </div>
-                    <h2 className="text-xl font-black text-slate-800">Analyse Requise</h2>
+                    <h2 className="text-xl font-black text-slate-800">{t('recommendations.error_title', { defaultValue: 'Analyse Requise' })}</h2>
                     <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
-                        Pour des recommandations précises, l'IA a besoin d'analyser votre peau ou de consulter vos derniers résultats.
+                        {t('recommendations.error_desc', { defaultValue: 'Pour des recommandations précises, l\'IA a besoin d\'analyser votre peau ou de consulter vos derniers résultats.' })}
                     </p>
                     <button
                         onClick={() => navigate('/analysis')}
                         className="mt-2 px-8 py-3.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-teal-500/25 hover:scale-105 active:scale-95 transition-all"
                     >
-                        Démarrer une analyse
+                        {t('recommendations.start_analysis', { defaultValue: 'Démarrer une analyse' })}
                     </button>
                 </div>
             )}

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Bell, Sun, Moon, Save } from 'lucide-react';
 import { authFetch, getAccessToken, getUser } from '@/lib/authSession';
@@ -88,7 +88,7 @@ export function SettingsPanel() {
           return newSettings;
         });
       }
-    } catch(e) {
+    } catch (e) {
       console.error('Error fetching settings:', e);
     }
   };
@@ -118,10 +118,10 @@ export function SettingsPanel() {
 
       setSuccessMessage(`Saved ${type} setting successfully.`);
       setTimeout(() => setSuccessMessage(''), 3000);
-      
+
       // Request permission if enabling
       if (settings[type].isActive && 'Notification' in window && Notification.permission !== 'granted') {
-         Notification.requestPermission();
+        Notification.requestPermission();
       }
     } catch (e) {
       setError('Error saving settings');
@@ -219,28 +219,28 @@ export function SettingsPanel() {
     return (
       <div className="border border-slate-200 rounded p-4 mt-4 relative">
         <div className="flex items-center justify-between mb-4">
-           <div className="flex items-center gap-2">
-             {icon}
-             <h4 className="font-semibold text-slate-800">{type} Routine</h4>
-           </div>
-           <label className="flex items-center cursor-pointer relative">
-              <input type="checkbox" className="sr-only" checked={data.isActive} onChange={e => setSettings({...settings, [type]: {...data, isActive: e.target.checked}})} />
-              <div className={`block w-10 h-6 rounded-full transition-colors ${data.isActive ? 'bg-[#0d9488]' : 'bg-slate-300'}`}></div>
-              <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${data.isActive ? 'transform translate-x-4' : ''}`}></div>
-           </label>
+          <div className="flex items-center gap-2">
+            {icon}
+            <h4 className="font-semibold text-slate-800">{type} Routine</h4>
+          </div>
+          <label className="flex items-center cursor-pointer relative">
+            <input type="checkbox" className="sr-only" checked={data.isActive} onChange={e => setSettings({ ...settings, [type]: { ...data, isActive: e.target.checked } })} />
+            <div className={`block w-10 h-6 rounded-full transition-colors ${data.isActive ? 'bg-[#0d9488]' : 'bg-slate-300'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${data.isActive ? 'transform translate-x-4' : ''}`}></div>
+          </label>
         </div>
         <div className="space-y-3">
-           <div>
-              <label className="text-sm text-slate-600 block mb-1">Time</label>
-              <input type="time" value={data.time} onChange={e => setSettings({...settings, [type]: {...data, time: e.target.value}})} className="w-full sm:w-auto bg-white border border-slate-200 rounded px-3 py-2 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]" />
-           </div>
-           <div>
-              <label className="text-sm text-slate-600 block mb-1">Message</label>
-              <input type="text" value={data.message} onChange={e => setSettings({...settings, [type]: {...data, message: e.target.value}})} className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]" placeholder="Enter custom message..." />
-           </div>
-           <button disabled={isSaving} onClick={() => saveSetting(type)} className="mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition">
-             <Save className="w-4 h-4" /> Save {type} Setting
-           </button>
+          <div>
+            <label className="text-sm text-slate-600 block mb-1">Time</label>
+            <input type="time" value={data.time} onChange={e => setSettings({ ...settings, [type]: { ...data, time: e.target.value } })} className="w-full sm:w-auto bg-white border border-slate-200 rounded px-3 py-2 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]" />
+          </div>
+          <div>
+            <label className="text-sm text-slate-600 block mb-1">Message</label>
+            <input type="text" value={data.message} onChange={e => setSettings({ ...settings, [type]: { ...data, message: e.target.value } })} className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]" placeholder="Enter custom message..." />
+          </div>
+          <button disabled={isSaving} onClick={() => saveSetting(type)} className="mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition">
+            <Save className="w-4 h-4" /> Save {type} Setting
+          </button>
         </div>
       </div>
     );
@@ -380,7 +380,7 @@ export function SettingsPanel() {
             )}
           </div>
         )}
-        
+
         {successMessage && (
           <div className="mt-4 text-green-700 bg-green-50 border border-green-200 p-3 rounded text-sm transition-all duration-300">
             {successMessage}

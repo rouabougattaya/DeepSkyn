@@ -10,6 +10,7 @@ import {
     Sun, Moon, UserCircle
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { aiAnalysisService } from '../services/aiAnalysisService';
 import { chatService } from '../services/chat.service';
@@ -25,201 +26,133 @@ import { comparisonService } from '../services/comparison.service';
 import TimelineView from '../components/insights/TimelineView';
 import { svrRoutineService, type SvrRoutineResult } from '../services/svrRoutineService';
 
-/* ─────────────────────────── Constants ─────────────────────────── */
+/* ─────────────────────── metadata getter ────────────────────── */
 
-const CONDITION_META: Record<string, {
-    label: string;
-    icon: any;
-    color: string;
-    bg: string;
-    border: string;
-    gradient: string;
-    description: string;
-}> = {
-    'Acne': {
-        label: 'Acné', icon: Flame, color: '#f43f5e',
-        bg: 'rgba(244,63,94,0.05)', border: 'rgba(244,63,94,0.15)',
-        gradient: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-        description: 'Inflammation folliculaire et sébum'
-    },
-    'Enlarged-Pores': {
-        label: 'Pores dilatés', icon: Waves, color: '#8b5cf6',
-        bg: 'rgba(139,92,246,0.05)', border: 'rgba(139,92,246,0.15)',
-        gradient: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-        description: 'Pores visibles et accumulation de sébum'
-    },
-    'Atrophic Scars': {
-        label: 'Cicatrices', icon: Bandage, color: '#64748b',
-        bg: 'rgba(100,116,139,0.05)', border: 'rgba(100,116,139,0.15)',
-        gradient: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        description: 'Dépressions cutanées post-inflammatoires'
-    },
-    'Skin Redness': {
-        label: 'Rougeurs', icon: HeartPulse, color: '#ef4444',
-        bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.15)',
-        gradient: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-        description: 'Érythème et irritation diffuse'
-    },
-    'Blackheads': {
-        label: 'Points noirs', icon: CircleDot, color: '#1e293b',
-        bg: 'rgba(30,41,59,0.05)', border: 'rgba(30,41,59,0.15)',
-        gradient: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-        description: 'Comédons ouverts avec oxydation'
-    },
-    'Dark-Spots': {
-        label: 'Taches brunes', icon: Sparkles, color: '#d97706',
-        bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
-        gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-        description: 'Hyperpigmentation post-inflammatoire'
-    },
-    'black_dots': {
-        label: 'Micro-imperfections', icon: Microscope, color: '#0d9488',
-        bg: 'rgba(13,148,136,0.05)', border: 'rgba(13,148,136,0.15)',
-        gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-        description: 'Formation de microcomédons'
-    },
-    'Hydration': {
-        label: 'Hydratation', icon: Waves, color: '#0ea5e9',
-        bg: 'rgba(14,165,233,0.05)', border: 'rgba(14,165,233,0.15)',
-        gradient: 'linear-gradient(135deg, #ecfeff 0%, #e0f2fe 100%)',
-        description: 'Niveau d’hydratation et confort cutané'
-    },
-    'Wrinkles': {
-        label: 'Rides', icon: AlertTriangle, color: '#d97706',
-        bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
-        gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-        description: 'Ridules et rides visibles'
-    },
-};
+const getAnalysisMetadata = (t: any) => {
+    const CONDITION_META: Record<string, {
+        label: string;
+        icon: any;
+        color: string;
+        bg: string;
+        border: string;
+        gradient: string;
+        description: string;
+    }> = {
+        'Acne': {
+            label: t('analysis.conditions.Acne'), icon: Flame, color: '#f43f5e',
+            bg: 'rgba(244,63,94,0.05)', border: 'rgba(244,63,94,0.15)',
+            gradient: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+            description: t('analysis.condition_meta_desc.Acne')
+        },
+        'Enlarged-Pores': {
+            label: t('analysis.conditions.Enlarged-Pores'), icon: Waves, color: '#8b5cf6',
+            bg: 'rgba(139,92,246,0.05)', border: 'rgba(139,92,246,0.15)',
+            gradient: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+            description: t('analysis.condition_meta_desc.Enlarged-Pores')
+        },
+        'Atrophic Scars': {
+            label: t('analysis.conditions.Atrophic Scars'), icon: Bandage, color: '#64748b',
+            bg: 'rgba(100,116,139,0.05)', border: 'rgba(100,116,139,0.15)',
+            gradient: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            description: t('analysis.condition_meta_desc.Atrophic Scars')
+        },
+        'Skin Redness': {
+            label: t('analysis.conditions.Skin Redness'), icon: HeartPulse, color: '#ef4444',
+            bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.15)',
+            gradient: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            description: t('analysis.condition_meta_desc.Skin Redness')
+        },
+        'Blackheads': {
+            label: t('analysis.conditions.Blackheads'), icon: CircleDot, color: '#1e293b',
+            bg: 'rgba(30,41,59,0.05)', border: 'rgba(30,41,59,0.15)',
+            gradient: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+            description: t('analysis.condition_meta_desc.Blackheads')
+        },
+        'Dark-Spots': {
+            label: t('analysis.conditions.Dark-Spots'), icon: Sparkles, color: '#d97706',
+            bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
+            gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+            description: t('analysis.condition_meta_desc.Dark-Spots')
+        },
+        'black_dots': {
+            label: t('analysis.conditions.black_dots'), icon: Microscope, color: '#0d9488',
+            bg: 'rgba(13,148,136,0.05)', border: 'rgba(13,148,136,0.15)',
+            gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            description: t('analysis.condition_meta_desc.black_dots')
+        },
+        'Hydration': {
+            label: t('analysis.conditions.Hydration'), icon: Waves, color: '#0ea5e9',
+            bg: 'rgba(14,165,233,0.05)', border: 'rgba(14,165,233,0.15)',
+            gradient: 'linear-gradient(135deg, #ecfeff 0%, #e0f2fe 100%)',
+            description: t('analysis.condition_meta_desc.Hydration')
+        },
+        'Wrinkles': {
+            label: t('analysis.conditions.Wrinkles'), icon: AlertTriangle, color: '#d97706',
+            bg: 'rgba(217,119,6,0.05)', border: 'rgba(217,119,6,0.15)',
+            gradient: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+            description: t('analysis.condition_meta_desc.Wrinkles')
+        },
+    };
 
-const BLEND_LABELS: Record<string, { label: string; helper: string }> = {
-    'Acne': { label: 'Acné', helper: 'Fusion photo + questionnaire' },
-    'Blackheads': { label: 'Points noirs', helper: 'Visuel + auto-évaluation' },
-    'Enlarged-Pores': { label: 'Pores', helper: 'Mix AI + ressenti' },
-    'Skin Redness': { label: 'Rougeurs', helper: 'Observation + vécu' },
-    'Hydration': { label: 'Hydratation', helper: 'Questionnaire + signal visuel' },
-    'Wrinkles': { label: 'Rides', helper: 'Photo + perception utilisateur' },
-};
+    const BLEND_LABELS: Record<string, { label: string; helper: string }> = {
+        'Acne': { label: t('analysis.conditions.Acne'), helper: t('analysis.fusion') },
+        'Blackheads': { label: t('analysis.conditions.Blackheads'), helper: t('analysis.fusion') },
+        'Enlarged-Pores': { label: t('analysis.profile.concerns_labels.pores'), helper: t('analysis.fusion') },
+        'Skin Redness': { label: t('analysis.conditions.Skin Redness'), helper: t('analysis.fusion') },
+        'Hydration': { label: t('analysis.conditions.Hydration'), helper: t('analysis.fusion') },
+        'Wrinkles': { label: t('analysis.conditions.Wrinkles'), helper: t('analysis.fusion') },
+    };
 
-const CONDITION_DETAILS: Record<string, { detailedDescription: string; causes: string[]; careRecommendations: string[] }> = {
-    'Acne': {
-        detailedDescription: 'L\'acne est une condition inflammatoire du follicule pileux associee a une production de sebum elevee, une hyperkeratinisation et une activite bacterienne.',
-        causes: [
-            'Surproduction de sebum et obstruction des pores',
-            'Variation hormonale et stress chronique',
-            'Produits cosmetiques comedogenes'
-        ],
-        careRecommendations: [
-            'Nettoyant doux matin et soir sans decapage',
-            'Introduire un actif cible (BHA ou acide azelaique) progressivement',
-            'Hydratant non comedogene + protection solaire quotidienne'
-        ]
-    },
-    'Enlarged-Pores': {
-        detailedDescription: 'Les pores dilates traduisent souvent une combinaison de sebum abondant, perte de fermete cutanee et accumulation de cellules mortes.',
-        causes: [
-            'Exces de sebum dans la zone T',
-            'Perte d\'elasticite avec l\'age',
-            'Nettoyage incomplet et depots residuels'
-        ],
-        careRecommendations: [
-            'Utiliser regulierement une exfoliation chimique douce',
-            'Ajouter niacinamide pour lisser le grain de peau',
-            'Appliquer un SPF quotidien pour proteger la texture'
-        ]
-    },
-    'Blackheads': {
-        detailedDescription: 'Les points noirs sont des comedons ouverts oxydes au contact de l\'air, surtout dans les zones riches en glandes sebacees.',
-        causes: [
-            'Accumulation de sebum et cellules mortes',
-            'Oxydation des bouchons folliculaires',
-            'Routine d\'exfoliation insuffisante'
-        ],
-        careRecommendations: [
-            'Exfoliant BHA 2 a 3 fois par semaine selon tolerance',
-            'Masque purifiant doux une fois par semaine',
-            'Hydratation legere pour eviter l\'effet rebond'
-        ]
-    },
-    'Skin Redness': {
-        detailedDescription: 'Les rougeurs indiquent une sensibilite cutanee ou une inflammation diffuse de la barriere, parfois reactive a l\'environnement.',
-        causes: [
-            'Barriere cutanee fragilisee',
-            'Produits irritants ou parfumes',
-            'Chaleur, UV, pollution ou variations climatiques'
-        ],
-        careRecommendations: [
-            'Simplifier la routine avec des soins apaisants',
-            'Eviter les actifs agressifs en phase reactive',
-            'Utiliser quotidiennement une protection solaire minerale ou tolerante'
-        ]
-    },
-    'Hydration': {
-        detailedDescription: 'Un deficit d\'hydratation se manifeste par une peau inconfortable, terne et plus reactive, meme sur peau mixte ou grasse.',
-        causes: [
-            'Perte en eau trans-epidermique elevee',
-            'Nettoyants trop agressifs',
-            'Exposition prolongee aux environnements secs'
-        ],
-        careRecommendations: [
-            'Associer humectants (glycerine, acide hyaluronique) et emollients',
-            'Reduire la frequence d\'exfoliation',
-            'Renforcer la barriere avec ceramides et creme adaptee'
-        ]
-    },
-    'Wrinkles': {
-        detailedDescription: 'Les rides et ridules resultent d\'une diminution progressive du collagene, de l\'elastine et de l\'hydratation de la peau.',
-        causes: [
-            'Photovieillissement lie aux UV',
-            'Baisse naturelle du renouvellement cutane',
-            'Stress oxydatif et hygiene de vie'
-        ],
-        careRecommendations: [
-            'Protection solaire large spectre tous les jours',
-            'Introduire progressivement un retinoide ou des peptides',
-            'Combiner antioxydants le matin et hydratation reparatrice le soir'
-        ]
-    },
-    'Atrophic Scars': {
-        detailedDescription: 'Les cicatrices atrophiques correspondent a une perte de tissu dermique, souvent apres une inflammation acneique marquee.',
-        causes: [
-            'Inflammation profonde non controlee',
-            'Manipulation des lesions',
-            'Cicatrisation alteree'
-        ],
-        careRecommendations: [
-            'Maintenir une routine anti-inflammatoire stable',
-            'Proteger la peau du soleil pour limiter les marques',
-            'Consulter un professionnel pour traitements techniques adaptes'
-        ]
-    },
-    'Dark-Spots': {
-        detailedDescription: 'Les taches brunes sont des zones d\'hyperpigmentation souvent post-inflammatoires ou associees a une exposition UV repetitive.',
-        causes: [
-            'Inflammation cutanee precedente',
-            'Exposition solaire cumulative',
-            'Perturbation de la melanogenese'
-        ],
-        careRecommendations: [
-            'Utiliser un SPF eleve et reappliquer en journee',
-            'Incorporer des actifs eclaircissants progressifs (niacinamide, vitamine C)',
-            'Eviter toute irritation qui entretient l\'inflammation'
-        ]
-    },
-    'black_dots': {
-        detailedDescription: 'Les micro-imperfections sont des irregularites superficielles pouvant traduire un desequilibre sebum-kératine discret.',
-        causes: [
-            'Microcomedons non visibles a l\'oeil nu initialement',
-            'Accumulation de residus et cellules mortes',
-            'Routine inconstante'
-        ],
-        careRecommendations: [
-            'Nettoyage regulier sans surdecapage',
-            'Exfoliation douce hebdomadaire',
-            'Hydratation legere et non occlusive'
-        ]
-    }
-};
+    const CONDITION_DETAILS: Record<string, { detailedDescription: string; causes: string[]; careRecommendations: string[] }> = {
+        'Acne': {
+            detailedDescription: t('analysis.condition_details.Acne.desc'),
+            causes: t('analysis.condition_details.Acne.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Acne.care', { returnObjects: true }) as string[]
+        },
+        'Enlarged-Pores': {
+            detailedDescription: t('analysis.condition_details.Enlarged-Pores.desc'),
+            causes: t('analysis.condition_details.Enlarged-Pores.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Enlarged-Pores.care', { returnObjects: true }) as string[]
+        },
+        'Blackheads': {
+            detailedDescription: t('analysis.condition_details.Blackheads.desc'),
+            causes: t('analysis.condition_details.Blackheads.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Blackheads.care', { returnObjects: true }) as string[]
+        },
+        'Skin Redness': {
+            detailedDescription: t('analysis.condition_details.Skin Redness.desc'),
+            causes: t('analysis.condition_details.Skin Redness.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Skin Redness.care', { returnObjects: true }) as string[]
+        },
+        'Hydration': {
+            detailedDescription: t('analysis.condition_details.Hydration.desc'),
+            causes: t('analysis.condition_details.Hydration.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Hydration.care', { returnObjects: true }) as string[]
+        },
+        'Wrinkles': {
+            detailedDescription: t('analysis.condition_details.Wrinkles.desc'),
+            causes: t('analysis.condition_details.Wrinkles.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Wrinkles.care', { returnObjects: true }) as string[]
+        },
+        'Atrophic Scars': {
+            detailedDescription: t('analysis.condition_details.Atrophic Scars.desc'),
+            causes: t('analysis.condition_details.Atrophic Scars.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Atrophic Scars.care', { returnObjects: true }) as string[]
+        },
+        'Dark-Spots': {
+            detailedDescription: t('analysis.condition_details.Dark-Spots.desc'),
+            causes: t('analysis.condition_details.Dark-Spots.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.Dark-Spots.care', { returnObjects: true }) as string[]
+        },
+        'black_dots': {
+            detailedDescription: t('analysis.condition_details.black_dots.desc'),
+            causes: t('analysis.condition_details.black_dots.causes', { returnObjects: true }) as string[],
+            careRecommendations: t('analysis.condition_details.black_dots.care', { returnObjects: true }) as string[]
+        }
+    };
+
+    return { CONDITION_META, BLEND_LABELS, CONDITION_DETAILS };
+}
 
 const drawerSectionTitleStyle: React.CSSProperties = {
     margin: '0 0 12px',
@@ -247,8 +180,9 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
     const r = 45;
     const circumference = 2 * Math.PI * r;
     const filled = ((100 - score) / 100) * circumference;
+    const { t } = useTranslation();
     const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
-    const label = score >= 75 ? 'Optimal' : score >= 50 ? 'Modéré' : 'Critique';
+    const label = score >= 75 ? t('analysis.optimal') : score >= 50 ? t('analysis.moderate') : t('analysis.critical');
 
     return (
         <div style={{ position: 'relative', width: size, height: size }}>
@@ -291,6 +225,8 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 }
 
 function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSelect?: (condition: ConditionScore) => void }) {
+    const { t } = useTranslation();
+    const { CONDITION_META } = getAnalysisMetadata(t);
     const meta = CONDITION_META[condition.type] || {
         label: condition.type, icon: Info, color: '#6b7280',
         bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)',
@@ -308,12 +244,12 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
                 : '#ef4444';
 
     const interpretation = !isEvaluated
-        ? 'Indisponible'
+        ? t('analysis.unavailable')
         : scoreValue >= 75
-            ? 'Excellent : Condition sous contrôle, barrière cutanée saine.'
+            ? `${t('analysis.optimal')} : ${t('analysis.interpretation.optimal')}`
             : scoreValue >= 50
-                ? 'Modéré : Signes visibles nécessitant une attention régulière.'
-                : 'Critique : Condition marquée nécessitant des soins ciblés prioritaires.';
+                ? `${t('analysis.moderate')} : ${t('analysis.interpretation.moderate')}`
+                : `${t('analysis.critical')} : ${t('analysis.interpretation.critical')}`;
 
     const Icon = meta.icon;
 
@@ -338,6 +274,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
                 overflow: 'hidden',
                 cursor: 'pointer'
             }}>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{
@@ -351,7 +288,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
                     <div>
                         <div style={{ fontWeight: 700, color: meta.color, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{meta.label}</div>
                         <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 15, letterSpacing: '-0.01em' }}>
-                            {isEvaluated ? interpretation.split(':')[0] : 'Non évalué'}
+                            {isEvaluated ? interpretation.split(':')[0] : t('analysis.non_evaluated')}
                         </div>
                     </div>
                 </div>
@@ -383,7 +320,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
             </div>
 
             <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.5, marginBottom: 14, minHeight: '1.5em' }}>
-                {isEvaluated ? interpretation.split(':')[1].trim() : (condition.notEvaluatedReason || 'Aucune donnée disponible pour cette analyse.')}
+                {isEvaluated ? interpretation.split(':')[1].trim() : (condition.notEvaluatedReason || t('analysis.no_data_available'))}
             </div>
 
             {/* Premium Progress bar */}
@@ -421,16 +358,18 @@ interface ConditionDetailDrawerProps {
 }
 
 function ConditionDetailDrawer({ condition, result, profile, onClose }: ConditionDetailDrawerProps) {
+    const { t } = useTranslation();
+    const { CONDITION_META, CONDITION_DETAILS } = getAnalysisMetadata(t);
     const meta = CONDITION_META[condition.type] || {
         label: condition.type,
         icon: Info,
         color: '#6b7280',
-        description: 'Aucune description disponible.'
+        description: t('analysis.no_description_available')
     };
     const baseDetails = CONDITION_DETAILS[condition.type] || {
-        detailedDescription: meta.description || 'Aucune description detaillee disponible pour cette condition.',
-        causes: ['Facteurs multiples a evaluer selon votre routine et votre environnement.'],
-        careRecommendations: ['Adoptez une routine douce et reguliere en suivant les conseils d\'un professionnel si besoin.']
+        detailedDescription: meta.description || t('analysis.no_detailed_description'),
+        causes: [t('analysis.multiple_factors')],
+        careRecommendations: [t('analysis.adopt_gentle_routine')]
     };
 
     const isEvaluated = typeof condition.score === 'number';
@@ -445,10 +384,10 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
             : scoreValue >= 50 ? 'moderate'
                 : 'critical';
 
-    const severityLabel = tier === 'unknown' ? 'Non évalué'
-        : tier === 'excellent' ? 'Excellent'
-            : tier === 'moderate' ? 'Modéré'
-                : 'Critique';
+    const severityLabel = tier === 'unknown' ? t('analysis.non_evaluated')
+        : tier === 'excellent' ? t('analysis.optimal')
+            : tier === 'moderate' ? t('analysis.moderate')
+                : t('analysis.critical');
     const severityColor = tier === 'unknown' ? '#94a3b8'
         : tier === 'excellent' ? '#10b981'
             : tier === 'moderate' ? '#f59e0b'
@@ -458,20 +397,20 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
     const dynamicDescription = !isEvaluated
         ? baseDetails.detailedDescription
         : tier === 'excellent'
-            ? `${baseDetails.detailedDescription} Vos résultats indiquent que cette condition est bien maîtrisée — continuez votre routine actuelle pour maintenir ce bon niveau.`
+            ? `${baseDetails.detailedDescription} ${t('analysis.desc_excellent')}`
             : tier === 'moderate'
-                ? `${baseDetails.detailedDescription} Le score obtenu (${scoreValue}/100) signale des signes modérés qui méritent une attention régulière sans urgence.`
-                : `${baseDetails.detailedDescription} Avec un score de ${scoreValue}/100 et ${detectionCount > 0 ? `${detectionCount} détection(s) identifiée(s)` : 'plusieurs signaux détectés'}, cette condition est prioritaire dans votre routine.`;
+                ? `${baseDetails.detailedDescription} ${t('analysis.desc_moderate', { score: scoreValue })}`
+                : `${baseDetails.detailedDescription} ${t('analysis.desc_critical', { score: scoreValue, detections: detectionCount > 0 ? (detectionCount > 1 ? t('analysis.detections_plural', { count: detectionCount }) : t('analysis.detections_singular', { count: detectionCount })) : t('analysis.several_signals') })}`;
 
     const dynamicCauses = tier === 'excellent'
         ? baseDetails.causes.slice(0, 2)
         : baseDetails.causes;
 
     const dynamicRecos = tier === 'excellent'
-        ? [`Maintenez votre routine actuelle : elle est efficace pour ${meta.label.toLowerCase()}.`, ...baseDetails.careRecommendations.slice(0, 1)]
+        ? [t('analysis.reco_excellent', { condition: meta.label.toLowerCase() }), ...baseDetails.careRecommendations.slice(0, 1)]
         : tier === 'moderate'
             ? baseDetails.careRecommendations
-            : [`⚠️ Priorité haute : intensifier le traitement de ${meta.label.toLowerCase()} avec des actifs ciblés dès que possible.`, ...baseDetails.careRecommendations];
+            : [t('analysis.reco_critical', { condition: meta.label.toLowerCase() }), ...baseDetails.careRecommendations];
 
     // Context badges
     const isBest = result?.analysis?.bestCondition === condition.type;
@@ -544,17 +483,17 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                 {isBest && (
                                     <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 99, background: '#dcfce7', color: '#16a34a', border: '1px solid #bbf7d0' }}>
-                                        ✓ Meilleur aspect
+                                        ✓ {t('analysis.best_aspect')}
                                     </span>
                                 )}
                                 {isWorst && (
                                     <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 99, background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca' }}>
-                                        ⚠ Point critique
+                                        ⚠ {t('analysis.critical_point')}
                                     </span>
                                 )}
                                 {isDominant && !isWorst && (
                                     <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 99, background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' }}>
-                                        ● Dominant
+                                        ● {t('analysis.dominant')}
                                     </span>
                                 )}
                             </div>
@@ -563,7 +502,7 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
 
                     <div style={{ marginTop: 18 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, color: '#666', fontFamily: 'monospace' }}>Score de santé</span>
+                            <span style={{ fontSize: 12, color: '#666', fontFamily: 'monospace' }}>{t('analysis.health_score')}</span>
                             <span style={{ fontSize: 24, fontWeight: 900, color: severityColor }}>
                                 {scoreValue !== null ? scoreValue : '—'}
                                 <span style={{ fontSize: 13, fontWeight: 400, color: '#aaa' }}>/100</span>
@@ -580,16 +519,16 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                                 {detectionCount > 0 && (
                                     <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `${severityColor}14`, color: severityColor, border: `1px solid ${severityColor}28` }}>
-                                        {detectionCount} détection{detectionCount > 1 ? 's' : ''}
+                                        {detectionCount} {detectionCount > 1 ? t('analysis.detections_plural') : t('analysis.detections_singular')}
                                     </span>
                                 )}
                                 {severityPct !== null && (
                                     <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}>
-                                        Sévérité : {severityPct}%
+                                        {t('analysis.severity')} : {severityPct}%
                                     </span>
                                 )}
                                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `${severityColor}14`, color: severityColor, border: `1px solid ${severityColor}28` }}>
-                                    {tier === 'excellent' ? '✓ Sous contrôle' : tier === 'moderate' ? '○ À surveiller' : '! Prioritaire'}
+                                    {tier === 'excellent' ? `✓ ${t('analysis.under_control')}` : tier === 'moderate' ? `○ ${t('analysis.to_monitor')}` : `! ${t('analysis.priority')}`}
                                 </span>
                             </div>
                         )}
@@ -605,14 +544,14 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                     )}
 
                     <section style={{ marginBottom: 28 }}>
-                        <h3 style={drawerSectionTitleStyle}>Description détaillée</h3>
+                        <h3 style={drawerSectionTitleStyle}>{t('analysis.description')}</h3>
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: '#444' }}>
                             {dynamicDescription}
                         </p>
                     </section>
 
                     <section style={{ marginBottom: 28 }}>
-                        <h3 style={drawerSectionTitleStyle}>Causes principales</h3>
+                        <h3 style={drawerSectionTitleStyle}>{t('analysis.causes')}</h3>
                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                             {dynamicCauses.map((cause: string, index: number) => (
                                 <li key={`cause-${index}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: index < dynamicCauses.length - 1 ? '1px solid #f5f5f5' : 'none', fontSize: 13.5, color: '#555', lineHeight: 1.5 }}>
@@ -626,7 +565,7 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                     </section>
 
                     <section style={{ marginBottom: 16 }}>
-                        <h3 style={drawerSectionTitleStyle}>Recommandations de soins</h3>
+                        <h3 style={drawerSectionTitleStyle}>{t('analysis.recommendations')}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {dynamicRecos.map((reco: string, index: number) => (
                                 <div key={`reco-${index}`} style={{ background: recoBg, border: `1px solid ${recoBorder}`, borderLeft: `3px solid ${recoBorderColor}`, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, color: '#374151', lineHeight: 1.55 }}>
@@ -641,9 +580,9 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                         <div style={{ padding: '10px 14px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
                             <BarChart2 size={12} style={{ color: '#94a3b8', flexShrink: 0 }} />
                             <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                                Score global : {Math.round(result.globalScore)}/100 · {result.totalDetections} détection{result.totalDetections > 1 ? 's' : ''} au total
-                                {result.analysis.bestCondition && ` · Meilleur : ${CONDITION_META[result.analysis.bestCondition]?.label ?? result.analysis.bestCondition}`}
-                                {result.analysis.worstCondition && ` · Critique : ${CONDITION_META[result.analysis.worstCondition]?.label ?? result.analysis.worstCondition}`}
+                                {t('analysis.global_score')} : {Math.round(result.globalScore)}/100 · {result.totalDetections} {result.totalDetections > 1 ? t('analysis.detections_plural') : t('analysis.detections_singular')} {t('analysis.total')}
+                                {result.analysis.bestCondition && ` · ${t('analysis.best')} : ${CONDITION_META[result.analysis.bestCondition]?.label ?? result.analysis.bestCondition}`}
+                                {result.analysis.worstCondition && ` · ${t('analysis.critical')} : ${CONDITION_META[result.analysis.worstCondition]?.label ?? result.analysis.worstCondition}`}
                             </span>
                         </div>
                     )}
@@ -653,9 +592,12 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
     );
 }
 
+
 /* ──────────────────────── Main Page ──────────────────────────── */
 
 export default function SkinAnalysisPage() {
+    const { t, i18n } = useTranslation();
+    const { CONDITION_META, BLEND_LABELS, CONDITION_DETAILS } = getAnalysisMetadata(t);
     const navigate = useNavigate();
     const [result, setResult] = useState<GlobalScoreResult | null>(() => {
         const cached = sessionStorage.getItem('skinAnalysisResult');
@@ -721,7 +663,7 @@ export default function SkinAnalysisPage() {
         if (!r) return '';
         const evaluated = (r.conditionScores || []).filter(c => c?.evaluated !== false && typeof c?.score === 'number') as ConditionScore[];
         if (evaluated.length === 0) {
-            return "Aucune condition n'a pu être évaluée. Ajoutez un selfie (recommandé) ou renseignez vos niveaux (acné, pores, rougeurs, hydratation, rides) pour obtenir un diagnostic fiable et des solutions adaptées.";
+            return t('analysis.no_data_provided_desc', { defaultValue: "Aucune condition n'a pu être évaluée. Ajoutez un selfie (recommandé) ou renseignez vos niveaux (acné, pores, rougeurs, hydratation, rides) pour obtenir un diagnostic fiable et des solutions adaptées." });
         }
 
         const sorted = [...evaluated].sort((a, b) => (a.score as number) - (b.score as number));
@@ -739,21 +681,21 @@ export default function SkinAnalysisPage() {
         const addIfPresent = (condType: string, text: string) => {
             if (evaluated.some(c => c.type === condType)) solutions.push(text);
         };
-        addIfPresent('Acne', "Acné : routine douce + actifs ciblés (BHA/azélaïque) progressivement, sans sur-nettoyer.");
-        addIfPresent('Blackheads', "Points noirs : exfoliation chimique régulière (BHA) et hydratation légère pour éviter l'effet rebond.");
-        addIfPresent('Enlarged-Pores', "Pores : niacinamide + contrôle du sébum, et protection solaire quotidienne pour préserver la texture.");
-        addIfPresent('Skin Redness', "Rougeurs : apaiser la barrière cutanée, éviter les irritants et privilégier des formules sans parfum.");
-        addIfPresent('Hydration', "Hydratation : renforcer la barrière (humectants + émollients) et limiter les exfoliants trop fréquents.");
-        addIfPresent('Wrinkles', "Rides : SPF quotidien + actifs anti-âge introduits progressivement (rétinoïde/peptides).");
+        addIfPresent('Acne', t('analysis.summary_solutions.Acne', { defaultValue: "Acné : routine douce + actifs ciblés (BHA/azélaïque) progressivement, sans sur-nettoyer." }));
+        addIfPresent('Blackheads', t('analysis.summary_solutions.Blackheads', { defaultValue: "Points noirs : exfoliation chimique régulière (BHA) et hydratation légère pour éviter l'effet rebond." }));
+        addIfPresent('Enlarged-Pores', t('analysis.summary_solutions.Enlarged-Pores', { defaultValue: "Pores : niacinamide + contrôle du sébum, et protection solaire quotidienne pour préserver la texture." }));
+        addIfPresent('Skin Redness', t('analysis.summary_solutions.Skin Redness', { defaultValue: "Rougeurs : apaiser la barrière cutanée, éviter les irritants et privilégier des formules sans parfum." }));
+        addIfPresent('Hydration', t('analysis.summary_solutions.Hydration', { defaultValue: "Hydratation : renforcer la barrière (humectants + émollients) et limiter les exfoliants trop fréquents." }));
+        addIfPresent('Wrinkles', t('analysis.summary_solutions.Wrinkles', { defaultValue: "Rides : SPF quotidien + actifs anti-âge introduits progressivement (rétinoïde/peptides)." }));
 
-        const header = score !== null ? `Score global estimé : ${score}/100.` : `Analyse réalisée.`;
-        const focus = allProblems.length ? `Conditions analysées : ${allProblems.join(', ')}.` : '';
+        const header = score !== null ? `${t('analysis.global_score_estimated') || 'Score global estimé'} : ${score}/100.` : `${t('analysis.summary_header_done') || 'Analyse réalisée.'}`;
+        const focus = allProblems.length ? `${t('analysis.conditions_analyzed_label') || 'Conditions analysées'} : ${allProblems.join(', ')}.` : '';
         const mismatch = userDeclaredNotDetected.length
-            ? `Déclarées mais non détectées visuellement : ${userDeclaredNotDetected.join(', ')}.`
+            ? `${t('analysis.declared_not_detected_label') || 'Déclarées mais non détectées visuellement'} : ${userDeclaredNotDetected.join(', ')}.`
             : '';
-        const plan = solutions.length ? `Plan recommandé : ${solutions.join(' ')}` : '';
+        const plan = solutions.length ? `${t('analysis.recommended_plan_label') || 'Plan recommandé'} : ${solutions.join(' ')}` : '';
         return `${header} ${focus} ${mismatch} ${plan}`.trim();
-    }, []);
+    }, [t, CONDITION_META]);
 
     useEffect(() => {
         let mounted = true;
@@ -776,7 +718,7 @@ export default function SkinAnalysisPage() {
                 setTimelineData(history);
             } catch (e: any) {
                 if (!mounted) return;
-                setTimelineError(e?.message || "Impossible de charger l'historique.");
+                setTimelineError(e?.message || t('analysis.errors.history_load_fail', { defaultValue: "Impossible de charger l'historique." }));
             } finally {
                 if (mounted) setTimelineLoading(false);
             }
@@ -807,13 +749,13 @@ export default function SkinAnalysisPage() {
     const exportToCSV = useCallback(() => {
         if (!result) return;
         if (currentPlan === 'FREE') {
-            setError('L\'exportation CSV est réservée aux utilisateurs PRO et PREMIUM. Passez au plan supérieur !');
+            setError(t('analysis.errors.csv_pro_only', { defaultValue: 'L\'exportation CSV est réservée aux utilisateurs PRO et PREMIUM. Passez au plan supérieur !' }));
             return;
         }
-        const headers = ['Condition', 'Score', 'Detections', 'Severity'];
+        const headers = [t('analysis.csv.condition'), t('analysis.csv.score'), t('analysis.csv.detections'), t('analysis.csv.severity')];
         const rows = result.conditionScores.map(c => [
-            c.type,
-            typeof c.score === 'number' ? c.score : 'Non evalue',
+            CONDITION_META[c.type]?.label || c.type,
+            typeof c.score === 'number' ? c.score : t('analysis.unavailable'),
             c.count || 0,
             typeof c.severity === 'number' ? (c.severity * 100).toFixed(0) + '%' : 'N/A'
         ]);
@@ -844,16 +786,21 @@ export default function SkinAnalysisPage() {
             return;
         }
 
-        const text = `
-            Voici l'analyse de votre peau par DeepSkyn. 
-            Votre score global est de ${Math.round(result.globalScore)} sur 100. 
-            Votre meilleur aspect est ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'non déterminé'}. 
-            Le point critique identifié est ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'non déterminé'}. 
-            Prenez soin de vous avec une routine adaptée.
-        `;
+        const text = t('analysis.speech_template', {
+            score: Math.round(result.globalScore),
+            best: result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : t('analysis.unavailable'),
+            worst: result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : t('analysis.unavailable'),
+            defaultValue: `
+                Voici l'analyse de votre peau par DeepSkyn. 
+                Votre score global est de ${Math.round(result.globalScore)} sur 100. 
+                Votre meilleur aspect est ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'non déterminé'}. 
+                Le point critique identifié est ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'non déterminé'}. 
+                Prenez soin de vous avec une routine adaptée.
+            `
+        });
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
+        utterance.lang = i18n.language === 'ar' ? 'ar-SA' : i18n.language === 'en' ? 'en-US' : 'fr-FR';
         utterance.onend = () => setIsSpeaking(false);
 
         setIsSpeaking(true);
@@ -918,8 +865,8 @@ export default function SkinAnalysisPage() {
         } catch (err: any) {
             console.error('Chat error:', err);
             const msg = err.message?.includes('LIMIT_REACHED')
-                ? "🔒 Limite journalière de messages atteinte (Plan FREE). Passez au plan PRO pour discuter sans limites !"
-                : "Désolé, j'ai rencontré une erreur. Réessaye plus tard.";
+                ? t('chat.limit_message')
+                : t('chat.error_fallback', { defaultValue: "Désolé, j'ai rencontré une erreur. Réessaye plus tard." });
             setChatMessages(prev => [...prev, { role: 'assistant', content: msg }]);
         } finally {
             setChatLoading(false);
@@ -932,7 +879,7 @@ export default function SkinAnalysisPage() {
     const runAnalysis = useCallback(async () => {
         // Validate age is provided
         if (!profile.age || profile.age < 1 || profile.age > 120) {
-            setError('Please enter a valid age (1-120) to perform analysis');
+            setError(t('analysis.errors.invalid_age', { defaultValue: 'Please enter a valid age (1-120) to perform analysis' }));
             return;
         }
 
@@ -989,8 +936,8 @@ export default function SkinAnalysisPage() {
             const errorMsg = err.message?.includes('LIMIT_REACHED')
                 ? "LIMIT_REACHED"
                 : err.message?.includes('visage humain')
-                    ? err.message
-                    : `Erreur d'analyse : ${err.message || 'Impossible de se connecter au serveur.'}`;
+                    ? t('analysis.errors.no_face_detected', { defaultValue: 'Image non reconnue : aucun visage humain détecté.' })
+                    : `${t('analysis.errors.generic_analysis_fail', { defaultValue: "Erreur d'analyse" })} : ${err.message || t('analysis.errors.connection_fail', { defaultValue: 'Impossible de se connecter au serveur.' })}`;
             setError(errorMsg);
             setScanPhase('idle');
         } finally {
@@ -1036,10 +983,10 @@ export default function SkinAnalysisPage() {
     })();
 
     const scanLabels: Record<string, string> = {
-        capturing: 'Capture de l\'image...',
-        processing: 'Analyse multi-conditions par l\'IA...',
-        scoring: 'Calcul du score composite expert...',
-        done: 'Analyse terminée',
+        capturing: t('analysis.scan.capturing'),
+        processing: t('analysis.scan.processing'),
+        scoring: t('analysis.scan.scoring'),
+        done: t('analysis.scan.done'),
         idle: '',
     };
 
@@ -1219,7 +1166,7 @@ export default function SkinAnalysisPage() {
                         }}>
                             <Sparkles size={12} style={{ color: '#0d9488' }} />
                             <span style={{ fontSize: 10, color: '#0d9488', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                Moteur IA Multi-Conditions
+                                {t('analysis.ai_engine_tag')}
                             </span>
                         </div>
                         <h1 style={{
@@ -1228,10 +1175,10 @@ export default function SkinAnalysisPage() {
                             margin: 0, lineHeight: 1.05,
                             letterSpacing: '-0.02em'
                         }}>
-                            Analyse de Peau
+                            {t('analysis.title')}
                         </h1>
                         <p style={{ color: '#64748b', fontSize: 15, margin: 0 }}>
-                            Expertise Dermatologique • Score composite intelligent
+                            {t('analysis.subtitle')}
                         </p>
                     </div>
 
@@ -1251,7 +1198,7 @@ export default function SkinAnalysisPage() {
                             }}>
                                 <div className="pulse-dot" style={{ width: 6, height: 6 }} />
                                 <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>
-                                    {analysisCount} analyse{analysisCount > 1 ? 's' : ''}
+                                    {analysisCount} {analysisCount > 1 ? t('analysis.detections_analyzed_plural') : t('analysis.detections_analyzed_singular')}
                                 </span>
                             </div>
                         )}
@@ -1274,7 +1221,7 @@ export default function SkinAnalysisPage() {
                                 transition: 'all 0.2s'
                             }}
                         >
-                            <GitCompare size={16} /> Comparer
+                            <GitCompare size={16} /> {t('common.compare') || 'Comparer'}
                         </Link>
                     </div>
                 </div>
@@ -1292,7 +1239,7 @@ export default function SkinAnalysisPage() {
 
                             <div className="glass-card fade-in" style={{ padding: 32, borderRadius: '24px' }}>
                                 <h2 style={{ fontSize: 14, fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <UserCircle size={18} /> Profil de Peau
+                                    <UserCircle size={18} /> {t('analysis.profile.title')}
                                 </h2>
                                 <SkinProfileForm
                                     profile={profile}
@@ -1307,10 +1254,10 @@ export default function SkinAnalysisPage() {
                             <div className="glass-card" style={{ padding: 32 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                                     <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-                                        Ajouter des photos
+                                        {t('analysis.profile.add_photos')}
                                     </h2>
                                     <span style={{ fontSize: 11, fontWeight: 700, color: (profile.imagesBase64?.length || 0) >= 5 ? '#ef4444' : '#0d9488', backgroundColor: (profile.imagesBase64?.length || 0) >= 5 ? '#fef2f2' : '#f0fdf4', padding: '4px 12px', borderRadius: '99px' }}>
-                                        {profile.imagesBase64?.length || 0}/5 images
+                                        {t('analysis.profile.images_count', { count: profile.imagesBase64?.length || 0 })}
                                     </span>
                                 </div>
 
@@ -1340,7 +1287,7 @@ export default function SkinAnalysisPage() {
                                             </button>
                                             {idx === 0 && (
                                                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(13,148,136,0.9), transparent)', color: 'white', fontSize: '11px', textAlign: 'center', fontWeight: 'bold', padding: '8px 4px' }}>
-                                                    PRINCIPALE
+                                                    {t('analysis.profile.main_photo')}
                                                 </div>
                                             )}
                                         </div>
@@ -1384,8 +1331,8 @@ export default function SkinAnalysisPage() {
                                         >
                                             <Upload size={32} style={{ color: '#0d9488' }} strokeWidth={1.5} />
                                             <div style={{ textAlign: 'center' }}>
-                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#0d9488', display: 'block' }}>Ajouter une photo</span>
-                                                <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>ou glisser-déposer</span>
+                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#0d9488', display: 'block' }}>{t('analysis.profile.add_a_photo')}</span>
+                                                <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>{t('analysis.profile.or_drag_drop')}</span>
                                             </div>
                                         </button>
                                     )}
@@ -1402,7 +1349,7 @@ export default function SkinAnalysisPage() {
                                     <div className="mt-4 p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-2">
                                         <CheckCircle size={14} className="text-teal-500" />
                                         <span className="text-[11px] font-bold text-teal-700 uppercase tracking-widest">
-                                            Photos prêtes pour l'analyse IA multi-angles
+                                            {t('analysis.profile.photos_ready')}
                                         </span>
                                     </div>
                                 )}
@@ -1423,7 +1370,7 @@ export default function SkinAnalysisPage() {
                                 ) : (
                                     <>
                                         <Zap size={18} />
-                                        Lancer l'analyse IA
+                                        {t('analysis.profile.launch_analysis')}
                                     </>
                                 )}
                             </button>
@@ -1480,8 +1427,8 @@ export default function SkinAnalysisPage() {
                                             <CheckCircle size={20} />
                                         </div>
                                         <div className="text-left">
-                                            <h3 className="font-bold text-slate-800 leading-tight">Analyse terminée</h3>
-                                            <p className="text-slate-500 text-xs">Retrouvez plus bas vos scores et conseils personnalisés</p>
+                                            <h3 className="font-bold text-slate-800 leading-tight">{t('analysis.scan.done')}</h3>
+                                            <p className="text-slate-500 text-xs">{t('analysis.done_hint', { defaultValue: 'Retrouvez plus bas vos scores et conseils personnalisés' })}</p>
                                         </div>
                                     </div>
                                     <button
@@ -1489,7 +1436,7 @@ export default function SkinAnalysisPage() {
                                         className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95 text-sm"
                                     >
                                         <RefreshCw size={16} className="text-teal-600" />
-                                        Nouvelle analyse
+                                        {t('analysis.new_analysis')}
                                     </button>
                                 </div>
                             )}
@@ -1504,7 +1451,7 @@ export default function SkinAnalysisPage() {
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
                                         <h2 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <Zap size={18} style={{ color: '#f59e0b' }} /> Score de Santé Cutanée
+                                            <Zap size={18} style={{ color: '#f59e0b' }} /> {t('analysis.health_score_title')}
                                         </h2>
                                         <CheckCircle size={16} style={{ color: '#10b981' }} />
                                     </div>
@@ -1520,11 +1467,11 @@ export default function SkinAnalysisPage() {
                                                 marginBottom: 12,
                                             }}>
                                                 <div style={{ padding: '8px 10px', borderRadius: 10, background: '#ecfeff', border: '1px solid #bae6fd' }}>
-                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>Age reel</div>
+                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>{t('analysis.real_age')}</div>
                                                     <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>{profile.age}</div>
                                                 </div>
                                                 <div style={{ padding: '8px 10px', borderRadius: 10, background: '#f0fdfa', border: '1px solid #99f6e4' }}>
-                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>Skin age IA</div>
+                                                    <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 700, textTransform: 'uppercase' }}>{t('analysis.skin_age_ia')}</div>
                                                     <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
                                                         {typeof result.skinAge === 'number' ? result.skinAge : 'N/A'}
                                                     </div>
@@ -1532,9 +1479,9 @@ export default function SkinAnalysisPage() {
                                             </div>
 
                                             {[
-                                                { label: 'Meilleur', value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
-                                                { label: 'Point critique', value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
-                                                { label: 'Dominant', value: result.analysis.dominantCondition, color: '#f59e0b', Icon: BarChart3 },
+                                                { label: t('analysis.best'), value: result.analysis.bestCondition, color: '#10b981', Icon: CircleCheck },
+                                                { label: t('analysis.critical_point'), value: result.analysis.worstCondition, color: '#ef4444', Icon: AlertTriangle },
+                                                { label: t('analysis.dominant'), value: result.analysis.dominantCondition, color: '#f59e0b', Icon: BarChart3 },
                                             ].map(({ label, value, color, Icon }) => (
                                                 <div key={label} style={{
                                                     display: 'flex', alignItems: 'center',
@@ -1559,7 +1506,7 @@ export default function SkinAnalysisPage() {
                                             }}>
                                                 <BarChart2 size={12} style={{ color: '#94a3b8' }} />
                                                 <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                    {result.totalDetections} détections analysées
+                                                    {result.totalDetections} {result.totalDetections > 1 ? t('analysis.detections_analyzed_plural') : t('analysis.detections_analyzed_singular')}
                                                 </span>
                                             </div>
                                         </div>
@@ -1579,14 +1526,14 @@ export default function SkinAnalysisPage() {
                                             className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
                                         >
                                             <Download size={14} className="text-teal-600" />
-                                            Export CSV
+                                            {t('analysis.export_csv')}
                                         </button>
                                         <button
                                             onClick={exportToPDF}
                                             className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 border border-teal-700 rounded-xl text-xs font-bold text-white hover:bg-teal-700 transition-all shadow-md active:scale-95"
                                         >
                                             <Download size={14} />
-                                            Exporter Rapport PDF
+                                            {t('analysis.export_pdf')}
                                         </button>
                                         <button
                                             onClick={speakAnalysis}
@@ -1596,7 +1543,7 @@ export default function SkinAnalysisPage() {
                                                 }`}
                                         >
                                             {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} className="text-orange-500" />}
-                                            {isSpeaking ? 'Arrêter l\'écoute' : 'Écouter l\'analyse'}
+                                            {isSpeaking ? t('analysis.stop_listening') : t('analysis.listen_analysis')}
                                         </button>
                                     </div>
                                 </div>
@@ -1604,7 +1551,7 @@ export default function SkinAnalysisPage() {
                                 {/* Condition Scores */}
                                 <div className="glass-card" style={{ padding: 32, borderRadius: '24px' }}>
                                     <h2 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <BarChart3 size={18} style={{ color: '#0ea5e9' }} /> Scores par Condition
+                                        <BarChart3 size={18} style={{ color: '#0ea5e9' }} /> {t('analysis.scores_by_condition')}
                                     </h2>
                                     {result.combinedInsights && (
                                         <div style={{
@@ -1615,9 +1562,9 @@ export default function SkinAnalysisPage() {
                                             background: 'linear-gradient(135deg, #ecfeff, #f8fafc)'
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>Fusion photo + questionnaire</div>
+                                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{t('analysis.fusion_photo_questionnaire')}</div>
                                                 <div style={{ fontSize: 11, color: '#0ea5e9', fontWeight: 700 }}>
-                                                    {Math.round((displayMetaWeighting.aiWeight ?? 0) * 100)}% IA · {Math.round((displayMetaWeighting.userWeight ?? 0) * 100)}% Vous
+                                                    {Math.round((displayMetaWeighting.aiWeight ?? 0) * 100)}% {t('analysis.ai_photo')} · {Math.round((displayMetaWeighting.userWeight ?? 0) * 100)}% {t('analysis.you')}
                                                 </div>
                                             </div>
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
@@ -1636,18 +1583,18 @@ export default function SkinAnalysisPage() {
                                                             <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>{meta.helper}</div>
                                                             {hasPhoto && (
                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#0f172a' }}>
-                                                                    <span>IA (photo)</span>
+                                                                    <span>{t('analysis.ai_photo')}</span>
                                                                     <span>{entry.aiScore ?? '—'}</span>
                                                                 </div>
                                                             )}
                                                             {entry.userScore !== undefined && (
                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#0f172a' }}>
-                                                                    <span>Vous</span>
+                                                                    <span>{t('analysis.you')}</span>
                                                                     <span>{entry.userScore}</span>
                                                                 </div>
                                                             )}
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 800, color: '#0ea5e9', marginTop: 6 }}>
-                                                                <span>Fusion</span>
+                                                                <span>{t('analysis.fusion')}</span>
                                                                 <span>{Math.round(entry.combinedScore)}</span>
                                                             </div>
                                                         </div>
@@ -1656,7 +1603,7 @@ export default function SkinAnalysisPage() {
                                             </div>
                                             {!hasPhoto && (
                                                 <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
-                                                    Aucun selfie fourni · Fusion basée sur le questionnaire et l'estimation profil IA.
+                                                    {t('analysis.no_selfie_provided')} · {t('analysis.fusion_based_on')}
                                                 </div>
                                             )}
                                         </div>
@@ -1684,17 +1631,17 @@ export default function SkinAnalysisPage() {
                                             <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mb-4 border-2 border-amber-400">
                                                 <Lock size={28} className="text-amber-300" />
                                             </div>
-                                            <h3 className="text-lg font-black text-white mb-2">Analyse Approfondie</h3>
-                                            <p className="text-xs text-slate-300 text-center max-w-[220px] mb-4">Débloquez l'analyse IA complète avec recommandations personnalisées</p>
+                                            <h3 className="text-lg font-black text-white mb-2">{t('analysis.deep_analysis')}</h3>
+                                            <p className="text-xs text-slate-300 text-center max-w-[220px] mb-4">{t('analysis.unlock_analysis_desc')}</p>
                                             <button onClick={() => navigate('/upgrade')} className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg font-bold text-xs shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all">
-                                                DÉBLOQUER L'ANALYSE
+                                                {t('analysis.unlock_button')}
                                             </button>
                                         </div>
                                     )}
                                     {currentPlan !== 'FREE' && <Sparkles className="absolute -right-4 -top-4 w-24 h-24 opacity-10 group-hover:rotate-12 transition-transform" />}
                                     <div className={`relative z-10 ${currentPlan === 'FREE' ? 'blur-sm opacity-40' : ''}`}>
                                         <h3 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 opacity-80">
-                                            <CheckCircle size={14} /> Sommaire de l'analyse
+                                            <CheckCircle size={14} /> {t('analysis.analysis_summary')}
                                         </h3>
                                         <p className="text-lg font-medium leading-relaxed italic">
                                             {buildAnalysisSummary(result)}
@@ -1710,10 +1657,10 @@ export default function SkinAnalysisPage() {
                                                 <div className="bg-teal-100 p-2 rounded-xl text-teal-600">
                                                     <Sparkles size={20} />
                                                 </div>
-                                                <h3 className="text-xl font-black text-slate-800">Solutions IA Personnalisées</h3>
+                                                <h3 className="text-xl font-black text-slate-800">{t('analysis.ai_personalized_solutions')}</h3>
                                             </div>
                                             <p className="text-slate-600 text-sm leading-relaxed">
-                                                Basé sur votre analyse, l'IA a généré une routine complète et sélectionné les produits les plus adaptés à vos besoins.
+                                                {t('analysis.ai_solutions_desc')}
                                             </p>
                                         </div>
 
@@ -1723,14 +1670,14 @@ export default function SkinAnalysisPage() {
                                                 className="group flex items-center justify-center gap-3 px-8 py-4 bg-white border-2 border-teal-500 text-teal-700 rounded-2xl font-bold transition-all hover:bg-teal-50 hover:shadow-lg active:scale-95"
                                             >
                                                 <FlaskConical size={18} className="group-hover:rotate-12 transition-transform" />
-                                                Voir les Produits
+                                                {t('analysis.view_products')}
                                             </button>
                                             <button
                                                 onClick={() => navigate('/routines')}
                                                 className="group flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-2xl font-bold shadow-xl shadow-teal-600/20 hover:scale-105 active:scale-95 transition-all"
                                             >
                                                 <Calendar size={18} />
-                                                Ma Routine IA
+                                                {t('analysis.my_ia_routine')}
                                                 <ArrowUpCircle size={16} className="rotate-45" />
                                             </button>
                                         </div>
@@ -1744,10 +1691,10 @@ export default function SkinAnalysisPage() {
                                             <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-50 rounded-full flex items-center justify-center mb-3 border-2 border-amber-300 shadow-lg shadow-amber-200/50">
                                                 <Lock size={32} className="text-amber-600" />
                                             </div>
-                                            <h3 className="text-xl font-black text-amber-900 mb-2">Suivi de Progression</h3>
-                                            <p className="text-slate-700 text-sm text-center max-w-[260px] mb-6 leading-relaxed">Visualisez l'évolution de votre peau au fil du temps avec des graphiques détaillés et des analyses de tendances.</p>
+                                            <h3 className="text-xl font-black text-amber-900 mb-2">{t('analysis.progress_tracking')}</h3>
+                                            <p className="text-slate-700 text-sm text-center max-w-[260px] mb-6 leading-relaxed">{t('analysis.progress_tracking_desc')}</p>
                                             <Link to="/upgrade" className="px-7 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all" style={{ textDecoration: 'none' }}>
-                                                ✨ Débloquer le Suivi Complet
+                                                {t('analysis.unlock_tracking')}
                                             </Link>
                                         </div>
                                     )}
@@ -1757,7 +1704,7 @@ export default function SkinAnalysisPage() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                                 <BarChart2 className="text-teal-600" size={20} />
                                                 <h2 style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                                                    Suivi de progression
+                                                    {t('analysis.progress_tracking')}
                                                 </h2>
                                             </div>
                                         </div>
@@ -1792,7 +1739,7 @@ export default function SkinAnalysisPage() {
                                                 style={{ textDecoration: 'none' }}
                                             >
                                                 <BarChart3 size={14} className="text-teal-600" />
-                                                Voir l'historique complet
+                                                {t('analysis.view_full_history')}
                                             </Link>
                                         </div>
                                     </div>
@@ -1857,13 +1804,13 @@ export default function SkinAnalysisPage() {
                                 </div>
                                 <div>
                                     <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0d9488', margin: 0, letterSpacing: '-0.04em' }}>DEEPSKYN PRO</h1>
-                                    <p style={{ margin: 0, color: '#64748b', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Intelligence Artificielle Dermatologique</p>
+                                    <p style={{ margin: 0, color: '#64748b', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('analysis.pdf.ai_expertise', { defaultValue: 'Intelligence Artificielle Dermatologique' })}</p>
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>RAPPORT ANALYTIQUE EXPERT</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{t('analysis.pdf.expert_report', { defaultValue: 'RAPPORT ANALYTIQUE EXPERT' })}</div>
                                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>ID: #{new Date().getTime().toString().slice(-8)}</div>
-                                <div style={{ fontSize: 12, color: '#94a3b8' }}>Généré le {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                <div style={{ fontSize: 12, color: '#94a3b8' }}>{t('analysis.pdf.generated_on', { defaultValue: 'Généré le' })} {new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : i18n.language === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                             </div>
                         </div>
 
@@ -1871,7 +1818,7 @@ export default function SkinAnalysisPage() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 30, marginBottom: 40 }}>
                             {/* Score Card */}
                             <div style={{ background: '#f8fafc', padding: 35, borderRadius: 24, border: '1px solid #e2e8f0', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 20, letterSpacing: '0.05em' }}>Score Global de Santé</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 20, letterSpacing: '0.05em' }}>{t('analysis.health_score_title')}</div>
                                 <div style={{ fontSize: 80, fontWeight: 900, color: globalScoreColor, lineHeight: 1, letterSpacing: '-0.05em' }}>{Math.round(result.globalScore)}<span style={{ fontSize: 24, color: '#94a3b8' }}>/100</span></div>
                                 <div style={{
                                     marginTop: 20,
@@ -1884,20 +1831,20 @@ export default function SkinAnalysisPage() {
                                     fontWeight: 800,
                                     textTransform: 'uppercase'
                                 }}>
-                                    {result.globalScore >= 75 ? 'Excellent' : result.globalScore >= 50 ? 'Modéré' : 'Critique'}
+                                    {result.globalScore >= 75 ? t('analysis.optimal') : result.globalScore >= 50 ? t('analysis.moderate') : t('analysis.critical')}
                                 </div>
                                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 30, paddingTop: 20, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                                        <span style={{ color: '#64748b', fontWeight: 600 }}>Âge:</span>
-                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{profile.age} ans</span>
+                                        <span style={{ color: '#64748b', fontWeight: 600 }}>{t('analysis.profile.age')}:</span>
+                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{profile.age} {t('analysis.pdf.years', { defaultValue: 'ans' })}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                                        <span style={{ color: '#64748b', fontWeight: 600 }}>Type de peau:</span>
-                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{profile.skinType}</span>
+                                        <span style={{ color: '#64748b', fontWeight: 600 }}>{t('analysis.profile.skin_type')}:</span>
+                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{t(`analysis.profile.skin_types.${profile.skinType}`) || profile.skinType}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                                        <span style={{ color: '#64748b', fontWeight: 600 }}>Detections IA:</span>
-                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{result.totalDetections} points</span>
+                                        <span style={{ color: '#64748b', fontWeight: 600 }}>{t('analysis.pdf.ai_detections', { defaultValue: 'Detections IA' })}:</span>
+                                        <span style={{ fontWeight: 800, color: '#1e293b' }}>{result.totalDetections} {t('analysis.pdf.points', { defaultValue: 'points' })}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1910,19 +1857,24 @@ export default function SkinAnalysisPage() {
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#334155', lineHeight: 1.8, marginBottom: 25, textAlign: 'justify' }}>
                                     {currentPlan === 'FREE'
-                                        ? 'Le diagnostic expert approfondi est réservé aux membres PRO. Ce rapport interactif présente une synthèse de votre état cutané actuel basée sur notre moteur IA multi-spectre.'
-                                        : `L'analyse automatisée de votre profil cutané met en évidence une performance optimale sur la condition ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}. À l'inverse, l'aspect ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'} constitue votre priorité dermatologique actuelle. L'équilibre global de votre barrière est évalué à ${Math.round(result.globalScore)}/100.`
+                                        ? t('analysis.pdf.free_plan_message', { defaultValue: 'Le diagnostic expert approfondi est réservé aux membres PRO. Ce rapport interactif présente une synthèse de votre état cutané actuel basée sur notre moteur IA multi-spectre.' })
+                                        : t('analysis.pdf.pro_summary_template', {
+                                            best: result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A',
+                                            worst: result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A',
+                                            score: Math.round(result.globalScore),
+                                            defaultValue: `L'analyse automatisée de votre profil cutané met en évidence une performance optimale sur la condition ${result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'N/A'}. À l'inverse, l'aspect ${result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'N/A'} constitue votre priorité dermatologique actuelle. L'équilibre global de votre barrière est évalué à ${Math.round(result.globalScore)}/100.`
+                                        })
                                     }
                                 </p>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                                     <div style={{ padding: 20, borderRadius: 20, background: '#f0fdf4', border: '1px solid #dcfce7' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', marginBottom: 8 }}>Point de Force</div>
-                                        <div style={{ fontSize: 16, fontWeight: 900, color: '#065f46' }}>{result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : 'Stable'}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', marginBottom: 8 }}>{t('analysis.pdf.strength_point', { defaultValue: 'Point de Force' })}</div>
+                                        <div style={{ fontSize: 16, fontWeight: 900, color: '#065f46' }}>{result.analysis.bestCondition ? (CONDITION_META[result.analysis.bestCondition]?.label || result.analysis.bestCondition) : t('analysis.pdf.stable', { defaultValue: 'Stable' })}</div>
                                     </div>
                                     <div style={{ padding: 20, borderRadius: 20, background: '#fef2f2', border: '1px solid #fee2e2' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', marginBottom: 8 }}>Axe Prioritaire</div>
-                                        <div style={{ fontSize: 16, fontWeight: 900, color: '#991b1b' }}>{result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : 'Aucun'}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', marginBottom: 8 }}>{t('analysis.pdf.priority_axis', { defaultValue: 'Axe Prioritaire' })}</div>
+                                        <div style={{ fontSize: 16, fontWeight: 900, color: '#991b1b' }}>{result.analysis.worstCondition ? (CONDITION_META[result.analysis.worstCondition]?.label || result.analysis.worstCondition) : t('analysis.pdf.none', { defaultValue: 'Aucun' })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1931,7 +1883,7 @@ export default function SkinAnalysisPage() {
                         {/* Conditions Detailed List (Page 2) */}
                         <div style={{ marginTop: 20 }}>
                             <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 20, paddingLeft: 14, borderLeft: '5px solid #0d9488' }}>
-                                Analyse Détaillée des Conditions
+                                {t('analysis.pdf.detailed_analysis', { defaultValue: 'Analyse Détaillée des Conditions' })}
                             </h2>
                             <div style={{ display: 'block' }}>
                                 {result.conditionScores.slice(0, 4).map(c => {
@@ -1955,14 +1907,14 @@ export default function SkinAnalysisPage() {
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div style={{ fontSize: 24, fontWeight: 900, color: color }}>{hasScore ? `${Math.round(scoreValue)}/100` : '—'}</div>
-                                                    <div style={{ fontSize: 10, fontWeight: 800, color: color, textTransform: 'uppercase' }}>Expert Score</div>
+                                                    <div style={{ fontSize: 10, fontWeight: 800, color: color, textTransform: 'uppercase' }}>{t('analysis.pdf.expert_score', { defaultValue: 'Expert Score' })}</div>
                                                 </div>
                                             </div>
 
                                             {details && (
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 15, paddingTop: 15, borderTop: '1px dashed #e2e8f0' }}>
                                                     <div>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Causes Probables</div>
+                                                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>{t('analysis.pdf.probable_causes', { defaultValue: 'Causes Probables' })}</div>
                                                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                                                             {details.causes.map((cause, i) => (
                                                                 <li key={i} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
@@ -1972,7 +1924,7 @@ export default function SkinAnalysisPage() {
                                                         </ul>
                                                     </div>
                                                     <div>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Conseils de Soins</div>
+                                                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>{t('analysis.pdf.care_advice', { defaultValue: 'Conseils de Soins' })}</div>
                                                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                                                             {details.careRecommendations.map((reco, i) => (
                                                                 <li key={i} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
@@ -1993,14 +1945,14 @@ export default function SkinAnalysisPage() {
                     {/* Page 2: Full Skincare Routine */}
                     <div className="page-break" style={{ paddingTop: '10mm' }}>
                         <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0d9488', marginBottom: 30, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                            Votre Stratégie de Soins Complète
+                            {t('analysis.pdf.complete_care_strategy', { defaultValue: 'Votre Stratégie de Soins Complète' })}
                         </h2>
 
                         {currentPlan === 'FREE' ? (
                             <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, border: '1px dashed #e2e8f0', borderRadius: 20, background: '#f8fafc' }}>
                                 <div style={{ fontSize: 40, marginBottom: 15 }}>✨</div>
-                                <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Passez à la vitesse supérieure</h3>
-                                La routine de soins complète et détaillée (incluant les recommandations de produits spécifiques) est une fonctionnalité de notre Intelligence Artificielle avancée exclusive aux abonnés <strong>PRO</strong> et <strong>PREMIUM</strong>.
+                                <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>{t('analysis.pdf.upgrade_title', { defaultValue: 'Passez à la vitesse supérieure' })}</h3>
+                                {t('analysis.pdf.pro_routine_only', { defaultValue: 'La routine de soins complète et détaillée (incluant les recommandations de produits spécifiques) est une fonctionnalité de notre Intelligence Artificielle avancée exclusive aux abonnés PRO et PREMIUM.' })}
                             </div>
                         ) : routineResult ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 35 }}>
@@ -2008,16 +1960,16 @@ export default function SkinAnalysisPage() {
                                 <div className="no-break" style={{ display: 'inline-block', width: '100%', boxSizing: 'border-box' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, padding: '10px 20px', background: '#f0f9ff', borderRadius: 14, border: '1px solid #bae6fd' }}>
                                         <Sun size={24} color="#0369a1" />
-                                        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', margin: 0 }}>Routine du Matin (AM)</h3>
+                                        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', margin: 0 }}>{t('analysis.pdf.morning_routine', { defaultValue: 'Routine du Matin (AM)' })}</h3>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         {routineResult.morning.map((step, i) => (
                                             <div key={i} style={{ display: 'flex', gap: 15, padding: 15, borderRadius: 16, border: '1px solid #f1f5f9', background: '#fcfcfd' }}>
                                                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#0369a1', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>{i + 1}</div>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{step.stepName} — <span style={{ color: '#0369a1' }}>{step.product?.name || 'Produit recommandé'}</span></div>
+                                                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{step.stepName} — <span style={{ color: '#0369a1' }}>{step.product?.name || t('analysis.pdf.recommended_product', { defaultValue: 'Produit recommandé' })}</span></div>
                                                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 1.5 }}>
-                                                        <strong>Instructions:</strong> {step.instruction}
+                                                        <strong>{t('analysis.pdf.instructions', { defaultValue: 'Instructions' })}:</strong> {step.instruction}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2029,16 +1981,16 @@ export default function SkinAnalysisPage() {
                                 <div className="no-break" style={{ display: 'inline-block', width: '100%', boxSizing: 'border-box', marginTop: 35 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, padding: '10px 20px', background: '#f5f3ff', borderRadius: 14, border: '1px solid #ddd6fe' }}>
                                         <Moon size={24} color="#5b21b6" />
-                                        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6', margin: 0 }}>Routine du Soir (PM)</h3>
+                                        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6', margin: 0 }}>{t('analysis.pdf.night_routine', { defaultValue: 'Routine du Soir (PM)' })}</h3>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         {routineResult.night.map((step, i) => (
                                             <div key={i} style={{ display: 'flex', gap: 15, padding: 15, borderRadius: 16, border: '1px solid #f1f5f9', background: '#fcfcfd' }}>
                                                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#5b21b6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>{i + 1}</div>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{step.stepName} — <span style={{ color: '#5b21b6' }}>{step.product?.name || 'Produit recommandé'}</span></div>
+                                                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{step.stepName} — <span style={{ color: '#5b21b6' }}>{step.product?.name || t('analysis.pdf.recommended_product', { defaultValue: 'Produit recommandé' })}</span></div>
                                                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 1.5 }}>
-                                                        <strong>Instructions:</strong> {step.instruction}
+                                                        <strong>{t('analysis.pdf.instructions', { defaultValue: 'Instructions' })}:</strong> {step.instruction}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2050,7 +2002,7 @@ export default function SkinAnalysisPage() {
                                 <div className="no-break" style={{ padding: 25, borderRadius: 24, background: 'linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 100%)', border: '1px solid #ccfbf1', display: 'inline-block', width: '100%', boxSizing: 'border-box', marginTop: 35 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                                         <Info size={20} color="#0d9488" />
-                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conseil Expert Personnalisé</div>
+                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('analysis.pdf.expert_personalized_advice', { defaultValue: 'Conseil Expert Personnalisé' })}</div>
                                     </div>
                                     <p style={{ margin: 0, fontSize: 14, color: '#134e4a', lineHeight: 1.8, fontStyle: 'italic' }}>
                                         "{routineResult.generalAdvice}"
@@ -2059,13 +2011,13 @@ export default function SkinAnalysisPage() {
                             </div>
                         ) : routineError ? (
                             <div style={{ padding: 40, textAlign: 'center', color: '#ef4444', fontSize: 14, border: '1px dashed #fecaca', borderRadius: 20, background: '#fef2f2' }}>
-                                ⚠️ Impossible de charger la section routine pour le moment.<br />
-                                (Veuillez réessayer plus tard ou vérifier votre connexion)
+                                ⚠️ {t('analysis.errors.routine_load_fail', { defaultValue: 'Impossible de charger la section routine pour le moment.' })}<br />
+                                {t('analysis.errors.retry_hint', { defaultValue: '(Veuillez réessayer plus tard ou vérifier votre connexion)' })}
                             </div>
                         ) : (
                             <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, border: '1px dashed #e2e8f0', borderRadius: 20 }}>
-                                Génération de la routine personnalisée en cours... <br />
-                                (Veuillez attendre avant le téléchargement PDF)
+                                {t('analysis.routine_generating', { defaultValue: 'Génération de la routine personnalisée en cours...' })} <br />
+                                {t('analysis.routine_generating_hint', { defaultValue: '(Veuillez attendre avant le téléchargement PDF)' })}
                             </div>
                         )}
                     </div>
@@ -2079,10 +2031,9 @@ export default function SkinAnalysisPage() {
                             <span style={{ fontSize: 14, fontWeight: 900, color: '#0d9488', letterSpacing: '0.1em' }}>DEEPSKYN AI</span>
                         </div>
                         <p style={{ fontSize: 10, color: '#94a3b8', maxWidth: 600, margin: '0 auto', lineHeight: 1.5 }}>
-                            Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn. Les résultats sont basés sur une analyse visuelle et des données déclaratives.
-                            Cette analyse n'est pas un diagnostic médical et ne remplace en aucun cas l'avis, le diagnostic ou le traitement d'un professionnel de santé qualifié.
+                            {t('analysis.pdf.footer_disclaimer', { defaultValue: "Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn. Les résultats sont basés sur une analyse visuelle et des données déclaratives. Cette analyse n'est pas un diagnostic médical et ne remplace en aucun cas l'avis, le diagnostic ou le traitement d'un professionnel de santé qualifié." })}
                         </p>
-                        <p style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', marginTop: 15 }}>www.deepskyn.app • Expertise Digitale Dermatologique</p>
+                        <p style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', marginTop: 15 }}>{t('analysis.pdf.footer_brand', { defaultValue: 'www.deepskyn.app • Expertise Digitale Dermatologique' })}</p>
                     </div>
                 </div>
             )}

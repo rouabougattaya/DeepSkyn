@@ -534,10 +534,10 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
           <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
             <div
               className={`h-2 rounded-full transition-all ${overallRiskScore >= 70
-                  ? 'bg-red-500'
-                  : overallRiskScore >= 50
-                    ? 'bg-orange-500'
-                    : 'bg-green-500'
+                ? 'bg-red-500'
+                : overallRiskScore >= 50
+                  ? 'bg-orange-500'
+                  : 'bg-green-500'
                 }`}
               style={{ width: `${overallRiskScore}%` }}
             />
@@ -628,10 +628,10 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${risk.risk_score >= 70
-                        ? 'bg-red-500'
-                        : risk.risk_score >= 50
-                          ? 'bg-orange-500'
-                          : 'bg-yellow-500'
+                      ? 'bg-red-500'
+                      : risk.risk_score >= 50
+                        ? 'bg-orange-500'
+                        : 'bg-yellow-500'
                       }`}
                     style={{ width: `${risk.risk_score}%` }}
                   />

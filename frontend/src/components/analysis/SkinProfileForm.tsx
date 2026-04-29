@@ -296,7 +296,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-rose-600 uppercase tracking-widest">
                                 <Target size={14} /> Acné — Diagnostic Détaillé
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Gravité de l'inflammation</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -305,20 +305,17 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={level}
                                             type="button"
                                             onClick={() => setSingle('acne', 'severity', level)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.acne.severity === level
-                                                ? 'bg-white border-rose-400 shadow-md ring-2 ring-rose-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.acne.severity === level
+                                                    ? 'bg-white border-rose-400 shadow-md ring-2 ring-rose-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.acne.severity === level ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
-                                                <div className={`rounded-full ${
-                                                    level === 'mild' ? 'h-2 w-2 bg-rose-300' : 
-                                                    level === 'moderate' ? 'h-4 w-4 bg-rose-400' : 
-                                                    'h-6 w-6 bg-rose-600'
-                                                }`} />
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.acne.severity === level ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
+                                                <div className={`rounded-full ${level === 'mild' ? 'h-2 w-2 bg-rose-300' :
+                                                        level === 'moderate' ? 'h-4 w-4 bg-rose-400' :
+                                                            'h-6 w-6 bg-rose-600'
+                                                    }`} />
                                             </div>
                                             <span className={`text-[10px] font-bold ${questionnaire.acne.severity === level ? 'text-rose-700' : ''}`}>
                                                 {level === 'mild' ? 'Léger' : level === 'moderate' ? 'Modéré' : 'Sévère'}
@@ -336,11 +333,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={kind}
                                             type="button"
                                             onClick={() => setSingle('acne', 'type', kind)}
-                                            className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all ${
-                                                questionnaire.acne.type === kind
-                                                ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
-                                                : 'bg-white border-slate-100 text-slate-500 hover:border-rose-200'
-                                            }`}
+                                            className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all ${questionnaire.acne.type === kind
+                                                    ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
+                                                    : 'bg-white border-slate-100 text-slate-500 hover:border-rose-200'
+                                                }`}
                                         >
                                             {kind === 'whiteheads' ? 'Points Blancs' : kind === 'cystic' ? 'Kystique' : 'Hormonal'}
                                         </button>
@@ -356,11 +352,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={zone}
                                             type="button"
                                             onClick={() => toggleMultiSelect('acne', 'location', zone)}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                                questionnaire.acne.location.includes(zone)
-                                                ? 'bg-white border-rose-400 text-rose-700 shadow-sm'
-                                                : 'bg-white/50 border-slate-100 text-slate-500'
-                                            }`}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${questionnaire.acne.location.includes(zone)
+                                                    ? 'bg-white border-rose-400 text-rose-700 shadow-sm'
+                                                    : 'bg-white/50 border-slate-100 text-slate-500'
+                                                }`}
                                         >
                                             <MapPin size={12} className={questionnaire.acne.location.includes(zone) ? 'text-rose-500' : 'text-slate-300'} />
                                             <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -378,7 +373,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-amber-600 uppercase tracking-widest">
                                 <History size={14} /> Rides — Analyse Structurelle
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Profondeur des sillons</div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -387,15 +382,13 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={depth}
                                             type="button"
                                             onClick={() => setSingle('wrinkles', 'depth', depth)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.wrinkles.depth === depth
-                                                ? 'bg-white border-amber-400 shadow-md ring-2 ring-amber-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.wrinkles.depth === depth
+                                                    ? 'bg-white border-amber-400 shadow-md ring-2 ring-amber-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.wrinkles.depth === depth ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.wrinkles.depth === depth ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
                                                 <div className="flex flex-col gap-0.5">
                                                     <div className="h-[1px] w-4 bg-amber-300" />
                                                     {depth === 'deep' && (
@@ -422,11 +415,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={zone}
                                             type="button"
                                             onClick={() => toggleMultiSelect('wrinkles', 'location', zone)}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                                questionnaire.wrinkles.location.includes(zone)
-                                                ? 'bg-white border-amber-400 text-amber-700 shadow-sm'
-                                                : 'bg-white/50 border-slate-100 text-slate-500'
-                                            }`}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${questionnaire.wrinkles.location.includes(zone)
+                                                    ? 'bg-white border-amber-400 text-amber-700 shadow-sm'
+                                                    : 'bg-white/50 border-slate-100 text-slate-500'
+                                                }`}
                                         >
                                             {zone === 'eyes' ? <Eye size={12} /> : <MapPin size={12} />}
                                             <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -444,7 +436,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-sky-600 uppercase tracking-widest">
                                 <Droplets size={14} /> Hydratation — Analyse du confort
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Sensation de la peau</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -453,23 +445,20 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={feel}
                                             type="button"
                                             onClick={() => setSingle('hydration', 'feel', feel)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.hydration.feel === feel
-                                                ? 'bg-white border-sky-400 shadow-md ring-2 ring-sky-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.hydration.feel === feel
+                                                    ? 'bg-white border-sky-400 shadow-md ring-2 ring-sky-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.hydration.feel === feel ? 'border-sky-200 bg-sky-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
-                                                <div className={`w-full h-full rounded-full opacity-30 ${
-                                                    feel === 'normal' ? 'bg-sky-400' : 
-                                                    feel === 'tight' ? 'bg-sky-200' : 
-                                                    'bg-slate-300'
-                                                }`} style={{ 
-                                                    backgroundImage: feel === 'very-dry' ? 'radial-gradient(#94a3b8 1px, transparent 1px)' : 'none',
-                                                    backgroundSize: '4px 4px'
-                                                }} />
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.hydration.feel === feel ? 'border-sky-200 bg-sky-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
+                                                <div className={`w-full h-full rounded-full opacity-30 ${feel === 'normal' ? 'bg-sky-400' :
+                                                        feel === 'tight' ? 'bg-sky-200' :
+                                                            'bg-slate-300'
+                                                    }`} style={{
+                                                        backgroundImage: feel === 'very-dry' ? 'radial-gradient(#94a3b8 1px, transparent 1px)' : 'none',
+                                                        backgroundSize: '4px 4px'
+                                                    }} />
                                             </div>
                                             <span className={`text-[10px] font-bold ${questionnaire.hydration.feel === feel ? 'text-sky-700' : ''}`}>
                                                 {feel === 'tight' ? 'Tiraillée' : feel === 'normal' ? 'Normale' : 'Très Sèche'}
@@ -486,7 +475,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-slate-600 uppercase tracking-widest">
                                 <CircleDot size={14} /> Points Noirs — Diagnostic de Visibilité
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Densité & Visibilité</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -495,15 +484,13 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={level}
                                             type="button"
                                             onClick={() => setSingle('blackheads', 'severity', level)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.blackheads.severity === level
-                                                ? 'bg-white border-slate-400 shadow-md ring-2 ring-slate-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.blackheads.severity === level
+                                                    ? 'bg-white border-slate-400 shadow-md ring-2 ring-slate-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.blackheads.severity === level ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.blackheads.severity === level ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
                                                 <div className="flex flex-wrap gap-0.5 justify-center p-1">
                                                     <div className="h-1 w-1 rounded-full bg-slate-800" />
                                                     {level !== 'low' && <div className="h-1 w-1 rounded-full bg-slate-800" />}
@@ -531,11 +518,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={zone}
                                             type="button"
                                             onClick={() => toggleMultiSelect('blackheads', 'location', zone)}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                                questionnaire.blackheads.location.includes(zone)
-                                                ? 'bg-white border-slate-400 text-slate-700 shadow-sm'
-                                                : 'bg-white/50 border-slate-100 text-slate-500'
-                                            }`}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${questionnaire.blackheads.location.includes(zone)
+                                                    ? 'bg-white border-slate-400 text-slate-700 shadow-sm'
+                                                    : 'bg-white/50 border-slate-100 text-slate-500'
+                                                }`}
                                         >
                                             <MapPin size={12} className={questionnaire.blackheads.location.includes(zone) ? 'text-slate-600' : 'text-slate-300'} />
                                             <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -553,7 +539,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-violet-600 uppercase tracking-widest">
                                 <Layers size={14} /> Pores — Analyse de la Texture
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Visibilité des pores</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -562,15 +548,13 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={level}
                                             type="button"
                                             onClick={() => setSingle('pores', 'visibility', level)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.pores.visibility === level
-                                                ? 'bg-white border-violet-400 shadow-md ring-2 ring-violet-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.pores.visibility === level
+                                                    ? 'bg-white border-violet-400 shadow-md ring-2 ring-violet-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.pores.visibility === level ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.pores.visibility === level ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
                                                 <div className="grid grid-cols-2 gap-0.5 opacity-40">
                                                     <div className="h-1 w-1 rounded-full bg-violet-600" />
                                                     <div className="h-1 w-1 rounded-full bg-violet-600" />
@@ -594,11 +578,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={zone}
                                             type="button"
                                             onClick={() => setSingle('pores', 'zone', zone)}
-                                            className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all ${
-                                                questionnaire.pores.zone === zone
-                                                ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
-                                                : 'bg-white border-slate-100 text-slate-500'
-                                            }`}
+                                            className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all ${questionnaire.pores.zone === zone
+                                                    ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
+                                                    : 'bg-white border-slate-100 text-slate-500'
+                                                }`}
                                         >
                                             {zone === 'tzone' ? 'Zone T' : zone === 'cheeks' ? 'Joues' : 'Global'}
                                         </button>
@@ -613,7 +596,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-red-600 uppercase tracking-widest">
                                 <ShieldAlert size={14} /> Sensibilité — Seuil de Réactivité
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Niveau de tolérance</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -622,20 +605,17 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={level}
                                             type="button"
                                             onClick={() => setSingle('sensitivity', 'level', level)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.sensitivity.level === level
-                                                ? 'bg-white border-red-400 shadow-md ring-2 ring-red-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.sensitivity.level === level
+                                                    ? 'bg-white border-red-400 shadow-md ring-2 ring-red-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.sensitivity.level === level ? 'border-red-200 bg-red-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
-                                                <div className={`h-4 w-4 rounded-full transition-all ${
-                                                    level === 'low' ? 'bg-orange-300' : 
-                                                    level === 'medium' ? 'bg-orange-500' : 
-                                                    'bg-red-600 animate-pulse'
-                                                }`} />
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.sensitivity.level === level ? 'border-red-200 bg-red-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
+                                                <div className={`h-4 w-4 rounded-full transition-all ${level === 'low' ? 'bg-orange-300' :
+                                                        level === 'medium' ? 'bg-orange-500' :
+                                                            'bg-red-600 animate-pulse'
+                                                    }`} />
                                             </div>
                                             <span className={`text-[10px] font-bold ${questionnaire.sensitivity.level === level ? 'text-red-700' : ''}`}>
                                                 {level === 'low' ? 'Stable' : level === 'medium' ? 'Réactive' : 'Critique'}
@@ -652,7 +632,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                             <div className="flex items-center gap-2 text-xs font-black text-rose-600 uppercase tracking-widest">
                                 <Zap size={14} /> Rougeurs — Diagnostic Vasculaire
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Intensité de l'érythème</div>
                                 <div className="grid grid-cols-3 gap-3">
@@ -661,20 +641,17 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={level}
                                             type="button"
                                             onClick={() => setSingle('redness', 'level', level)}
-                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                                                questionnaire.redness.level === level
-                                                ? 'bg-white border-rose-400 shadow-md ring-2 ring-rose-500/10'
-                                                : 'bg-white/50 border-slate-100 text-slate-400'
-                                            }`}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${questionnaire.redness.level === level
+                                                    ? 'bg-white border-rose-400 shadow-md ring-2 ring-rose-500/10'
+                                                    : 'bg-white/50 border-slate-100 text-slate-400'
+                                                }`}
                                         >
-                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${
-                                                questionnaire.redness.level === level ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-slate-50'
-                                            }`}>
-                                                <div className={`h-5 w-5 rounded-full filter blur-[1px] ${
-                                                    level === 'occasional' ? 'bg-rose-200' : 
-                                                    level === 'persistent' ? 'bg-rose-400' : 
-                                                    'bg-rose-600 animate-pulse'
-                                                }`} />
+                                            <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${questionnaire.redness.level === level ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-slate-50'
+                                                }`}>
+                                                <div className={`h-5 w-5 rounded-full filter blur-[1px] ${level === 'occasional' ? 'bg-rose-200' :
+                                                        level === 'persistent' ? 'bg-rose-400' :
+                                                            'bg-rose-600 animate-pulse'
+                                                    }`} />
                                             </div>
                                             <span className={`text-[10px] font-bold ${questionnaire.redness.level === level ? 'text-rose-700' : ''}`}>
                                                 {level === 'occasional' ? 'Légère' : level === 'persistent' ? 'Diffuse' : 'Intense'}
@@ -692,11 +669,10 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                             key={zone}
                                             type="button"
                                             onClick={() => toggleMultiSelect('redness', 'location', zone)}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                                questionnaire.redness.location.includes(zone)
-                                                ? 'bg-white border-rose-400 text-rose-700 shadow-sm'
-                                                : 'bg-white/50 border-slate-100 text-slate-500'
-                                            }`}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${questionnaire.redness.location.includes(zone)
+                                                    ? 'bg-white border-rose-400 text-rose-700 shadow-sm'
+                                                    : 'bg-white/50 border-slate-100 text-slate-500'
+                                                }`}
                                         >
                                             <MapPin size={12} className={questionnaire.redness.location.includes(zone) ? 'text-rose-500' : 'text-slate-300'} />
                                             <span className="text-[10px] font-bold uppercase tracking-tight">

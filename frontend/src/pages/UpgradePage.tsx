@@ -89,8 +89,8 @@ const PLANS = [
 
 const COLOR_MAP: Record<string, Record<string, string>> = {
   slate: { bg: 'bg-slate-50', text: 'text-slate-700', ring: 'ring-slate-300', btn: 'bg-slate-800 hover:bg-slate-700', badge: 'bg-slate-100 text-slate-600' },
-  teal:  { bg: 'bg-teal-50',  text: 'text-teal-700',  ring: 'ring-teal-400',  btn: 'bg-teal-600 hover:bg-teal-500',  badge: 'bg-teal-100 text-teal-700'  },
-  purple:{ bg: 'bg-purple-50',text: 'text-purple-700',ring: 'ring-purple-400',btn: 'bg-purple-600 hover:bg-purple-500',badge: 'bg-purple-100 text-purple-700'},
+  teal: { bg: 'bg-teal-50', text: 'text-teal-700', ring: 'ring-teal-400', btn: 'bg-teal-600 hover:bg-teal-500', badge: 'bg-teal-100 text-teal-700' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-700', ring: 'ring-purple-400', btn: 'bg-purple-600 hover:bg-purple-500', badge: 'bg-purple-100 text-purple-700' },
 };
 
 // ─── Checkout Modal ──────────────────────────────────────────────────────────
@@ -103,10 +103,10 @@ interface CheckoutModalProps {
 function CheckoutModal({ plan, onClose, onSuccess }: CheckoutModalProps) {
   const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry]         = useState('');
-  const [cvv, setCvv]               = useState('');
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Format card number with spaces
   const handleCardNumber = (v: string) => {
@@ -293,21 +293,21 @@ export default function UpgradePage() {
   const navigate = useNavigate();
   const [currentPlan, setCurrentPlan] = useState<Plan>('FREE');
   const [selectedPlan, setSelectedPlan] = useState<(typeof PLANS)[number] | null>(null);
-  const [successPlan, setSuccessPlan]   = useState<string | null>(null);
-  const [loading, setLoading]           = useState(true);
+  const [successPlan, setSuccessPlan] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const user = getUser();
     if (!user?.id) { setLoading(false); return; }
     apiGet<SubscriptionData>(`/subscription/${user.id}`)
       .then(s => setCurrentPlan(s.plan))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
   const handleUpgradeClick = async (plan: (typeof PLANS)[number]) => {
     if (plan.price === 0) return; // FREE has no checkout
-    
+
     const user = getUser();
     if (!user?.id) { navigate('/auth/login'); return; }
 
@@ -388,7 +388,7 @@ export default function UpgradePage() {
           const c = COLOR_MAP[plan.color];
           const Icon = plan.icon;
           const isCurrent = plan.id === currentPlan;
-          const isLocked  = planLevel[plan.id as Plan] <= planLevel[currentPlan];
+          const isLocked = planLevel[plan.id as Plan] <= planLevel[currentPlan];
 
           return (
             <div

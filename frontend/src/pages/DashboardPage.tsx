@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getUser, authFetch } from '@/lib/authSession';
 import {
   TrendingUp, BarChart2, Activity,
@@ -8,7 +9,7 @@ import {
 import { dashboardService } from '@/services/dashboardService';
 import { skinAgeInsightsService, type SkinAgeInsightResponse } from '@/services/skinAgeInsightsService';
 import SkinAgeInsightCard from '@/components/insights/SkinAgeInsightCard';
-import type { DashboardMetrics, TrendData, MonthlyData } from '@/types/dashboard';
+import type { DashboardMetrics, MonthlyData } from '@/types/dashboard';
 import { WeatherAdaptiveWidget } from '@/components/dashboard/WeatherAdaptiveWidget';
 import { RiskAlerts } from '@/components/dashboard/RiskAlerts';
 import {
@@ -16,51 +17,39 @@ import {
   LineElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { useTheme } from '@/context/ThemeContext';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-const THEME = {
-  primary: '#0d9488', // DeepSkyn Teal
-  primaryLight: '#f0fdfa',
-  primaryBorder: '#ccfbf1',
-  success: '#10b981',
-  successLight: '#f0fdf4',
-  danger: '#f43f5e',
-  dangerLight: '#fff1f2',
-  warning: '#f59e0b',
-  warningLight: '#fffbeb',
-  background: '#f8fafc', // Technical Gray
-  surface: '#ffffff',
-  border: '#e2e8f0',
-  textPrimary: '#0f172a',
-  textSecondary: '#475569',
-  textTertiary: '#94a3b8',
-};
 
 // Medical Grade Metric Card
 function TechnicalStat({ title, value, unit, icon, color, trend }: any) {
   return (
-    <div style={{ background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: '24px', position: 'relative', overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }} className="clinical-card-hover">
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: color }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>{icon}</div>
+    <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 transition-all hover:scale-[1.02] shadow-sm">
+      <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />
+      <div className="flex justify-between items-start mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}15`, color }}>
+          {icon}
+        </div>
         {trend !== undefined && (
-          <div style={{ fontSize: 11, fontWeight: 700, color: trend >= 0 ? THEME.success : THEME.danger, background: trend >= 0 ? THEME.successLight : THEME.dangerLight, padding: '4px 8px', borderRadius: 6 }}>
+          <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${trend >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-600'}`}>
             {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: THEME.textPrimary, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">{title}</div>
+      <div className="text-2xl font-black text-slate-900 dark:text-white flex items-baseline gap-1">
         {value}
-        {unit && <span style={{ fontSize: 14, fontWeight: 600, color: THEME.textTertiary }}>{unit}</span>}
+        {unit && <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{unit}</span>}
       </div>
     </div>
   );
 }
 
 export default function ProfessionalDashboard() {
-  const [user, setUser] = useState<any>(null);
+  const { t } = useTranslation();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const [, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -102,131 +91,133 @@ export default function ProfessionalDashboard() {
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: THEME.background }}>
-        <div style={{ textAlign: 'center' }}>
-          <Activity size={40} className="animate-spin" style={{ color: THEME.primary, marginBottom: 16 }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: THEME.textSecondary }}>Synchronizing clinical data...</div>
-        </div>
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Activity size={40} className="text-teal-600 dark:text-teal-400 animate-spin mb-4" />
+        <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+          {t('dashboard.sync_data', { defaultValue: 'Synchronizing clinical data...' })}
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: THEME.background, fontFamily: 'Inter, system-ui, sans-serif', color: THEME.textPrimary }}>
-      <style>{`
-        .clinical-card-hover:hover { transform: translateY(-4px); border-color: ${THEME.primary}40; box-shadow: 0 12px 24px -8px rgba(13,148,136,0.1); }
-        .clinical-panel { background: white; border: 1px solid ${THEME.border}; border-radius: 20px; box-shadow: 0 4px 12px rgba(13,148,136,0.03); position: relative; }
-        .clinical-accent-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: ${THEME.primary}; border-radius: 20px 20px 0 0; }
-        .hover-lift { transition: all 0.2s ease; }
-        .hover-lift:hover { transform: translateY(-2px); filter: brightness(0.98); }
-        @keyframes pulse-soft { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .status-pulse { animation: pulse-soft 2s infinite ease-in-out; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-      `}</style>
-
-      <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '48px 40px' }}>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      <main className="max-w-[1440px] mx-auto px-6 lg:px-10 py-12">
 
         {/* TOP BAR: IDENTITY & GLOBAL STATUS */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 48, borderBottom: `1px solid ${THEME.border}`, paddingBottom: 24 }}>
+        <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12 pb-6 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: THEME.success }} className="status-pulse" />
-              <span style={{ fontSize: 11, fontWeight: 800, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Core Engine Diagnostic Mode</span>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{t('dashboard.diagnostic_mode')}</span>
             </div>
-            <h1 style={{ fontSize: 36, fontWeight: 900, color: THEME.textPrimary, letterSpacing: '-0.03em', margin: 0 }}>
-              DeepSkyn <span style={{ color: THEME.primary, fontWeight: 500 }}>Clinical</span>
+            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              DeepSkyn <span className="text-teal-600 dark:text-teal-400 font-medium">{t('dashboard.clinical_tag', { defaultValue: 'Clinical' })}</span>
             </h1>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderRadius: 12, background: THEME.surface, border: `1px solid ${THEME.border}`, fontWeight: 700, fontSize: 13, color: THEME.textSecondary, cursor: 'pointer' }} className="hover-lift">
-              <RefreshCw size={16} /> Sync Profile
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-xs text-slate-600 dark:text-slate-400 hover:shadow-md transition-all active:scale-95"
+            >
+              <RefreshCw size={14} /> {t('dashboard.sync_profile')}
             </button>
-            <Link to="/analysis" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: THEME.primary, color: 'white', fontWeight: 800, fontSize: 14, textDecoration: 'none', boxShadow: `0 4px 12px ${THEME.primary}30` }} className="hover-lift">
-              <Zap size={18} fill="white" /> Launch AI Session
+            <Link
+              to="/analysis"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 dark:bg-teal-500 text-white font-black text-sm shadow-lg shadow-teal-600/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              <Zap size={16} fill="currentColor" /> {t('dashboard.launch_ai')}
             </Link>
           </div>
         </header>
 
         {/* ANALYTIC SUMMARY ROW */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginBottom: 48 }}>
-          <TechnicalStat title="Aggregate Health" value={metrics?.averageScore?.toFixed(1) ?? '—'} unit="/100" icon={<Activity size={20} />} color={THEME.primary} trend={metrics?.trendPercentage ?? 0} />
-          <TechnicalStat title="Diagnostic Peak" value={metrics?.bestScore ?? '—'} unit="/100" icon={<TrendingUp size={20} />} color={THEME.success} />
-          <TechnicalStat title="Analysis Count" value={metrics?.totalAnalyses ?? '0'} icon={<BarChart2 size={20} />} color="#6366f1" />
-          <TechnicalStat title="Engine Tier" value={currentPlan} icon={<Star size={20} />} color={THEME.warning} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <TechnicalStat title={t('dashboard.metrics.health')} value={metrics?.averageScore?.toFixed(1) ?? '—'} unit="/100" icon={<Activity size={20} />} color="#0d9488" trend={metrics?.trendPercentage ?? 0} />
+          <TechnicalStat title={t('dashboard.metrics.peak')} value={metrics?.bestScore ?? '—'} unit="/100" icon={<TrendingUp size={20} />} color="#10b981" />
+          <TechnicalStat title={t('dashboard.metrics.count')} value={metrics?.totalAnalyses ?? '0'} icon={<BarChart2 size={20} />} color="#6366f1" />
+          <TechnicalStat title={t('dashboard.metrics.tier')} value={currentPlan} icon={<Star size={20} />} color="#f59e0b" />
         </div>
 
         {/* PRIMARY DIAGNOSTIC GRID */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 40 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* LEFT: DEEP DIAGNOSTICS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+          <div className="lg:col-span-2 space-y-8">
 
             {/* AI DIAGNOSTIC PANEL */}
-            <div className="clinical-panel" style={{ padding: 32 }}>
-              <div className="clinical-accent-bar" />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: THEME.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: THEME.primary, border: `1px solid ${THEME.primaryBorder}` }}>
-                    <Brain size={22} />
+            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-teal-600 dark:bg-teal-50 rounded-t-3xl" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-800">
+                    <Brain size={24} />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Clinical AI Intelligence</h2>
-                    <p style={{ fontSize: 13, color: THEME.textSecondary, margin: 0 }}>Neural-network derived skin markers</p>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{t('dashboard.ai_intelligence', { defaultValue: 'Clinical AI Intelligence' })}</h2>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('dashboard.neural_markers', { defaultValue: 'Neural-network derived skin markers' })}</p>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: THEME.primary, background: THEME.primaryLight, padding: '6px 12px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Stream Active</div>
+                <div className="px-3 py-1 bg-teal-50 dark:bg-teal-900/30 text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest rounded-lg border border-teal-100 dark:border-teal-800/30">
+                  {t('dashboard.live_stream', { defaultValue: 'Live Stream Active' })}
+                </div>
               </div>
 
               {isPro ? (
                 <SkinAgeInsightCard insight={skinAgeInsight} loading={skinAgeLoading} />
               ) : (
-                <div style={{ padding: '48px 32px', textAlign: 'center', background: THEME.background, borderRadius: 16, border: `1px dashed ${THEME.border}` }}>
-                  <div style={{ width: 64, height: 64, background: 'white', borderRadius: '50%', display: 'grid', placeItems: 'center', margin: '0 auto 24px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                    <Lock size={28} style={{ color: THEME.textTertiary }} />
+                <div className="bg-slate-50 dark:bg-slate-800/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl py-12 px-6 text-center">
+                  <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-slate-200/50 dark:shadow-none text-slate-400 dark:text-slate-500">
+                    <Lock size={32} />
                   </div>
-                  <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Diagnostic Insight Restricted</h3>
-                  <p style={{ color: THEME.textSecondary, fontSize: 15, marginBottom: 28, maxWidth: 360, marginInline: 'auto', lineHeight: 1.6 }}>The Professional Engine provides deep-layer analysis of skin age markers and clinical routine adjustments.</p>
-                  <Link to="/upgrade" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 32px', background: THEME.primary, color: 'white', borderRadius: 12, fontWeight: 700, textDecoration: 'none', boxShadow: `0 4px 12px ${THEME.primary}25` }}>
-                    Activate Pro Engine <ArrowRight size={18} />
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">{t('dashboard.diagnostic_restricted', { defaultValue: 'Diagnostic Insight Restricted' })}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 leading-relaxed">
+                    {t('dashboard.pro_engine_desc', { defaultValue: 'The Professional Engine provides deep-layer analysis of skin age markers and clinical routine adjustments.' })}
+                  </p>
+                  <Link
+                    to="/upgrade"
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-teal-600 dark:bg-teal-500 text-white font-bold rounded-xl shadow-lg shadow-teal-600/20 hover:scale-105 transition-all"
+                  >
+                    {t('dashboard.activate_pro', { defaultValue: 'Activate Pro Engine' })} <ArrowRight size={18} />
                   </Link>
                 </div>
               )}
             </div>
 
             {/* PERFORMANCE TRAJECTORY */}
-            <div className="clinical-panel" style={{ padding: 32 }}>
-              <div className="clinical-accent-bar" style={{ background: '#6366f1' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm relative">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-3xl" />
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                 <div>
-                  <h3 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Health Trajectory</h3>
-                  <p style={{ fontSize: 13, color: THEME.textSecondary, marginTop: 4 }}>Longitudinal tracking of clinical skin scores</p>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{t('dashboard.health_trajectory', { defaultValue: 'Health Trajectory' })}</h3>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{t('dashboard.trajectory_desc', { defaultValue: 'Longitudinal tracking of clinical skin scores' })}</p>
                 </div>
-                <div style={{ display: 'flex', gap: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: THEME.textSecondary }}>
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: THEME.primary }} /> Aggregate
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-teal-600" /> {t('dashboard.aggregate')}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: THEME.textSecondary }}>
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: THEME.border }} /> Tolerance
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-slate-200 dark:bg-slate-700" /> {t('dashboard.tolerance')}
                   </div>
                 </div>
               </div>
 
-              <div style={{ height: 320, width: '100%' }}>
+              <div className="h-[340px] w-full">
                 {monthly.length > 0 ? (
                   <Line
                     data={{
                       labels: monthly.map(m => m.month),
                       datasets: [{
-                        label: 'Score',
+                        label: t('dashboard.score_label', { defaultValue: 'Score' }),
                         data: monthly.map(m => m.averageScore),
-                        borderColor: THEME.primary,
-                        backgroundColor: `${THEME.primary}05`,
+                        borderColor: '#0d9488',
+                        backgroundColor: isDark ? 'rgba(13, 148, 136, 0.1)' : 'rgba(13, 148, 136, 0.05)',
                         fill: true,
                         tension: 0.4,
-                        pointRadius: 5,
-                        pointBackgroundColor: THEME.surface,
-                        pointBorderColor: THEME.primary,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#0d9488',
                         pointBorderWidth: 2,
                         borderWidth: 3
                       }]
@@ -234,17 +225,37 @@ export default function ProfessionalDashboard() {
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      plugins: { legend: { display: false }, tooltip: { cornerRadius: 8, padding: 12 } },
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: isDark ? '#1e293b' : '#fff',
+                          titleColor: isDark ? '#fff' : '#1e293b',
+                          bodyColor: isDark ? '#cbd5e1' : '#64748b',
+                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                          borderWidth: 1,
+                          padding: 12,
+                          cornerRadius: 12,
+                          displayColors: false
+                        }
+                      },
                       scales: {
-                        y: { beginAtZero: true, max: 100, grid: { color: THEME.border, lineWidth: 0.5 }, ticks: { color: THEME.textTertiary, font: { size: 11, weight: 600 } } },
-                        x: { grid: { display: false }, ticks: { color: THEME.textTertiary, font: { size: 11, weight: 600 } } }
+                        y: {
+                          beginAtZero: true,
+                          max: 100,
+                          grid: { color: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)', lineWidth: 1 },
+                          ticks: { color: '#94a3b8', font: { size: 10, weight: '700' }, padding: 8 }
+                        },
+                        x: {
+                          grid: { display: false },
+                          ticks: { color: '#94a3b8', font: { size: 10, weight: '700' }, padding: 8 }
+                        }
                       }
                     }}
                   />
                 ) : (
-                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: THEME.textTertiary, fontSize: 14, fontWeight: 600 }}>
-                    <Activity size={24} style={{ marginRight: 12, opacity: 0.5 }} />
-                    Diagnostic baseline required for trend analysis.
+                  <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 gap-4">
+                    <Activity size={40} className="opacity-20" />
+                    <p className="text-xs font-bold uppercase tracking-widest">{t('dashboard.baseline_required', { defaultValue: 'Diagnostic baseline required for trend analysis.' })}</p>
                   </div>
                 )}
               </div>
@@ -253,58 +264,63 @@ export default function ProfessionalDashboard() {
           </div>
 
           {/* RIGHT: CLINICAL TOOLS & ENVIRONMENTS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div className="space-y-8">
 
             {/* DIGITAL TWIN - CLINICAL STYLE */}
-            <div className="clinical-panel" style={{ padding: 28, background: `linear-gradient(135deg, ${THEME.primaryLight} 0%, #ffffff 100%)`, border: `1px solid ${THEME.primaryBorder}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                <Sparkles size={20} style={{ color: THEME.primary }} />
-                <span style={{ fontSize: 11, fontWeight: 900, color: THEME.primary, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Predictive Modeling</span>
+            <div className="bg-gradient-to-br from-teal-50 to-white dark:from-slate-900 dark:to-slate-950 border border-teal-100 dark:border-teal-900 rounded-3xl p-8 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles size={18} className="text-teal-600 dark:text-teal-400" />
+                <span className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">{t('dashboard.predictive_modeling', { defaultValue: 'Predictive Modeling' })}</span>
               </div>
-              <h3 style={{ fontSize: 22, fontWeight: 900, color: THEME.textPrimary, marginBottom: 10 }}>Digital Twin Simulation</h3>
-              <p style={{ fontSize: 14, color: THEME.textSecondary, lineHeight: 1.6, marginBottom: 24 }}>Calculate biological skin age trajectory based on your current routine and environmental exposure markers.</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{t('dashboard.digital_twin', { defaultValue: 'Digital Twin Simulation' })}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
+                {t('dashboard.digital_twin_desc', { defaultValue: 'Calculate biological skin age trajectory based on your current routine and environmental exposure markers.' })}
+              </p>
               <button
                 onClick={() => navigate(isPremiumPlan ? '/digital-twin' : '/upgrade')}
-                style={{ width: '100%', padding: '14px', borderRadius: 12, background: THEME.primary, color: 'white', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer', boxShadow: `0 4px 12px ${THEME.primary}20` }}
-                className="hover-lift"
+                className="w-full py-4 rounded-xl bg-teal-600 dark:bg-teal-500 text-white font-black text-sm shadow-lg shadow-teal-600/20 hover:scale-[1.02] active:scale-95 transition-all"
               >
-                {isPremiumPlan ? 'Start Simulation' : 'Activate Premium Modeling'}
+                {isPremiumPlan ? t('dashboard.start_simulation', { defaultValue: 'Start Simulation' }) : t('dashboard.activate_premium', { defaultValue: 'Activate Premium Modeling' })}
               </button>
             </div>
 
             {/* HEALTH MONITORING (RISK ALERTS) */}
-            <div className="clinical-panel" style={{ padding: 24 }}>
-              <h4 style={{ fontSize: 13, fontWeight: 900, color: THEME.textPrimary, marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Activity size={16} style={{ color: THEME.danger }} />
-                Active Monitoring
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+              <h4 className="text-[11px] font-black text-slate-900 dark:text-white mb-5 uppercase tracking-widest flex items-center gap-2">
+                <Activity size={16} className="text-rose-500" />
+                {t('dashboard.active_monitoring', { defaultValue: 'Active Monitoring' })}
               </h4>
               {isPremiumPlan ? (
                 <RiskAlerts />
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: 12, background: THEME.background, border: `1px solid ${THEME.border}` }}>
-                  <Lock size={18} style={{ color: THEME.textTertiary }} />
-                  <span style={{ fontSize: 13, color: THEME.textSecondary, fontWeight: 600 }}>Premium Risk Detection Disabled</span>
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50">
+                  <Lock size={18} className="text-slate-400 dark:text-slate-500" />
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t('dashboard.premium_risk_disabled', { defaultValue: 'Premium Risk Detection Disabled' })}</span>
                 </div>
               )}
             </div>
 
             {/* ENVIRONMENTAL CONTEXT */}
-            <div className="clinical-panel" style={{ padding: 24 }}>
-              <h4 style={{ fontSize: 12, fontWeight: 900, color: THEME.textTertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 20 }}>Environmental Context</h4>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5">{t('dashboard.env_context', { defaultValue: 'Environmental Context' })}</h4>
               <WeatherAdaptiveWidget />
             </div>
 
             {/* CLINICAL NAVIGATION */}
-            <div className="clinical-panel" style={{ padding: 24 }}>
-              <h4 style={{ fontSize: 12, fontWeight: 900, color: THEME.textTertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Management</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">{t('dashboard.management', { defaultValue: 'Management' })}</h4>
+              <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Sessions', icon: <Smartphone size={18} />, path: '/sessions' },
-                  { label: 'Routines', icon: <Calendar size={18} />, path: '/routines' },
+                  { label: t('dashboard.nav.sessions', { defaultValue: 'Sessions' }), icon: <Smartphone size={18} />, path: '/sessions' },
+                  { label: t('dashboard.nav.routines', { defaultValue: 'Routines' }), icon: <Calendar size={18} />, path: '/routines' },
                 ].map(item => (
-                  <Link key={item.label} to={item.path} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px', borderRadius: 16, background: THEME.background, border: `1px solid ${THEME.border}`, textDecoration: 'none', color: THEME.textPrimary, transition: '0.2s' }} className="hover-lift">
-                    <div style={{ color: THEME.primary }}>{item.icon}</div>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{item.label}</span>
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 text-slate-700 dark:text-slate-300 hover:border-teal-600 dark:hover:border-teal-500 hover:shadow-md transition-all active:scale-95 group"
+                  >
+                    <div className="text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform">{item.icon}</div>
+                    <span className="text-xs font-bold">{item.label}</span>
                   </Link>
                 ))}
               </div>

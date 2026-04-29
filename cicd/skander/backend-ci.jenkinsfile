@@ -1,0 +1,13 @@
+pipeline {
+    agent any
+    environment {
+        MEMBER_NAME = "Skander"
+        PROJECT_KEY = "DeepSkyn:{MEMBER_NAME}:Backend"
+    }
+    stages {
+        stage('Install') { steps { dir('backend') { sh 'npm install' } } }
+        stage('Tests') { steps { dir('backend') { sh 'npm run test -- --grep="Session|Recaptcha|ProductFilter|AIIntelligent|PricingUX|Comparison|MultiUpload"' } } }
+        stage('Sonar') { steps { script { /* Sonar config here */ } } }
+    }
+    post { success { build job: "${MEMBER_NAME}/backend-cd", wait: false } }
+}

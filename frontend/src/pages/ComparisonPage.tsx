@@ -733,7 +733,7 @@ export default function ComparisonPage() {
       `}</style>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
-        
+
         {/* LOCK OVERLAY FOR FREE USERS */}
         {currentPlan === 'FREE' && (
           <div style={{
@@ -761,17 +761,17 @@ export default function ComparisonPage() {
               Comparaison d'Analyses <span style={{ color: '#0d9488' }}>PRO</span>
             </h1>
             <p style={{ fontSize: 18, color: '#64748b', maxWidth: 500, lineHeight: 1.6, marginBottom: 32 }}>
-              La comparaison détaillée entre deux analyses et le calcul des tendances 
+              La comparaison détaillée entre deux analyses et le calcul des tendances
               sont réservés aux membres PRO. Suivez vos résultats précisément !
             </p>
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => navigate('/dashboard')}
                 className="px-8 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all font-sans"
               >
                 Retour
               </button>
-              <button 
+              <button
                 onClick={() => navigate('/upgrade')}
                 style={{
                   background: 'linear-gradient(135deg, #0d9488, #10b981)',

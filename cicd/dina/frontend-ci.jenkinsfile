@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    environment {
+        MEMBER_NAME = "Dina"
+        PROJECT_KEY = "DeepSkyn:{MEMBER_NAME}:Frontend"
+    }
+    stages {
+        stage('Install') { steps { dir('frontend') { sh 'npm install' } } }
+        stage('Tests') { steps { dir('frontend') { sh 'npm run test -- --grep="LoginGoogle|Pricing|Stripe|Products"' } } }
+    }
+    post { success { build job: "${MEMBER_NAME}/frontend-cd", wait: false } }
+}

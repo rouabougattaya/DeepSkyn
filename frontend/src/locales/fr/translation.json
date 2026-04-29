@@ -1,0 +1,479 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "analysis": "Analyse de peau",
+    "sessions": "Générateur Sessions",
+    "chat": "Conseiller IA",
+    "products": "Produits",
+    "dashboard": "Tableau de Bord",
+    "login": "Connexion",
+    "get_started": "Démarrer",
+    "skin_analysis": "Analyse de Peau",
+    "logout": "Déconnexion",
+    "settings": "Paramètres",
+    "language": "Langue",
+    "skin_intelligence": "Skin Intelligence",
+    "plans": "Plans",
+    "tagline": "Votre Expert Dermatologique IA Personnel"
+  },
+  "dashboard": {
+    "metrics": {
+      "sessions": "Sessions",
+      "analyses": "Analyses",
+      "routine_status": "Statut Routine",
+      "skin_health": "Santé de la peau",
+      "health": "Santé",
+      "peak": "Pic",
+      "count": "Total",
+      "tier": "Niveau"
+    },
+    "status": {
+      "active": "Active",
+      "pending": "En attente",
+      "completed": "Terminée"
+    },
+    "diagnostic_mode": "Mode Diagnostic",
+    "clinical_tag": "Clinique",
+    "sync_profile": "Synchroniser Profil",
+    "launch_ai": "Lancer IA",
+    "sync_data": "Synchronisation des données cliniques...",
+    "ai_intelligence": "Intelligence IA Clinique",
+    "neural_markers": "Marqueurs cutanés par réseau neuronal",
+    "live_stream": "Flux Live Actif",
+    "diagnostic_restricted": "Accès Diagnostic Restreint",
+    "pro_engine_desc": "Le moteur professionnel fournit une analyse approfondie des marqueurs d'âge et des ajustements de routine.",
+    "activate_pro": "Activer le Moteur Pro",
+    "health_trajectory": "Trajectoire de Santé",
+    "trajectory_desc": "Suivi longitudinal des scores cliniques",
+    "aggregate": "Agrégat",
+    "tolerance": "Tolérance",
+    "score_label": "Score",
+    "baseline_required": "Diagnostic initial requis pour l'analyse des tendances.",
+    "predictive_modeling": "Modélisation Prédictive",
+    "digital_twin": "Simulation Digital Twin",
+    "digital_twin_desc": "Calculez la trajectoire biologique de l'âge de la peau en fonction de votre routine et de l'exposition.",
+    "start_simulation": "Démarrer Simulation",
+    "activate_premium": "Activer Modélisation Premium",
+    "active_monitoring": "Surveillance Active",
+    "premium_risk_disabled": "Détection des risques Premium désactivée",
+    "env_context": "Contexte Environnemental",
+    "management": "Gestion",
+    "nav": {
+      "sessions": "Sessions",
+      "routines": "Routines"
+    },
+    "recommendations": {
+      "title": "Produits Recommandés",
+      "subtitle": "Conseils et soins SVR optimisés pour votre état actuel.",
+      "ai_selection_tag": "Sélection IA Personnalisée",
+      "back_to_analysis": "Retour à l'analyse",
+      "view_routine": "Voir ma routine",
+      "loading_profile": "Récupération de votre profil IA...",
+      "error_title": "Analyse Requise",
+      "error_desc": "Pour des recommandations précises, l'IA a besoin d'analyser votre peau ou de consulter vos derniers résultats.",
+      "start_analysis": "Démarrer une analyse"
+    }
+  },
+  "analysis": {
+    "title": "Analyse de Peau",
+    "subtitle": "Expertise Dermatologique • Score composite intelligent",
+    "ai_engine_tag": "Moteur IA Multi-Conditions",
+    "detections_analyzed_plural": "détections analysées",
+    "detections_analyzed_singular": "détection analysée",
+    "health_score_title": "Score de Santé Cutanée",
+    "real_age": "Âge réel",
+    "skin_age_ia": "Âge de peau IA",
+    "best": "Meilleur",
+    "critical_point": "Point critique",
+    "dominant": "Dominant",
+    "export_csv": "Export CSV",
+    "export_pdf": "Exporter Rapport PDF",
+    "listen_analysis": "Écouter l'analyse",
+    "stop_listening": "Arrêter l'écoute",
+    "scores_by_condition": "Scores par Condition",
+    "fusion_photo_questionnaire": "Fusion photo + questionnaire",
+    "ai_photo": "IA (photo)",
+    "you": "Vous",
+    "fusion": "Fusion",
+    "no_selfie_provided": "Aucun selfie fourni",
+    "fusion_based_on": "Fusion basée sur le questionnaire et l'estimation profil IA.",
+    "analysis_summary": "Sommaire de l'analyse",
+    "new_analysis": "Nouvelle analyse",
+    "done_hint": "Retrouvez plus bas vos scores et conseils personnalisés",
+    "deep_analysis": "Analyse Approfondie",
+    "unlock_analysis_desc": "Débloquez l'analyse IA complète avec recommandations personnalisées",
+    "unlock_button": "DÉBLOQUER L'ANALYSE",
+    "ai_personalized_solutions": "Solutions IA Personnalisées",
+    "ai_solutions_desc": "Basé sur votre analyse, l'IA a généré une routine complète et sélectionné les produits les plus adaptés à vos besoins.",
+    "view_products": "Voir les Produits",
+    "my_ia_routine": "Ma Routine IA",
+    "progress_tracking": "Suivi de Progression",
+    "progress_tracking_desc": "Visualisez l'évolution de votre peau au fil du temps avec des graphiques détaillés et des analyses de tendances.",
+    "unlock_tracking": "✨ Débloquer le Suivi Complet",
+    "view_full_history": "Voir l'historique complet",
+    "optimal": "Optimale",
+    "moderate": "Modérée",
+    "critical": "Critique",
+    "routine_generating": "Génération de la routine personnalisée en cours...",
+    "routine_generating_hint": "(Veuillez attendre avant le téléchargement PDF)",
+    "errors": {
+      "routine_load_fail": "Impossible de charger la section routine pour le moment.",
+      "retry_hint": "(Veuillez réessayer plus tard ou vérifier votre connexion)"
+    },
+    "profile": {
+      "title": "Profil de Peau",
+      "add_photos": "Ajouter des photos",
+      "images_count": "{{count}}/5 images",
+      "main_photo": "PRINCIPALE",
+      "add_a_photo": "Ajouter une photo",
+      "or_drag_drop": "ou glisser-déposer",
+      "photos_ready": "Photos prêtes pour l'analyse IA multi-angles",
+      "launch_analysis": "Lancer l'analyse IA",
+      "age": "Âge",
+      "skin_type": "Type de peau",
+      "skin_types": {
+        "Oily": "Grasse",
+        "Dry": "Sèche",
+        "Combination": "Mixte",
+        "Sensitive": "Sensible",
+        "Normal": "Normale"
+      }
+    },
+    "scan": {
+      "capturing": "Capture de l'image...",
+      "processing": "Analyse multi-conditions par l'IA...",
+      "scoring": "Calcul du score composite expert...",
+      "done": "Analyse terminée"
+    },
+    "pdf": {
+      "ai_expertise": "Intelligence Artificielle Dermatologique",
+      "expert_report": "RAPPORT ANALYTIQUE EXPERT",
+      "generated_on": "Généré le",
+      "years": "ans",
+      "ai_detections": "Detections IA",
+      "points": "points",
+      "diagnostic_summary": "Diagnostic de Synthèse",
+      "free_plan_message": "Le diagnostic expert approfondi est réservé aux membres PRO. Ce rapport interactif présente une synthèse de votre état cutané actuel basée sur notre moteur IA multi-spectre.",
+      "pro_summary_template": "L'analyse automatisée de votre profil cutané met en évidence une performance optimale sur la condition {{best}}. À l'inverse, l'aspect {{worst}} constitue votre priorité dermatologique actuelle. L'équilibre global de votre barrière est évalué à {{score}}/100.",
+      "strength_point": "Point de Force",
+      "priority_axis": "Axe Prioritaire",
+      "stable": "Stable",
+      "none": "Aucun",
+      "detailed_analysis": "Analyse Détaillée des Conditions",
+      "expert_score": "Expert Score",
+      "probable_causes": "Causes Probables",
+      "care_advice": "Conseils de Soins",
+      "complete_care_strategy": "Votre Stratégie de Soins Complète",
+      "upgrade_title": "Passez à la vitesse supérieure",
+      "pro_routine_only": "La routine de soins complète et détaillée (incluant les recommandations de produits spécifiques) est une fonctionnalité de notre Intelligence Artificielle avancée exclusive aux abonnés PRO et PREMIUM.",
+      "morning_routine": "Routine du Matin (AM)",
+      "night_routine": "Routine du Soir (PM)",
+      "recommended_product": "Produit recommandé",
+      "instructions": "Instructions",
+      "expert_personalized_advice": "Conseil Expert Personnalisé",
+      "footer_disclaimer": "Ce rapport a été généré par l'Intelligence Artificielle de DeepSkyn. Les résultats sont basés sur une analyse visuelle et des données déclaratives. Cette analyse n'est pas un diagnostic médical et ne remplace en aucun cas l'avis, le diagnostic ou le traitement d'un professionnel de santé qualifié.",
+      "footer_brand": "www.deepskyn.app • Expertise Digitale Dermatologique"
+    },
+    "conditions": {
+      "Acne": "Acné",
+      "Enlarged-Pores": "Pores dilatés",
+      "Atrophic Scars": "Cicatrices",
+      "Skin Redness": "Rougeurs",
+      "Blackheads": "Points noirs",
+      "Dark-Spots": "Taches brunes",
+      "black_dots": "Points noirs",
+      "Hydration": "Hydratation",
+      "Wrinkles": "Rides"
+    },
+    "condition_meta_desc": {
+      "Acne": "Inflammations, boutons",
+      "Enlarged-Pores": "Texture et visibilité",
+      "Atrophic Scars": "Relief et marques",
+      "Skin Redness": "Sensibilité et vaisseaux",
+      "Blackheads": "Pores et oxydation",
+      "Dark-Spots": "Pigmentation",
+      "black_dots": "Impuretés profondes",
+      "Hydration": "Élasticité",
+      "Wrinkles": "Profondeur"
+    },
+    "condition_details": {
+      "Acne": {
+        "label": "Acné",
+        "desc": "Inflammations et boutons",
+        "causes": [
+          "Hormones",
+          "Excès de sébum",
+          "Prolifération bactérienne",
+          "Pores obstrués"
+        ],
+        "care": [
+          "Nettoyage doux",
+          "Soins non comédogènes",
+          "Actifs ciblés (acide salicylique)",
+          "Protection solaire"
+        ]
+      },
+      "Enlarged-Pores": {
+        "label": "Pores dilatés",
+        "desc": "Visibilité accrue des pores",
+        "causes": [
+          "Génétique",
+          "Excès de sébum",
+          "Perte d'élasticité",
+          "Soleil"
+        ],
+        "care": [
+          "Nettoyage profond",
+          "Toniques astringents",
+          "Niacinamide",
+          "Exfoliation douce"
+        ]
+      },
+      "Atrophic Scars": {
+        "label": "Cicatrices",
+        "desc": "Marques et relief irrégulier",
+        "causes": [
+          "Acné passée",
+          "Inflammation sévère",
+          "Manque de collagène"
+        ],
+        "care": [
+          "Rétinol",
+          "Micro-needling",
+          "Vitamine C",
+          "Hydratation profonde"
+        ]
+      },
+      "Skin Redness": {
+        "label": "Rougeurs",
+        "desc": "Sensibilité et réactivité",
+        "causes": [
+          "Rosacée",
+          "Sensibilité",
+          "Facteurs climatiques",
+          "Stress"
+        ],
+        "care": [
+          "Soins apaisants",
+          "Sans parfum",
+          "CICA",
+          "Protection solaire"
+        ]
+      },
+      "Blackheads": {
+        "label": "Points noirs",
+        "desc": "Pores obstrués et oxydés",
+        "causes": [
+          "Sébum",
+          "Peaux mortes",
+          "Pollution"
+        ],
+        "care": [
+          "Acide salicylique",
+          "Double nettoyage",
+          "Masque à l'argile"
+        ]
+      },
+      "Dark-Spots": {
+        "label": "Taches brunes",
+        "desc": "Hyperpigmentation ciblée",
+        "causes": [
+          "UV",
+          "Âge",
+          "Hormones",
+          "Inflammation"
+        ],
+        "care": [
+          "Vitamine C",
+          "SPF 50+",
+          "Acide azélaïque",
+          "Niacinamide"
+        ]
+      },
+      "black_dots": {
+        "label": "Points noirs",
+        "desc": "Impuretés profondes",
+        "causes": [
+          "Sébum",
+          "Oxydation",
+          "Manque d'exfoliation"
+        ],
+        "care": [
+          "Exfoliation chimique",
+          "Hydratation légère",
+          "Nettoyage quotidien"
+        ]
+      },
+      "Hydration": {
+        "label": "Hydratation",
+        "desc": "Élasticité et confort",
+        "causes": [
+          "Manque d'eau",
+          "Barrière endommagée",
+          "Climat"
+        ],
+        "care": [
+          "Acide hyaluronique",
+          "Glycérine",
+          "Céramides"
+        ]
+      },
+      "Wrinkles": {
+        "label": "Rides",
+        "desc": "Marques du temps et expression",
+        "causes": [
+          "Âge",
+          "Déshydratation",
+          "Soleil",
+          "Expressions"
+        ],
+        "care": [
+          "Rétinoïdes",
+          "Peptides",
+          "Antioxydants",
+          "Protection solaire"
+        ]
+      }
+    },
+    "no_data_available": "Aucune donnée disponible pour cette analyse.",
+    "no_description_available": "Aucune description disponible.",
+    "no_detailed_description": "Aucune description détaillée disponible pour cette condition.",
+    "multiple_factors": "Facteurs multiples à évaluer selon votre routine et votre environnement.",
+    "adopt_gentle_routine": "Adoptez une routine douce et régulière en suivant les conseils d'un professionnel si besoin.",
+    "desc_excellent": "Vos résultats indiquent que cette condition est bien maîtrisée — continuez votre routine actuelle pour maintenir ce bon niveau.",
+    "desc_moderate": "Le score obtenu ({{score}}/100) signale des signes modérés qui méritent une attention régulière sans urgence.",
+    "desc_critical": "Avec un score de {{score}}/100 et {{detections}}, cette condition est prioritaire dans votre routine.",
+    "detections_plural": "{{count}} détections",
+    "detections_singular": "{{count}} détection",
+    "several_signals": "plusieurs signaux détectés",
+    "reco_excellent": "Maintenez votre routine actuelle : elle est efficace pour {{condition}}.",
+    "reco_critical": "⚠️ Priorité haute : intensifier le traitement de {{condition}} avec des actifs ciblés dès que possible.",
+    "best_aspect": "Meilleur aspect",
+    "severity": "Sévérité",
+    "under_control": "Sous contrôle",
+    "to_monitor": "À surveiller",
+    "priority": "Prioritaire",
+    "global_score": "Score global",
+    "total": "au total",
+    "unavailable": "Non disponible",
+    "non_evaluated": "Non évalué",
+    "health_score": "Score de santé",
+    "description": "Description",
+    "causes": "Causes",
+    "recommendations": "Recommandations",
+    "interpretation": {
+      "optimal": "Condition sous contrôle, barrière cutanée saine.",
+      "moderate": "Signes visibles nécessitant une attention régulière.",
+      "critical": "Condition marquée nécessitant des soins ciblés prioritaires."
+    }
+  },
+  "common": {
+    "compare": "Comparer",
+    "revoke": "Révoquer",
+    "revoke_all": "Révoquer toutes les sessions",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "success": "Succès"
+  },
+  "products": {
+    "title": "Nos Produits",
+    "subtitle": "Découvrez des produits soins sélectionnés par IA pour votre type de peau",
+    "search_placeholder": "Rechercher un produit...",
+    "filters": "Filtres",
+    "reset": "Réinitialiser",
+    "all": "Tous",
+    "clean_only": "Formules clean uniquement",
+    "results": "résultats",
+    "sort": {
+      "name_az": "Nom (A–Z)",
+      "name_za": "Nom (Z–A)",
+      "price_asc": "Prix : Croissant",
+      "price_desc": "Prix : Décroissant"
+    },
+    "no_results": "Aucun produit ne correspond à vos filtres.",
+    "buy": "Acheter",
+    "loading": "Chargement des produits...",
+    "error": "Impossible de charger les produits. Vérifiez votre connexion."
+  },
+  "routines": {
+    "builder": "Routine Builder",
+    "title": "Ta routine AM / PM",
+    "subtitle": "Coche chaque étape quand tu l’as faite. Objectif: une routine claire et régulière.",
+    "pdf": "Rapport PDF",
+    "analysis_adjustments": "Analyse & Ajustements",
+    "skin": "Peau",
+    "hydration": "Hydratation",
+    "sebum": "Sébum",
+    "acne": "Acné",
+    "wrinkles": "Rides",
+    "recommended_products": "Produits Recommandés SVR",
+    "tips": "Astuce: une routine simple et répétée donne de meilleurs résultats qu’une routine trop complexe.",
+    "pro_only": {
+      "title": "Routine Personnalisée PRO",
+      "desc": "Le Routine Builder intelligent, qui adapte vos soins selon vos analyses IA, est réservé aux membres PRO. Optimisez votre routine maintenant !",
+      "back": "Retour",
+      "unlock": "Débloquer maintenant"
+    }
+  },
+  "sessions": {
+    "title": "Sessions Actives",
+    "subtitle": "Gérez et révoquez vos sessions de connexion sur vos différents appareils.",
+    "revoke_all": "Révoquer tout",
+    "revoke": "Révoquer",
+    "current_session": "Session actuelle",
+    "last_activity": "Dernière activité",
+    "ip": "IP",
+    "empty": "Aucune session active",
+    "empty_hint": "Vos sessions s'afficheront ici une fois connecté.",
+    "risk": {
+      "high": "Risque Élevé",
+      "medium": "Risque Modéré",
+      "low": "Sécurisé"
+    },
+    "confirm_revoke_all": "Êtes-vous sûr de vouloir révoquer toutes les autres sessions ?",
+    "footer_info": "Les sessions sont automatiquement supprimées après 7 jours d'inactivité. Vous pouvez révoquer manuellement n'importe quelle session à tout moment.",
+    "loading": "Chargement des sessions...",
+    "unknown_browser": "Navigateur inconnu",
+    "unknown_system": "Système inconnu"
+  },
+  "svr_routine": {
+    "generating": "Génération en cours...",
+    "generating_desc": "L'IA sélectionne vos produits SVR personnalisés",
+    "free_notice": {
+      "title": "Programme SVR Personnalisé",
+      "desc": "Débloquez votre routine SVR générée par IA et vos programmes de soins personnalisés en passant au plan PRO.",
+      "upgrade": "Passer à PRO"
+    },
+    "selection_title": "Sélection IA Personnalisée",
+    "selection_subtitle": "Produits Recommandés pour Votre Peau",
+    "products_selected": "{{count}} produits sélectionnés",
+    "profile_identified": "Profil identifié : ",
+    "regenerate": "Regénérer",
+    "daily_routine": "Routine Quotidienne Personnalisée",
+    "morning_tab": "Routine Matin (AM)",
+    "night_tab": "Routine Soir (PM)",
+    "steps_count": "{{count}} étapes",
+    "advice_title": "Conseil Dermatologique Personnalisé",
+    "lock_message": "Complétez l'étape précédente pour déverrouiller",
+    "step_prefix": "Étape",
+    "application": "Application",
+    "why_product": "Pourquoi ce produit",
+    "hide": "Masquer",
+    "instructions_reason": "Instructions & raison",
+    "top": "TOP",
+    "details": "Détails",
+    "ai_analysis": "Analyse IA",
+    "reduce": "Réduire",
+    "categories": {
+      "cleanser": "Nettoyant",
+      "toner": "Tonique",
+      "serum": "Sérum",
+      "moisturizer": "Hydratant",
+      "sunscreen": "Écran Solaire",
+      "eye-cream": "Contour Yeux",
+      "exfoliant": "Exfoliant",
+      "mask": "Masque",
+      "treatment": "Traitement"
+    }
+  }
+}

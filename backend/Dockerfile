@@ -1,20 +1,39 @@
 # Build stage
-FROM node:18-alpine AS build
+FROM node:22-slim AS build
+
+# Installation des outils de build et de libgomp1 (crucial pour ONNX/AI)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    curl \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm install
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
 
-# Copy source
+COPY package*.json ./
+
+# Installation explicite de onnxruntime-node et sharp
+RUN npm install onnxruntime-node sharp --legacy-peer-deps || true
+
+# Installation du reste des dépendances
+RUN npm install --legacy-peer-deps
+
 COPY . .
 
-# Run tests with coverage
-RUN npm run test:coverage
+# Build
+RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:22-slim
+
+# On réinstalle libgomp1 dans l'image finale pour l'exécution
+RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -24,4 +43,4 @@ COPY --from=build /app/node_modules ./node_modules
 
 EXPOSE 3001
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "if [ -f dist/main.js ]; then node dist/main.js; else node dist/src/main.js; fi"]

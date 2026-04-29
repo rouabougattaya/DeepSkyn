@@ -86,8 +86,8 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
     if (user?.id) {
       authFetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"}/subscription/status/${user.id}`)
         .then(res => {
-           if (!res.ok) throw new Error('Unauthorized');
-           return res.json();
+          if (!res.ok) throw new Error('Unauthorized');
+          return res.json();
         })
         .then(data => setStatus(data))
         .catch(err => console.error("Error fetching status:", err));
@@ -108,10 +108,9 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
   return (
     <>
       {/* Desktop Sidebar with Collapse */}
-      <aside className={`hidden lg:flex lg:flex-col border-r border-slate-200 bg-white text-slate-900 fixed top-16 bottom-0 z-30 transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'lg:w-20' : 'lg:w-64'
-      }`}>
-        
+      <aside className={`hidden lg:flex lg:flex-col border-r border-slate-200 bg-white text-slate-900 fixed top-16 bottom-0 z-30 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:w-20' : 'lg:w-64'
+        }`}>
+
         {/* Header with Toggle */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200">
           {!isCollapsed && <h3 className="text-sm font-bold text-slate-900">Navigation</h3>}
@@ -176,36 +175,36 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
           {/* Usage Indicator */}
           {status && status.chat && status.analysis && !isCollapsed && (
             <div className="mx-1 mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-               <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                  <span>Usage {status.plan}</span>
-                  <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
-               </div>
-               <div className="space-y-3">
-                  <div className="space-y-1.5">
-                     <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-slate-600">Messages Chat</span>
-                        <span className="text-slate-900">{status.chat.used}/{status.chat.limit}</span>
-                     </div>
-                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-teal-500 transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (status.chat.used / status.chat.limit) * 100)}%` }} 
-                        />
-                     </div>
+              <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                <span>Usage {status.plan}</span>
+                <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="text-slate-600">Messages Chat</span>
+                    <span className="text-slate-900">{status.chat.used}/{status.chat.limit}</span>
                   </div>
-                  <div className="space-y-1.5">
-                     <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-slate-600">Analyses Peau</span>
-                        <span className="text-slate-900">{status.analysis.used}/{status.analysis.limit}</span>
-                     </div>
-                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-teal-500 transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (status.analysis.used / status.analysis.limit) * 100)}%` }} 
-                        />
-                     </div>
+                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (status.chat.used / status.chat.limit) * 100)}%` }}
+                    />
                   </div>
-               </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="text-slate-600">Analyses Peau</span>
+                    <span className="text-slate-900">{status.analysis.used}/{status.analysis.limit}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (status.analysis.used / status.analysis.limit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -228,7 +227,7 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
             className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
             title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="w-4 h-4" /> 
+            <LogOut className="w-4 h-4" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -258,7 +257,7 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
               {groups.map((group) => (
                 <div key={group.title} className="space-y-2">
@@ -306,7 +305,7 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
                 </div>
               ))}
             </div>
-            
+
             <div className="border-t border-slate-200 p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 grid place-items-center font-semibold flex-shrink-0">

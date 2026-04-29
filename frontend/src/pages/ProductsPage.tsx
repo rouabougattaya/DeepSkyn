@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Navbar } from "@/components/Navbar"
 import { Sidebar } from "@/components/Sidebar"
 import { getUser } from "@/lib/authSession"
@@ -29,6 +30,7 @@ const SORT_OPTIONS: { label: string; field: SortField; dir: SortDir }[] = [
 ]
 
 export default function ProductsPage() {
+    const { t } = useTranslation()
     const user = getUser()
     // ── Filter state ────────────────────────────────────────────────────────────
     const [search, setSearch] = useState("")
@@ -119,14 +121,14 @@ export default function ProductsPage() {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
                     <SlidersHorizontal size={15} />
-                    Filtres
+                    {t('products.filters')}
                 </div>
                 {hasActiveFilters && (
                     <button
                         onClick={resetFilters}
                         className="flex items-center gap-1 text-xs text-teal-600 font-bold hover:underline"
                     >
-                        <X size={12} /> Réinitialiser
+                        <X size={12} /> {t('products.reset')}
                     </button>
                 )}
             </div>
@@ -135,16 +137,16 @@ export default function ProductsPage() {
             <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
                 <div className="flex flex-wrap gap-2">
-                    {["", ...types].map((t) => (
+                    {["", ...types].map((typeOpt) => (
                         <button
-                            key={t || "__all__"}
-                            onClick={() => setType(t)}
-                            className={`rounded-full border px-3 py-1 text-xs font-bold capitalize transition ${type === t
+                            key={typeOpt || "__all__"}
+                            onClick={() => setType(typeOpt)}
+                            className={`rounded-full border px-3 py-1 text-xs font-bold capitalize transition ${type === typeOpt
                                 ? "bg-teal-600 border-teal-600 text-white"
                                 : "border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700"
                                 }`}
                         >
-                            {t || "Tous"}
+                            {typeOpt || t('products.all')}
                         </button>
                     ))}
                 </div>
@@ -206,7 +208,7 @@ export default function ProductsPage() {
                     </div>
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
                         <Leaf size={14} className="text-emerald-500" />
-                        Ingrédients clean uniquement
+                        {t('products.clean_only')}
                     </span>
                 </label>
             </div>
@@ -239,10 +241,10 @@ export default function ProductsPage() {
                                         Smart Search
                                     </div>
                                     <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
-                                        Produits Skincare
+                                        {t('products.title')}
                                     </h1>
                                     <p className="mt-1 text-sm text-slate-500">
-                                        Recherche, filtre et trouve le produit parfait pour ta peau.
+                                        {t('products.subtitle')}
                                     </p>
                                 </div>
 
@@ -251,7 +253,7 @@ export default function ProductsPage() {
                                     <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                     <input
                                         type="text"
-                                        placeholder="Rechercher un produit…"
+                                        placeholder={t('products.search_placeholder')}
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400"
@@ -297,7 +299,7 @@ export default function ProductsPage() {
                                         {/* Result count */}
                                         {!loading && (
                                             <span className="text-xs text-slate-500 font-semibold">
-                                                {products.length} résultat{products.length !== 1 ? 's' : ''}
+                                                {products.length} {t('products.results')}{products.length !== 1 ? 's' : ''}
                                             </span>
                                         )}
 
@@ -321,7 +323,7 @@ export default function ProductsPage() {
                                 {loading && (
                                     <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-white py-16 shadow-sm text-slate-500">
                                         <Loader2 size={22} className="animate-spin text-teal-500" />
-                                        <span className="text-sm font-semibold">Chargement des produits…</span>
+                                        <span className="text-sm font-semibold">{t('common.loading')}</span>
                                     </div>
                                 )}
 
@@ -336,12 +338,12 @@ export default function ProductsPage() {
                                 {!loading && !error && products.length === 0 && (
                                     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-white py-20 shadow-sm text-center">
                                         <span className="text-5xl">🔍</span>
-                                        <p className="text-sm font-semibold text-slate-600">Aucun produit trouvé pour ces critères.</p>
+                                        <p className="text-sm font-semibold text-slate-600">{t('products.no_products')}</p>
                                         <button
                                             onClick={resetFilters}
                                             className="mt-2 rounded-xl bg-teal-600 px-4 py-2 text-xs font-extrabold text-white hover:brightness-105 transition"
                                         >
-                                            Réinitialiser les filtres
+                                            {t('products.reset')}
                                         </button>
                                     </div>
                                 )}

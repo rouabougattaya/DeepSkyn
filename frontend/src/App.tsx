@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
 import { AppLayout } from './components/AppLayout'
@@ -58,10 +61,18 @@ function Home() {
 }
 
 function App() {
+  const { i18n } = useTranslation()
+
+  useEffect(() => {
+    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr'
+    document.documentElement.lang = i18n.language
+  }, [i18n.language])
+
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
@@ -137,10 +148,11 @@ function App() {
           path="/admin/settings"
         />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   )
 }
 

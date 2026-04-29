@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Sun, Moon, Sparkles, ChevronDown, ChevronUp,
   Loader2, Lock, ArrowUpRight, Info, CheckCircle, AlertCircle,
@@ -35,6 +36,7 @@ const normalizeImageUrl = (url?: string) => {
 
 /* ─── Dynamic Recommended Product Card ──────────────────────────── */
 function RecommendedCard({ product, rank }: { product: SvrRecommendedProduct; rank: number }) {
+  const { t } = useTranslation();
   const [showReason, setShowReason] = useState(false);
   const [failedImg, setFailedImg] = useState(false);
   const cat = getCat(product.category);
@@ -111,7 +113,7 @@ function RecommendedCard({ product, rank }: { product: SvrRecommendedProduct; ra
             textTransform: 'uppercase', letterSpacing: '0.05em',
             background: `${cat.color}10`, padding: '3px 10px', borderRadius: 8,
           }}>
-            {cat.label}
+            {t(`svr_routine.categories.${product.category}`, { defaultValue: cat.label })}
           </span>
           {product.texture && (
             <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
@@ -175,7 +177,7 @@ function RecommendedCard({ product, rank }: { product: SvrRecommendedProduct; ra
             }}
           >
             <Sparkles size={14} style={{ color: cat.color }} />
-            {showReason ? 'Réduire' : 'Analyse IA'}
+            {showReason ? t('svr_routine.reduce', { defaultValue: 'Réduire' }) : t('svr_routine.ai_analysis', { defaultValue: 'Analyse IA' })}
             {showReason ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 
@@ -217,7 +219,7 @@ function RecommendedCard({ product, rank }: { product: SvrRecommendedProduct; ra
             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4
           }}
         >
-          Détails <ArrowUpRight size={14} />
+          {t('svr_routine.details', { defaultValue: 'Détails' })} <ArrowUpRight size={14} />
         </a>
       </div>
     </div>
@@ -232,6 +234,7 @@ function StepCard({ step, index, completed, locked, onToggle }: {
   locked?: boolean;
   onToggle?: () => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const cat = getCat(step.product.category);
 
@@ -261,7 +264,7 @@ function StepCard({ step, index, completed, locked, onToggle }: {
           background: '#f1f5f9', borderBottom: '1px solid #e2e8f0',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
-          <Lock size={12} /> Complétez l'étape précédente pour déverrouiller
+          <Lock size={12} /> {t('svr_routine.lock_message', { defaultValue: "Complétez l'étape précédente pour déverrouiller" })}
         </div>
       )}
       {/* Header */}
@@ -289,7 +292,7 @@ function StepCard({ step, index, completed, locked, onToggle }: {
             textTransform: 'uppercase', letterSpacing: '0.07em',
             textDecoration: completed ? 'line-through' : 'none'
           }}>
-            Étape {index + 1} — {step.stepName}
+            {t('svr_routine.step_prefix', { defaultValue: 'Étape' })} {index + 1} — {step.stepName}
           </div>
           <div style={{
             fontSize: 14, fontWeight: 800, color: completed ? '#64748b' : '#0f172a',
@@ -305,7 +308,7 @@ function StepCard({ step, index, completed, locked, onToggle }: {
             background: cat.bg, color: cat.color, border: `1px solid ${cat.color}25`,
             display: 'block',
           }}>
-            {cat.emoji} {cat.label}
+            {cat.emoji} {t(`svr_routine.categories.${step.product.category}`, { defaultValue: cat.label })}
           </span>
         </div>
       </div>
@@ -355,16 +358,16 @@ function StepCard({ step, index, completed, locked, onToggle }: {
           }}
         >
           {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          {expanded ? 'Masquer' : 'Instructions & raison'}
+          {expanded ? t('svr_routine.hide', { defaultValue: 'Masquer' }) : t('svr_routine.instructions_reason', { defaultValue: 'Instructions & raison' })}
         </button>
         {expanded && (
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 4 }}>
             <div style={{ borderRadius: 12, padding: '11px 13px', background: 'rgba(8,145,178,0.05)', border: '1px solid rgba(8,145,178,0.15)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', marginBottom: 4 }}>📋 Application</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', marginBottom: 4 }}>📋 {t('svr_routine.application', { defaultValue: 'Application' })}</div>
               <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.6 }}>{step.instruction}</p>
             </div>
             <div style={{ borderRadius: 12, padding: '11px 13px', background: 'rgba(13,148,136,0.05)', border: '1px solid rgba(13,148,136,0.15)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', marginBottom: 4 }}>💡 Pourquoi ce produit</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', marginBottom: 4 }}>💡 {t('svr_routine.why_product', { defaultValue: 'Pourquoi ce produit' })}</div>
               <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.6 }}>{step.reason}</p>
             </div>
           </div>
@@ -411,6 +414,7 @@ export function SvrRoutinePanel({
   completedSteps = [],
   onToggleStep
 }: SvrRoutinePanelProps & { onRoutineLoad?: (data: SvrRoutineResult) => void }) {
+  const { t } = useTranslation();
   const [routine, setRoutine] = useState<SvrRoutineResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -501,8 +505,8 @@ export function SvrRoutinePanel({
           boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
         }}>
           <Loader2 className="animate-spin mx-auto mb-3 text-teal-600" size={32} />
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Génération en cours...</div>
-          <div style={{ fontSize: 13, color: '#64748b' }}>L'IA sélectionne vos produits SVR personnalisés</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{t('svr_routine.generating', { defaultValue: 'Génération en cours...' })}</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t('svr_routine.generating_desc', { defaultValue: "L'IA sélectionne vos produits SVR personnalisés" })}</div>
         </div>
       )}
 
@@ -513,9 +517,9 @@ export function SvrRoutinePanel({
           border: '1px dashed #cbd5e1', marginBottom: 20
         }}>
           <Lock className="mx-auto mb-4 text-slate-400" size={32} />
-          <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>Programme SVR Personnalisé</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>{t('svr_routine.free_notice.title', { defaultValue: 'Programme SVR Personnalisé' })}</h3>
           <p style={{ fontSize: 14, color: '#64748b', maxWidth: 400, margin: '8px auto 16px' }}>
-            Débloquez votre routine SVR générée par IA et vos programmes de soins personnalisés en passant au plan PRO.
+            {t('svr_routine.free_notice.desc', { defaultValue: 'Débloquez votre routine SVR générée par IA et vos programmes de soins personnalisés en passant au plan PRO.' })}
           </p>
           <button
             onClick={() => window.location.href = '/upgrade'}
@@ -524,7 +528,7 @@ export function SvrRoutinePanel({
               color: 'white', fontWeight: 700, borderRadius: 50, border: 'none', cursor: 'pointer'
             }}
           >
-            Passer à PRO
+            {t('svr_routine.free_notice.upgrade', { defaultValue: 'Passer à PRO' })}
           </button>
         </div>
       )}
@@ -571,10 +575,10 @@ export function SvrRoutinePanel({
                 </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Sélection IA Personnalisée
+                    {t('svr_routine.selection_title', { defaultValue: 'Sélection IA Personnalisée' })}
                   </div>
                   <h3 style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Produits Recommandés pour Votre Peau
+                    {t('svr_routine.selection_subtitle', { defaultValue: 'Produits Recommandés pour Votre Peau' })}
                   </h3>
                 </div>
                 <span style={{
@@ -582,7 +586,7 @@ export function SvrRoutinePanel({
                   background: 'rgba(13,148,136,0.1)', color: '#0d9488',
                   padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(13,148,136,0.25)',
                 }}>
-                  {routine.recommendedProducts?.length ?? 0} produits sélectionnés
+                  {t('svr_routine.products_selected', { count: routine.recommendedProducts?.length ?? 0, defaultValue: 'produits sélectionnés' })}
                 </span>
               </div>
 
@@ -595,7 +599,7 @@ export function SvrRoutinePanel({
               }}>
                 <CheckCircle size={16} style={{ color: '#0d9488', flexShrink: 0 }} />
                 <div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0d9488' }}>Profil identifié : </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0d9488' }}>{t('svr_routine.profile_identified', { defaultValue: 'Profil identifié : ' })}</span>
                   <span style={{ fontSize: 13, color: '#334155' }}>{routine.skinProfile}</span>
                 </div>
                 <button
@@ -606,7 +610,7 @@ export function SvrRoutinePanel({
                     color: '#0d9488', cursor: 'pointer', flexShrink: 0,
                   }}
                 >
-                  ↻ Regénérer
+                  ↻ {t('svr_routine.regenerate', { defaultValue: 'Regénérer' })}
                 </button>
               </div>
 
@@ -655,7 +659,7 @@ export function SvrRoutinePanel({
                   {activeTab === 'morning' ? <Sun size={18} color="white" /> : <Moon size={18} color="white" />}
                 </div>
                 <h3 style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Routine Quotidienne Personnalisée
+                  {t('svr_routine.daily_routine', { defaultValue: 'Routine Quotidienne Personnalisée' })}
                 </h3>
               </div>
 
@@ -673,14 +677,14 @@ export function SvrRoutinePanel({
                     boxShadow: activeTab === tab ? '0 4px 14px rgba(13,148,136,0.3)' : 'none',
                   }}>
                     {tab === 'morning' ? <Sun size={15} /> : <Moon size={15} />}
-                    {tab === 'morning' ? ' Routine Matin (AM)' : ' Routine Soir (PM)'}
+                    {tab === 'morning' ? t('svr_routine.morning_tab', { defaultValue: ' Routine Matin (AM)' }) : t('svr_routine.night_tab', { defaultValue: ' Routine Soir (PM)' })}
                     <span style={{
                       fontSize: 10, fontWeight: 800,
                       background: activeTab === tab ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
                       color: activeTab === tab ? 'white' : '#64748b',
                       padding: '2px 8px', borderRadius: 99,
                     }}>
-                      {(tab === 'morning' ? routine.morning : routine.night).length} étapes
+                      {t('svr_routine.steps_count', { count: (tab === 'morning' ? routine.morning : routine.night).length, defaultValue: 'étapes' })}
                     </span>
                   </button>
                 ))}
@@ -726,7 +730,7 @@ export function SvrRoutinePanel({
               </div>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>
-                  Conseil Dermatologique Personnalisé
+                  {t('svr_routine.advice_title', { defaultValue: 'Conseil Dermatologique Personnalisé' })}
                 </div>
                 <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.7 }}>{routine.generalAdvice}</p>
               </div>

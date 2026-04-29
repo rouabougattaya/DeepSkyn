@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
-import { 
-  Sparkles, 
-  Camera, 
-  MessageCircle, 
-  Sun, 
-  Moon, 
-  Shield, 
+import {
+  Sparkles,
+  Camera,
+  MessageCircle,
+  Sun,
+  Moon,
+  Shield,
   Zap,
   ArrowRight,
   Star,
@@ -32,14 +32,14 @@ export default function HomePage() {
             <Sparkles className="w-4 h-4" />
             <span>AI-Powered Dermatology Assistant</span>
           </div>
-          
+
           <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 mb-6 tracking-tight leading-[1.1]">
             Discover Your Skin's <br />
             <span className="text-[#0d9488]">True Potential</span>
           </h1>
-          
+
           <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Get personalized AI-powered skin analysis and routines tailored just for you. 
+            Get personalized AI-powered skin analysis and routines tailored just for you.
             Science-backed results in seconds.
           </p>
 
@@ -92,7 +92,7 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">How DeepSkyn Works</h2>
             <p className="text-slate-500">Transform your skincare journey in three simple steps</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <Step number="01" title="Upload Photos" description="Take clear photos of your face for our AI to process." />
             <Step number="02" title="AI Analysis" description="Advanced algorithms analyze texture, pores, and tone." />

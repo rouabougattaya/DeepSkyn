@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import AiResponseFormatter from '../components/chat/AiResponseFormatter';
@@ -6,6 +7,7 @@ import { AlertCircle, ArrowUpCircle } from 'lucide-react';
 
 
 const ChatPage: React.FC = () => {
+  const { t } = useTranslation();
   const { messages, isLoading, error, sendMessage } = useChat();
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -29,12 +31,12 @@ const ChatPage: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-4 border border-gray-100 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Chat IA Personnalisé</h1>
-          <p className="text-sm text-gray-500">Basé sur votre dernière analyse de peau</p>
+          <h1 className="text-xl font-bold text-gray-800">{t('chat.title')}</h1>
+          <p className="text-sm text-gray-500">{t('chat.subtitle')}</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 rtl:space-x-reverse">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <span className="text-xs font-medium text-gray-600">IA en ligne</span>
+          <span className="text-xs font-medium text-gray-600">{t('chat.online')}</span>
         </div>
       </div>
 
@@ -47,8 +49,8 @@ const ChatPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025 4.486 4.486 0 0 0-.153-1.856A8.074 8.074 0 0 1 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold mb-2">Comment puis-je vous aider aujourd'hui ?</h2>
-            <p className="text-sm max-w-xs">Posez vos questions sur vos analyses, votre routine ou des conseils de soins spécifiques.</p>
+            <h2 className="text-lg font-semibold mb-2">{t('chat.welcome')}</h2>
+            <p className="text-sm max-w-xs">{t('chat.welcome_hint')}</p>
           </div>
         )}
 
@@ -77,32 +79,32 @@ const ChatPage: React.FC = () => {
         {error && (
           <div className="flex flex-col items-center gap-3">
             <div className={`text-xs p-4 rounded-xl border flex items-center gap-3 w-full
-              ${error.includes('LIMIT_REACHED') 
-                ? 'bg-amber-50 border-amber-200 text-amber-700' 
+              ${error.includes('LIMIT_REACHED')
+                ? 'bg-amber-50 border-amber-200 text-amber-700'
                 : 'bg-red-50 border-red-200 text-red-600'}`}>
               <AlertCircle size={18} className="shrink-0" />
               <div className="flex-1">
                 <p className="font-bold">
-                  {error.includes('LIMIT_REACHED') ? 'Limite journalière atteinte 🔒' : 'Erreur'}
+                  {error.includes('LIMIT_REACHED') ? t('chat.limit_reached') : t('common.error')}
                 </p>
                 <p className="opacity-80">
-                  {error.includes('LIMIT_REACHED') 
-                    ? 'Vous avez épuisé vos 20 messages gratuits. Passez au plan PRO pour discuter sans limites avec notre expert IA.' 
+                  {error.includes('LIMIT_REACHED')
+                    ? t('chat.limit_message')
                     : error}
                 </p>
               </div>
               {error.includes('LIMIT_REACHED') && (
-                <Link 
-                  to="/upgrade" 
+                <Link
+                  to="/upgrade"
                   className="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors flex items-center gap-2 text-sm shadow-sm"
                 >
-                  <ArrowUpCircle size={14} /> Améliorer
+                  <ArrowUpCircle size={14} /> {t('chat.upgrade')}
                 </Link>
               )}
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -112,18 +114,17 @@ const ChatPage: React.FC = () => {
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Posez votre question à l'IA..."
+          placeholder={t('chat.placeholder')}
           className="flex-1 border-none focus:ring-0 text-sm py-2 px-1 text-gray-700"
           disabled={isLoading}
         />
         <button
           type="submit"
           disabled={!inputText.trim() || isLoading}
-          className={`p-2 rounded-lg transition-colors ${
-            !inputText.trim() || isLoading || (error && error.includes('LIMIT_REACHED'))
+          className={`p-2 rounded-lg transition-colors ${!inputText.trim() || isLoading || (error && error.includes('LIMIT_REACHED'))
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : 'bg-primary text-white hover:bg-opacity-90'
-          }`}
+            }`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             <path d="M3.105 2.289a.75.75 0 0 0-.826.95l1.414 4.925L10.29 10l-6.597 1.836-1.414 4.925a.75.75 0 0 0 .826.95 44.82 44.82 0 0 0 16.142-7.854.75.75 0 0 0 0-1.114 44.821 44.821 0 0 0-16.142-7.854Z" />

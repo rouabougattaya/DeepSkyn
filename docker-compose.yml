@@ -23,40 +23,26 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
-
-      # CORS - Autoriser le frontend Docker (port 80) ET le dev local
       CORS_ORIGIN: http://localhost
       FRONTEND_URL: http://localhost
-
-      # Database
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: deepskyn_db
       DB_USER: postgres
       DB_PASSWORD: skan2001
       DATABASE_URL: postgresql://postgres:skan2001@db:5432/deepskyn_db
-
-      # JWT
       JWT_SECRET: your_super_secret_jwt_key_here_change_in_production_12345
       JWT_ACCESS_SECRET: your_access_secret_key_12345
       JWT_REFRESH_SECRET: your_refresh_secret_key_12345
       JWT_EXPIRES_IN: 24h
       JWT_ISSUER: deepskyn
-
-      # Google / AI
       GEMINI_API_KEY: AIzaSyBneYSyhP9K3kX5PMMuXnr5eY-a8JbvItY
       GOOGLE_GENAI_API_KEY: AIzaSyBneYSyhP9K3kX5PMMuXnr5eY-a8JbvItY
-
-      # Email (Mailtrap)
       SMTP_HOST: sandbox.smtp.mailtrap.io
       SMTP_PORT: 2525
       SMTP_USER: 7a72a6b6cfeb56
       SMTP_PASS: 94caa5ddd078b4
-
-      # Security
       RECAPTCHA_SECRET_KEY: 6Le2AXUsAAAAACvq_TRyzOpynC9ibXBYDnxDES-s
-
-      # API Keys
       OPENROUTER_API_KEY: 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
       STRIPE_SECRET_KEY: sk_test_51TFwHuI4AYNJqh9RLg50jtzj2G4VRC33cw3seyv54cqzvcur3SVLePebVln6A13cuvFFLH4yK8MRgrjQYFDdEMgF00J849AMdn
       STRIPE_WEBHOOK_SECRET: whsec_0584d4801d12678a3a0b56efd182f440f8ffb003a01541ad7131588451890678
@@ -84,5 +70,27 @@ services:
     depends_on:
       - backend
 
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: deepskyn-jenkins
+    restart: always
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    extra_hosts:
+      - "github.com:140.82.121.3"
+      - "api.github.com:140.82.121.3"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JAVA_OPTS=-Dsun.net.spi.nameservice.nameservers=8.8.8.8 -Dsun.net.spi.nameservice.provider.1=dns,sun
+
 volumes:
   postgres_data:
+  jenkins_data:

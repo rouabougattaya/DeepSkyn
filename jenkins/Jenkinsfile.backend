@@ -16,7 +16,7 @@ pipeline {
         stage('📦 Checkout') {
             steps {
                 echo "📦 Récupération du code depuis GitHub..."
-                git branch: 'DEVOPS', 
+                git branch: 'master', 
                     url: 'https://github.com/rouabougattaya/DeepSkyn.git'
             }
         }

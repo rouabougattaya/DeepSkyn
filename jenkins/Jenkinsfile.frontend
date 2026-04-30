@@ -13,9 +13,7 @@ pipeline {
         VITE_GOOGLE_ID  = "203522484031-m9h6cfvjleufa23gir16pujbnctchqch.apps.googleusercontent.com"
     }
 
-    tools {
-        nodejs 'node20'
-    }
+   
 
     stages {
         stage('🔍 Diagnostic Réseau') {

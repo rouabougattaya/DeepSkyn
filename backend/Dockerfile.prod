@@ -1,0 +1,31 @@
+# Stage 1: Build
+FROM node:22-slim AS builder
+
+WORKDIR /app
+
+# Installation des dépendances système nécessaires pour sharp/onnx
+RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm install --legacy-peer-deps --network-timeout=100000
+
+COPY . .
+RUN npm run build
+
+# Stage 2: Production
+FROM node:22-slim
+
+WORKDIR /app
+
+# Répéter l'install des libs système pour l'exécution
+RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 3001
+
+CMD ["node", "dist/src/main.js"]

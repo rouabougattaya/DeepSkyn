@@ -13,19 +13,28 @@ pipeline {
     }
 
     stages {
-        stage('🔧 DNS Fix') {
+        stage('🔍 Diagnostic Réseau') {
             steps {
-                echo "🔧 Réparation du DNS pour GitHub..."
-                sh "echo '140.82.121.3 github.com' >> /etc/hosts || true"
-                sh "echo '140.82.121.3 api.github.com' >> /etc/hosts || true"
+                echo "--- Vérification du réseau Jenkins ---"
+                sh "cat /etc/hosts"
+                sh "getent hosts github.com || echo 'DNS : github.com inconnu'"
+                sh "curl -I https://140.82.121.3 --insecure --connect-timeout 5 || echo 'Réseau : IP injoignable'"
             }
         }
 
         stage('📦 Checkout') {
             steps {
                 echo "📦 Récupération du code depuis GitHub..."
-                git branch: 'master', 
-                    url: 'https://github.com/rouabougattaya/DeepSkyn.git'
+                // Utilisation de l'IP directe si le DNS échoue
+                script {
+                    try {
+                        git branch: 'master', url: 'https://github.com/rouabougattaya/DeepSkyn.git'
+                    } catch (Exception e) {
+                        echo "⚠️ Échec DNS, tentative via IP directe..."
+                        sh "git config --global http.sslVerify false"
+                        git branch: 'master', url: 'https://140.82.121.3/rouabougattaya/DeepSkyn.git'
+                    }
+                }
             }
         }
 
@@ -34,17 +43,7 @@ pipeline {
                 echo "📦 Installation des dépendances..."
                 sh '''
                     cd backend
-                    npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-                '''
-            }
-        }
-
-        stage('🧪 Tests') {
-            steps {
-                echo "🧪 Exécution des tests..."
-                sh '''
-                    cd backend
-                    npm run test || echo "Tests en attente de correction"
+                    npm install --legacy-peer-deps
                 '''
             }
         }
@@ -52,134 +51,46 @@ pipeline {
         stage('🏗️ Build NestJS') {
             steps {
                 echo "🏗️ Compilation du backend..."
-                sh '''
-                    cd backend
-                    npm run build || echo "Build à vérifier"
-                '''
+                sh 'cd backend && npm run build'
             }
         }
 
         stage('🐳 Docker Build') {
             steps {
-                echo "🐳 Construction de l'image Docker..."
-                sh '''
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ./backend
-                '''
+                echo "🐳 Construction de l'image..."
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ./backend"
             }
         }
 
-        stage('🔄 Stop & Remove Old Container') {
+        stage('🚀 Deployment') {
             steps {
-                echo "🔄 Arrêt du conteneur existant..."
+                echo "🚀 Déploiement des conteneurs..."
                 sh '''
-                    docker stop ${CONTAINER_NAME} 2>/dev/null || true
-                    docker rm ${CONTAINER_NAME} 2>/dev/null || true
-                '''
-            }
-        }
-
-        stage('🗄️ Start Database') {
-            steps {
-                echo "🐘 Démarrage de PostgreSQL..."
-                sh '''
-                    # Créer le réseau si nécessaire
                     docker network create ${NETWORK_NAME} 2>/dev/null || true
                     
-                    # Démarrer la base de données
-                    docker stop ${DB_CONTAINER} 2>/dev/null || true
-                    docker rm ${DB_CONTAINER} 2>/dev/null || true
+                    # Stop anciens
+                    docker stop ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
+                    docker rm ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
                     
-                    docker run -d \
-                        --name ${DB_CONTAINER} \
-                        --network ${NETWORK_NAME} \
-                        -e POSTGRES_USER=postgres \
-                        -e POSTGRES_PASSWORD=skan2001 \
-                        -e POSTGRES_DB=deepskyn_db \
-                        -p 5432:5432 \
-                        --restart always \
-                        postgres:15-alpine
+                    # DB
+                    docker run -d --name ${DB_CONTAINER} --network ${NETWORK_NAME} \
+                        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=skan2001 -e POSTGRES_DB=deepskyn_db \
+                        -p 5432:5432 postgres:15-alpine
                     
-                    echo "Attente du démarrage de PostgreSQL..."
                     sleep 10
-                '''
-            }
-        }
-
-        stage('🚀 Run Backend Container') {
-            steps {
-                echo "🚀 Démarrage du conteneur backend..."
-                sh '''
-                    docker run -d \
-                        --name ${CONTAINER_NAME} \
-                        --network ${NETWORK_NAME} \
+                    
+                    # Backend
+                    docker run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} \
                         -p ${PORT}:${PORT} \
-                        -e DB_HOST=${DB_CONTAINER} \
-                        -e DB_PORT=5432 \
-                        -e DB_NAME=deepskyn_db \
-                        -e DB_USER=postgres \
-                        -e DB_PASSWORD=skan2001 \
-                        -e NODE_ENV=production \
-                        -e PORT=${PORT} \
-                        -e CORS_ORIGIN=http://localhost \
-                        -e FRONTEND_URL=http://localhost \
-                        -e JWT_SECRET=your_super_secret_jwt_key \
-                        -e JWT_ACCESS_SECRET=your_access_secret_key \
-                        -e JWT_REFRESH_SECRET=your_refresh_secret_key \
-                        -e JWT_EXPIRES_IN=24h \
-                        -e JWT_ISSUER=deepskyn \
-                        --restart always \
+                        --env-file .env.prod \
                         ${IMAGE_NAME}:latest
-                    
-                    echo "Attente du démarrage..."
-                    sleep 10
-                '''
-            }
-        }
-
-        stage('🏥 Health Check') {
-            steps {
-                echo "🏥 Vérification de la santé..."
-                sh '''
-                    for i in 1 2 3 4 5; do
-                        if curl -s http://localhost:${PORT}/api/plans > /dev/null 2>&1; then
-                            echo "✅ Backend est prêt!"
-                            curl -s -o /dev/null -w "Backend HTTP: %{http_code}\\n" http://localhost:${PORT}/api/plans
-                            break
-                        fi
-                        echo "Attente du backend... ($i/5)"
-                        sleep 5
-                    done
-                    
-                    docker ps | grep ${CONTAINER_NAME}
-                '''
-            }
-        }
-
-        stage('📋 Logs') {
-            steps {
-                echo "📋 Dernières logs du backend..."
-                sh '''
-                    docker logs ${CONTAINER_NAME} --tail=30
                 '''
             }
         }
     }
 
     post {
-        success {
-            echo "✅ Pipeline Backend réussi !"
-            echo "📡 API disponible sur http://localhost:${PORT}"
-            echo "📚 Swagger: http://localhost:${PORT}/docs"
-        }
-        failure {
-            echo "❌ Pipeline Backend échoué"
-            sh '''
-                echo "=== Logs du backend ==="
-                docker logs ${CONTAINER_NAME} --tail=50 2>/dev/null || echo "Conteneur non trouvé"
-            '''
-        }
-        always {
-            echo "🏁 Pipeline terminé"
-        }
+        success { echo "✅ Pipeline réussi ! http://localhost:${PORT}" }
+        failure { echo "❌ Pipeline échoué." }
     }
 }

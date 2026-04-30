@@ -13,18 +13,16 @@ pipeline {
     }
 
     stages {
-        stage('📦 Checkout & Install') {
+        stage('📦 Checkout') {
             steps {
-                echo "📦 Récupération du code..."
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: 'DEVOPS']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/rouabougattaya/DeepSkyn.git',
-                        credentialsId: 'github-token'
-                    ]]
-                ])
-                
+                echo "📦 Récupération du code depuis GitHub..."
+                git branch: 'DEVOPS', 
+                    url: 'https://github.com/rouabougattaya/DeepSkyn.git'
+            }
+        }
+
+        stage('📦 Install Dependencies') {
+            steps {
                 echo "📦 Installation des dépendances..."
                 sh '''
                     cd backend
@@ -79,7 +77,7 @@ pipeline {
                     # Créer le réseau si nécessaire
                     docker network create ${NETWORK_NAME} 2>/dev/null || true
                     
-                    # Démarrer la base de données si elle n'existe pas
+                    # Démarrer la base de données
                     docker stop ${DB_CONTAINER} 2>/dev/null || true
                     docker rm ${DB_CONTAINER} 2>/dev/null || true
                     
@@ -125,7 +123,7 @@ pipeline {
                         ${IMAGE_NAME}:latest
                     
                     echo "Attente du démarrage..."
-                    sleep 5
+                    sleep 10
                 '''
             }
         }
@@ -134,7 +132,16 @@ pipeline {
             steps {
                 echo "🏥 Vérification de la santé..."
                 sh '''
-                    curl -s -o /dev/null -w "Backend: %{http_code}\\n" http://localhost:${PORT}/api/plans || echo "Backend non disponible"
+                    for i in 1 2 3 4 5; do
+                        if curl -s http://localhost:${PORT}/api/plans > /dev/null 2>&1; then
+                            echo "✅ Backend est prêt!"
+                            curl -s -o /dev/null -w "Backend HTTP: %{http_code}\\n" http://localhost:${PORT}/api/plans
+                            break
+                        fi
+                        echo "Attente du backend... ($i/5)"
+                        sleep 5
+                    done
+                    
                     docker ps | grep ${CONTAINER_NAME}
                 '''
             }
@@ -144,7 +151,7 @@ pipeline {
             steps {
                 echo "📋 Dernières logs du backend..."
                 sh '''
-                    docker logs ${CONTAINER_NAME} --tail=20
+                    docker logs ${CONTAINER_NAME} --tail=30
                 '''
             }
         }

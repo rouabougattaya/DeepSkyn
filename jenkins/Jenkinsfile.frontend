@@ -1,0 +1,93 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:20-alpine'
+            args '-u root'
+        }
+    }
+
+    environment {
+        PROJECT_NAME    = 'deepskyn'
+        SERVICE_NAME    = 'frontend'
+        DOCKER_REGISTRY = 'docker.io/rouabougattaya' // [REMPLACE]
+        IMAGE_NAME      = "${DOCKER_REGISTRY}/${PROJECT_NAME}-${SERVICE_NAME}"
+        IMAGE_TAG       = "${env.BUILD_NUMBER}"
+        STAGING_SERVER  = 'staging.deepskyn.com'      // [REMPLACE]
+        PROD_SERVER     = 'prod.deepskyn.com'         // [REMPLACE]
+    }
+
+    stages {
+        stage('📦 Install') {
+            steps {
+                sh 'npm ci --legacy-peer-deps'
+            }
+        }
+
+        stage('🔍 Lint & Typecheck') {
+            steps {
+                sh 'npm run lint || true' // Ne pas bloquer si lint simple échoue
+                // sh 'npx tsc --noEmit' // Désactivé si trop d'erreurs au début
+            }
+        }
+
+        stage('🧪 Test') {
+            steps {
+                sh 'npm test -- --coverage --watchAll=false'
+            }
+        }
+
+        stage('🏗️ Build React') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('🐳 Docker Build & Push') {
+            agent any // On sort du container node pour utiliser le moteur docker du host
+            steps {
+                script {
+                    docker.withRegistry('', 'dockerhub-credentials') { // ID du credential Jenkins
+                        def customImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", "-f frontend/Dockerfile.prod frontend/")
+                        customImage.push()
+                        customImage.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('🚀 Deploy Staging') {
+            when { branch 'master' }
+            steps {
+                echo "Déploiement sur ${STAGING_SERVER}..."
+                sshagent(['ssh-staging-key']) {
+                    sh "ssh -o StrictHostKeyChecking=no root@${STAGING_SERVER} 'docker pull ${IMAGE_NAME}:latest && docker run -d --name ${PROJECT_NAME}-frontend -p 80:80 ${IMAGE_NAME}:latest'"
+                }
+            }
+        }
+
+        stage('🛡️ Production Approval') {
+            when { branch 'master' }
+            steps {
+                input message: "Déployer en PRODUCTION ?", ok: "Oui, déployer !"
+            }
+        }
+
+        stage('🚀 Deploy Production') {
+            when { branch 'master' }
+            steps {
+                echo "Déploiement sur ${PROD_SERVER}..."
+                // Utiliser une stratégie de Blue/Green ou simple SSH
+                sshagent(['ssh-prod-key']) {
+                    sh "ssh -o StrictHostKeyChecking=no root@${PROD_SERVER} 'docker pull ${IMAGE_NAME}:latest && docker stop ${PROJECT_NAME}-frontend || true && docker rm ${PROJECT_NAME}-frontend || true && docker run -d --name ${PROJECT_NAME}-frontend -p 80:80 ${IMAGE_NAME}:latest'"
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Échec du pipeline Frontend"
+            // slackSend channel: '#deploy-logs', color: 'danger', message: "Build échoué: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+    }
+}

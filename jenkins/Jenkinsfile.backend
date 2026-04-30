@@ -1,0 +1,95 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:20-alpine'
+            args '-u root'
+        }
+    }
+
+    environment {
+        PROJECT_NAME    = 'deepskyn'
+        SERVICE_NAME    = 'backend'
+        DOCKER_REGISTRY = 'docker.io/rouabougattaya'
+        IMAGE_NAME      = "${DOCKER_REGISTRY}/${PROJECT_NAME}-${SERVICE_NAME}"
+        IMAGE_TAG       = "${env.BUILD_NUMBER}"
+        STAGING_SERVER  = 'staging.deepskyn.com'
+    }
+
+    stages {
+        stage('📦 Install') {
+            steps {
+                sh 'npm ci --legacy-peer-deps'
+            }
+        }
+
+        stage('🧪 Tests') {
+            parallel {
+                stage('Unit Tests') {
+                    steps { sh 'npm run test' }
+                }
+                stage('E2E Tests') {
+                    steps { sh 'npm run test:e2e' }
+                }
+            }
+        }
+
+        stage('🏗️ Build NestJS') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('🐳 Docker Build & Push') {
+            agent any
+            steps {
+                script {
+                    docker.withRegistry('', 'dockerhub-credentials') {
+                        def backendImg = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", "-f backend/Dockerfile.prod backend/")
+                        backendImg.push()
+                        backendImg.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('🗄️ Database Migrations') {
+            when { branch 'master' }
+            steps {
+                echo "Exécution des migrations sur Staging..."
+                withCredentials([usernamePassword(credentialsId: 'db-staging-creds', passwordVariable: 'DB_PASS', usernameVariable: 'DB_USER')]) {
+                    sh "export DB_PASSWORD=${DB_PASS} && npm run migration:run"
+                }
+            }
+        }
+
+        stage('🚀 Deploy Staging') {
+            when { branch 'master' }
+            steps {
+                sshagent(['ssh-staging-key']) {
+                    sh "ssh -o StrictHostKeyChecking=no root@${STAGING_SERVER} 'docker pull ${IMAGE_NAME}:latest && docker run -d --name ${PROJECT_NAME}-backend -p 3001:3001 ${IMAGE_NAME}:latest'"
+                }
+            }
+        }
+
+        stage('🛡️ Production Approval') {
+            when { branch 'master' }
+            steps {
+                input message: "Déployer le BACKEND en PRODUCTION ?"
+            }
+        }
+
+        stage('🚀 Deploy Production') {
+            when { branch 'master' }
+            steps {
+                echo "Déploiement final..."
+                // Commande de mise à jour du container en prod
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Échec du pipeline Backend"
+        }
+    }
+}

@@ -1,0 +1,24 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('🚀 Orchestration Deployment') {
+            steps {
+                parallel(
+                    "Frontend Pipeline": {
+                        build job: 'DeepSkyn-Frontend', wait: true
+                    },
+                    "Backend Pipeline": {
+                        build job: 'DeepSkyn-Backend', wait: true
+                    }
+                )
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Déploiement complet réussi !"
+        }
+    }
+}

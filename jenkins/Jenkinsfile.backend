@@ -13,6 +13,14 @@ pipeline {
     }
 
     stages {
+        stage('🔧 DNS Fix') {
+            steps {
+                echo "🔧 Réparation du DNS pour GitHub..."
+                sh "echo '140.82.121.3 github.com' >> /etc/hosts || true"
+                sh "echo '140.82.121.3 api.github.com' >> /etc/hosts || true"
+            }
+        }
+
         stage('📦 Checkout') {
             steps {
                 echo "📦 Récupération du code depuis GitHub..."

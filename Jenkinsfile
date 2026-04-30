@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         PROJECT_NAME = "DeepSkyn"
-        COMPOSE_PROJECT_NAME = "deepskynv1"
     }
 
     stages {
@@ -21,36 +20,47 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build & Deploy') {
             steps {
-                echo "🐳 Building Docker images..."
-                sh 'docker-compose build backend frontend'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo "🚀 Deploying containers..."
+                echo "🐳 Building and deploying..."
                 sh '''
-                    # Recréer uniquement backend et frontend (sans toucher à db)
-                    docker-compose up -d --force-recreate --no-deps backend frontend
+                    # Arrêter et supprimer les anciens conteneurs backend/frontend
+                    docker stop deepskyn-backend deepskyn-frontend 2>/dev/null || true
+                    docker rm deepskyn-backend deepskyn-frontend 2>/dev/null || true
                     
-                    # Vérifier l'état
+                    # Rebuild des images
+                    docker build -t deepskynv1-backend:latest ./backend
+                    docker build -t deepskynv1-frontend:latest ./frontend
+                    
+                    # Lancer le backend
+                    docker run -d \
+                        --name deepskyn-backend \
+                        --network deepskyn_network \
+                        -p 3001:3001 \
+                        --restart always \
+                        deepskynv1-backend:latest
+                    
+                    # Lancer le frontend
+                    docker run -d \
+                        --name deepskyn-frontend \
+                        --network deepskyn_network \
+                        -p 80:80 \
+                        --restart always \
+                        deepskynv1-frontend:latest
+                    
+                    # Vérifier que les conteneurs tournent
                     sleep 5
-                    docker-compose ps
+                    docker ps | grep deepskyn
                 '''
             }
         }
 
         stage('Verify') {
             steps {
-                echo "🏥 Verifying deployment..."
+                echo "🏥 Verifying..."
                 sh '''
-                    # Vérifier que le backend répond
-                    curl -s -o /dev/null -w "Backend: %{http_code}\\n" http://localhost:3001/api/plans || echo "Backend not ready"
-                    
-                    # Vérifier que le frontend répond
-                    curl -s -o /dev/null -w "Frontend: %{http_code}\\n" http://localhost || echo "Frontend not ready"
+                    curl -s -o /dev/null -w "Backend: %{http_code}\\n" http://localhost:3001/api/plans
+                    curl -s -o /dev/null -w "Frontend: %{http_code}\\n" http://localhost
                 '''
             }
         }
@@ -64,7 +74,7 @@ pipeline {
         }
         failure {
             echo "❌ Pipeline failed."
-            sh 'docker-compose logs --tail=30 backend || true'
+            sh 'docker logs deepskyn-backend --tail=30 2>/dev/null || true'
         }
     }
 }

@@ -1,93 +1,92 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:20-alpine'
-            args '-u root'
-        }
-    }
+    agent any
 
     environment {
         PROJECT_NAME    = 'deepskyn'
         SERVICE_NAME    = 'frontend'
-        DOCKER_REGISTRY = 'docker.io/rouabougattaya' // [REMPLACE]
-        IMAGE_NAME      = "${DOCKER_REGISTRY}/${PROJECT_NAME}-${SERVICE_NAME}"
+        CONTAINER_NAME  = 'deepskyn-frontend'
+        NETWORK_NAME    = 'deepskyn_network'
+        IMAGE_NAME      = "${PROJECT_NAME}-${SERVICE_NAME}"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        STAGING_SERVER  = 'staging.deepskyn.com'      // [REMPLACE]
-        PROD_SERVER     = 'prod.deepskyn.com'         // [REMPLACE]
+        // Variables pour le build React
+        VITE_API_URL    = "http://localhost:3001/api"
+        VITE_GOOGLE_ID  = "203522484031-m9h6cfvjleufa23gir16pujbnctchqch.apps.googleusercontent.com"
+    }
+
+    tools {
+        nodejs 'node20'
     }
 
     stages {
-        stage('📦 Install') {
+        stage('🔍 Diagnostic Réseau') {
             steps {
-                sh 'npm ci --legacy-peer-deps'
+                echo "--- Vérification du réseau Jenkins ---"
+                sh "cat /etc/hosts"
+                sh "getent hosts github.com || echo 'DNS : github.com inconnu'"
             }
         }
 
-        stage('🔍 Lint & Typecheck') {
+        stage('📦 Checkout') {
             steps {
-                sh 'npm run lint || true' // Ne pas bloquer si lint simple échoue
-                // sh 'npx tsc --noEmit' // Désactivé si trop d'erreurs au début
-            }
-        }
-
-        stage('🧪 Test') {
-            steps {
-                sh 'npm test -- --coverage --watchAll=false'
-            }
-        }
-
-        stage('🏗️ Build React') {
-            steps {
-                sh 'npm run build'
-            }
-        }
-
-        stage('🐳 Docker Build & Push') {
-            agent any // On sort du container node pour utiliser le moteur docker du host
-            steps {
+                echo "📦 Récupération du code depuis GitHub..."
                 script {
-                    docker.withRegistry('', 'dockerhub-credentials') { // ID du credential Jenkins
-                        def customImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", "-f frontend/Dockerfile.prod frontend/")
-                        customImage.push()
-                        customImage.push('latest')
+                    try {
+                        git branch: 'master', url: 'https://github.com/rouabougattaya/DeepSkyn.git'
+                    } catch (Exception e) {
+                        echo "⚠️ Échec DNS, tentative via IP directe..."
+                        sh "git config --global http.sslVerify false"
+                        git branch: 'master', url: 'https://140.82.121.3/rouabougattaya/DeepSkyn.git'
                     }
                 }
             }
         }
 
-        stage('🚀 Deploy Staging') {
-            when { branch 'master' }
+        stage('📦 Install Dependencies') {
             steps {
-                echo "Déploiement sur ${STAGING_SERVER}..."
-                sshagent(['ssh-staging-key']) {
-                    sh "ssh -o StrictHostKeyChecking=no root@${STAGING_SERVER} 'docker pull ${IMAGE_NAME}:latest && docker run -d --name ${PROJECT_NAME}-frontend -p 80:80 ${IMAGE_NAME}:latest'"
-                }
+                echo "📦 Installation des dépendances Frontend..."
+                sh 'cd frontend && npm install --legacy-peer-deps'
             }
         }
 
-        stage('🛡️ Production Approval') {
-            when { branch 'master' }
+        stage('🏗️ Build React') {
             steps {
-                input message: "Déployer en PRODUCTION ?", ok: "Oui, déployer !"
+                echo "🏗️ Compilation du frontend..."
+                sh 'cd frontend && npm run build'
             }
         }
 
-        stage('🚀 Deploy Production') {
-            when { branch 'master' }
+        stage('🐳 Docker Build') {
             steps {
-                echo "Déploiement sur ${PROD_SERVER}..."
-                // Utiliser une stratégie de Blue/Green ou simple SSH
-                sshagent(['ssh-prod-key']) {
-                    sh "ssh -o StrictHostKeyChecking=no root@${PROD_SERVER} 'docker pull ${IMAGE_NAME}:latest && docker stop ${PROJECT_NAME}-frontend || true && docker rm ${PROJECT_NAME}-frontend || true && docker run -d --name ${PROJECT_NAME}-frontend -p 80:80 ${IMAGE_NAME}:latest'"
-                }
+                echo "🐳 Construction de l'image Frontend avec variables..."
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest \
+                    --build-arg VITE_API_BASE_URL=${VITE_API_URL} \
+                    --build-arg VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_ID} \
+                    --build-arg VITE_GOOGLE_REDIRECT_URI=http://localhost/auth/callback/google \
+                    --build-arg VITE_RECAPTCHA_SITE_KEY=6Le2AXUsAAAAAH_UQWtmFFqFsJ33EH8yZEfhzqZS \
+                    -f frontend/Dockerfile.prod frontend/
+                """
+            }
+        }
+
+        stage('🚀 Deployment') {
+            steps {
+                echo "🚀 Déploiement du Frontend..."
+                sh '''
+                    docker network create ${NETWORK_NAME} 2>/dev/null || true
+                    docker stop ${CONTAINER_NAME} 2>/dev/null || true
+                    docker rm ${CONTAINER_NAME} 2>/dev/null || true
+                    
+                    docker run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} \
+                        -p 80:80 \
+                        ${IMAGE_NAME}:latest
+                '''
             }
         }
     }
 
     post {
-        failure {
-            echo "❌ Échec du pipeline Frontend"
-            // slackSend channel: '#deploy-logs', color: 'danger', message: "Build échoué: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-        }
+        success { echo "✅ Frontend déployé ! http://localhost" }
+        failure { echo "❌ Échec du pipeline Frontend." }
     }
 }

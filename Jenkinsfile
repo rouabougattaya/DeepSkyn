@@ -1,14 +1,10 @@
 pipeline {
     agent any
 
-    environment {
-        PROJECT_NAME = "DeepSkyn"
-    }
-
     stages {
         stage('Checkout') {
             steps {
-                echo "📦 Retrieving source code from GitHub..."
+                echo "📦 Récupération du code source..."
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: 'DEVOPS']],
@@ -22,17 +18,17 @@ pipeline {
 
         stage('Build & Deploy') {
             steps {
-                echo "🐳 Building and deploying..."
+                echo "🐳 Construction et déploiement..."
                 sh '''
-                    # Arrêter et supprimer les anciens conteneurs backend/frontend
+                    # Arrêter et supprimer les anciens conteneurs
                     docker stop deepskyn-backend deepskyn-frontend 2>/dev/null || true
                     docker rm deepskyn-backend deepskyn-frontend 2>/dev/null || true
                     
-                    # Rebuild des images
+                    # Builder les images
                     docker build -t deepskynv1-backend:latest ./backend
                     docker build -t deepskynv1-frontend:latest ./frontend
                     
-                    # Lancer le backend
+                    # Démarrer le backend
                     docker run -d \
                         --name deepskyn-backend \
                         --network deepskyn_network \
@@ -40,7 +36,7 @@ pipeline {
                         --restart always \
                         deepskynv1-backend:latest
                     
-                    # Lancer le frontend
+                    # Démarrer le frontend
                     docker run -d \
                         --name deepskyn-frontend \
                         --network deepskyn_network \
@@ -48,19 +44,25 @@ pipeline {
                         --restart always \
                         deepskynv1-frontend:latest
                     
-                    # Vérifier que les conteneurs tournent
-                    sleep 5
-                    docker ps | grep deepskyn
+                    # Attendre le démarrage
+                    sleep 10
+                    
+                    # Vérifier l'état
+                    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
                 '''
             }
         }
 
         stage('Verify') {
             steps {
-                echo "🏥 Verifying..."
+                echo "🏥 Vérification..."
                 sh '''
-                    curl -s -o /dev/null -w "Backend: %{http_code}\\n" http://localhost:3001/api/plans
-                    curl -s -o /dev/null -w "Frontend: %{http_code}\\n" http://localhost
+                    echo "Backend API:"
+                    curl -s -o /dev/null -w "Status: %{http_code}\\n" http://localhost:3001/api/plans
+                    
+                    echo ""
+                    echo "Frontend:"
+                    curl -s -o /dev/null -w "Status: %{http_code}\\n" http://localhost
                 '''
             }
         }
@@ -68,13 +70,16 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "✅ Pipeline réussi !"
             echo "📱 Application: http://localhost"
+            echo "📡 API: http://localhost:3001"
             echo "🔧 Jenkins: http://localhost:8080"
+            echo "📚 Swagger: http://localhost:3001/docs"
         }
         failure {
-            echo "❌ Pipeline failed."
-            sh 'docker logs deepskyn-backend --tail=30 2>/dev/null || true'
+            echo "❌ Pipeline échoué"
+            echo "Logs du backend:"
+            sh 'docker logs deepskyn-backend --tail=30 2>/dev/null || echo "Conteneur non trouvé"'
         }
     }
 }

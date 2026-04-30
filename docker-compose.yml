@@ -93,4 +93,11 @@ services:
 
 volumes:
   postgres_data:
-  jenkins_data:
+  jenkins_data: # Ajoutez à la fin de votre docker-compose.yml
+networks:
+  default:
+    name: deepskyn_network
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+      com.docker.network.enable_ipv6: "false"

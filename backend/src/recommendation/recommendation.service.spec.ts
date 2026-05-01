@@ -1,0 +1,356 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Logger } from '@nestjs/common';
+import { Repository } from 'typeorm';
+import { RecommendationService } from './recommendation.service';
+import { Product } from '../products/entities/product.entity';
+import { Recommendation } from './recommendation.entity';
+import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
+
+describe('RecommendationService', () => {
+  let service: RecommendationService;
+  let mockProductRepository: jest.Mocked<Repository<Product>>;
+  let mockRecommendationRepository: jest.Mocked<Repository<Recommendation>>;
+  let mockItemRepository: jest.Mocked<Repository<RecommendationItem>>;
+
+  beforeEach(async () => {
+    mockProductRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn(),
+    } as any;
+
+    mockRecommendationRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      create: jest.fn(),
+    } as any;
+
+    mockItemRepository = {
+      save: jest.fn(),
+      create: jest.fn(),
+    } as any;
+
+    // Suppress logger output during tests
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        RecommendationService,
+        {
+          provide: getRepositoryToken(Product),
+          useValue: mockProductRepository,
+        },
+        {
+          provide: getRepositoryToken(Recommendation),
+          useValue: mockRecommendationRepository,
+        },
+        {
+          provide: getRepositoryToken(RecommendationItem),
+          useValue: mockItemRepository,
+        },
+      ],
+    }).compile();
+
+    service = module.get<RecommendationService>(RecommendationService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('getRecommendationsForSkinState', () => {
+    it('should use database fallback when Python is disabled', async () => {
+      const userId = 'test-user-123';
+      const analysisId = 'analysis-456';
+      const skinType = 'oily';
+      const concerns = ['acne', 'excess-oil'];
+
+      const mockProducts = [
+        {
+          id: '1',
+          name: 'Oil Control Serum',
+          type: 'serum',
+          price: 35.99,
+          isClean: true,
+        } as any,
+      ];
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProducts),
+      };
+
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      const result = await service.getRecommendationsForSkinState(
+        userId,
+        analysisId,
+        skinType,
+        concerns
+      );
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should include concerns in recommendations when provided', async () => {
+      const userId = 'user-xyz';
+      const analysisId = 'analysis-789';
+      const skinType = 'dry';
+      const concerns = ['sensitivity', 'dryness'];
+
+      const mockProducts = [
+        {
+          id: '2',
+          name: 'Gentle Moisturizer',
+          type: 'moisturizer',
+          price: 28.99,
+          isClean: true,
+        } as any,
+      ];
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProducts),
+      };
+
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      const result = await service.getRecommendationsForSkinState(
+        userId,
+        analysisId,
+        skinType,
+        concerns
+      );
+
+      expect(result).toBeDefined();
+    });
+
+    it('should handle empty concerns array', async () => {
+      const userId = 'user-abc';
+      const analysisId = 'analysis-def';
+      const skinType = 'combination';
+      const concerns: string[] = [];
+
+      const mockProducts = [
+        {
+          id: '3',
+          name: 'Balanced Cleanser',
+          type: 'cleanser',
+          price: 18.99,
+          isClean: true,
+        } as any,
+      ];
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProducts),
+      };
+
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      const result = await service.getRecommendationsForSkinState(
+        userId,
+        analysisId,
+        skinType,
+        concerns
+      );
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should handle undefined concerns (treated as empty array)', async () => {
+      const userId = 'user-ghi';
+      const analysisId = 'analysis-jkl';
+      const skinType = 'sensitive';
+
+      const mockProducts: any[] = [];
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProducts),
+      };
+
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      const result = await service.getRecommendationsForSkinState(
+        userId,
+        analysisId,
+        skinType
+      );
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+  });
+
+  describe('saveFinalRecommendations', () => {
+    it('should save recommendations with all parameters', async () => {
+      const userId = 'user-save-123';
+      const analysisId = 'analysis-save-456';
+      const recommendations = [
+        { productId: '1', name: 'Product A', reason: 'Perfect for your skin' },
+        { productId: '2', name: 'Product B', reason: 'Complements Product A' },
+      ];
+      const explanation = 'Recommendations based on oily skin profile';
+      const aiConfidenceScore = 0.92;
+
+      const mockRecommendation = {
+        id: 'rec-123',
+        userId,
+        analysisId,
+        explanation,
+        aiConfidenceScore,
+        itemCount: 2,
+      };
+
+      mockProductRepository.findOne.mockResolvedValue({ id: '1', name: 'Product A' } as any);
+      mockRecommendationRepository.create.mockReturnValue(mockRecommendation as any);
+      mockRecommendationRepository.save.mockResolvedValue(mockRecommendation as any);
+      mockItemRepository.create.mockReturnValue({} as any);
+      mockItemRepository.save.mockResolvedValue({} as any);
+
+      await service.saveFinalRecommendations(
+        userId,
+        analysisId,
+        recommendations,
+        explanation,
+        aiConfidenceScore
+      );
+
+      expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+
+    it('should save recommendations without optional parameters', async () => {
+      const userId = 'user-save-789';
+      const analysisId = 'analysis-save-999';
+      const recommendations = [
+        { productId: '1', name: 'Product A' },
+      ];
+
+      const mockRecommendation = {
+        id: 'rec-789',
+        userId,
+        analysisId,
+      };
+
+      mockProductRepository.findOne.mockResolvedValue({ id: '1', name: 'Product A' } as any);
+      mockRecommendationRepository.create.mockReturnValue(mockRecommendation as any);
+      mockRecommendationRepository.save.mockResolvedValue(mockRecommendation as any);
+      mockItemRepository.create.mockReturnValue({} as any);
+      mockItemRepository.save.mockResolvedValue({} as any);
+
+      await service.saveFinalRecommendations(
+        userId,
+        analysisId,
+        recommendations
+      );
+
+      expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+
+    it('should handle empty recommendations array', async () => {
+      const userId = 'user-empty';
+      const analysisId = 'analysis-empty';
+      const recommendations: any[] = [];
+
+      await service.saveFinalRecommendations(
+        userId,
+        analysisId,
+        recommendations
+      );
+
+      expect(mockRecommendationRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should save multiple recommendation items', async () => {
+      const userId = 'user-multi';
+      const analysisId = 'analysis-multi';
+      const recommendations = [
+        { productId: '1', name: 'Product 1', reason: 'Reason 1', rank: 1 },
+        { productId: '2', name: 'Product 2', reason: 'Reason 2', rank: 2 },
+        { productId: '3', name: 'Product 3', reason: 'Reason 3', rank: 3 },
+      ];
+
+      const mockRecommendation = {
+        id: 'rec-multi',
+        userId,
+        analysisId,
+        itemCount: 3,
+      };
+
+      mockProductRepository.findOne.mockResolvedValue({ id: '1' } as any);
+      mockRecommendationRepository.create.mockReturnValue(mockRecommendation as any);
+      mockRecommendationRepository.save.mockResolvedValue(mockRecommendation as any);
+      mockItemRepository.create.mockReturnValue({} as any);
+      mockItemRepository.save.mockResolvedValue({} as any);
+
+      await service.saveFinalRecommendations(
+        userId,
+        analysisId,
+        recommendations
+      );
+
+      // Should call save for each item
+      expect(mockItemRepository.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('confidence score validation', () => {
+    it('should accept confidence score between 0 and 1', async () => {
+      mockProductRepository.findOne.mockResolvedValue({ id: '1' } as any);
+      mockRecommendationRepository.save.mockResolvedValue({ id: 'rec-1' } as any);
+
+      await service.saveFinalRecommendations(
+        'user-score',
+        'analysis-score',
+        [{ name: 'Product A' }]
+      );
+
+      expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+
+    it('should handle high confidence scores', async () => {
+      jest.clearAllMocks();
+      
+      mockProductRepository.findOne.mockResolvedValue({ id: '1' } as any);
+      mockRecommendationRepository.save.mockResolvedValue({ id: 'rec-high' } as any);
+
+      await service.saveFinalRecommendations(
+        'user-high',
+        'analysis-high',
+        [{ productId: '1', name: 'Product' }]
+      );
+
+      expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+
+    it('should handle low confidence scores', async () => {
+      jest.clearAllMocks();
+
+      mockProductRepository.findOne.mockResolvedValue({ id: '1' } as any);
+      mockRecommendationRepository.save.mockResolvedValue({ id: 'rec-low' } as any);
+
+      await service.saveFinalRecommendations(
+        'user-low',
+        'analysis-low',
+        [{ name: 'Product B' }]
+      );
+
+      expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+  });
+});

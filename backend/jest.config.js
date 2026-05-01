@@ -6,7 +6,14 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@scure|otplib|@otplib|@simplewebauthn)/)',
+  ],
+  moduleNameMapper: {
+    '^@scure/base$': '<rootDir>/node_modules/@scure/base/index.js',
+  },
   coverageDirectory: 'coverage',
+  coverageReporters: ['lcov', 'text'],
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
     '!src/**/*.d.ts',

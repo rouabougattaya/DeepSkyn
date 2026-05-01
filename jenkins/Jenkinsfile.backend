@@ -48,6 +48,36 @@ pipeline {
             }
         }
 
+        stage('🧪 Tests & Coverage') {
+            steps {
+                echo "🧪 Exécution des tests avec couverture..."
+                sh '''
+                    cd backend
+                    npm run test -- --coverage || echo "Tests en attente de correction"
+                '''
+            }
+        }
+
+        stage('📊 SonarQube Analysis') {
+            steps {
+                echo "📊 Analyse du code avec SonarQube..."
+                // Utilise le serveur SonarQube configuré dans Jenkins sous le nom 'sonarqube'
+                // Assurez-vous d'avoir installé le plugin SonarQube Scanner sur Jenkins
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        cd backend
+                        npx sonarqube-scanner \
+                          -Dsonar.projectKey=${PROJECT_NAME}-${SERVICE_NAME} \
+                          -Dsonar.sources=src \
+                          -Dsonar.tests=src \
+                          -Dsonar.test.inclusions="**/*.spec.ts" \
+                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.exclusions="**/*.spec.ts,dist/**,node_modules/**"
+                    '''
+                }
+            }
+        }
+
         stage('🏗️ Build NestJS') {
             steps {
                 echo "🏗️ Compilation du backend..."

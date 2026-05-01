@@ -4,7 +4,7 @@ import { ArrowRight, RefreshCcw, Sparkles, Activity, HeartPulse, FileText, Sheet
 import type { SkinAgeInsightResponse } from '@/services/skinAgeInsightsService';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { digitalTwinService } from '@/services/digitalTwinService';
 
 interface SkinAgeInsightCardProps {
@@ -492,10 +492,10 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
     doc.save(`skin-age-insights-${fileDate}.pdf`);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const now = new Date();
     const fileDate = now.toISOString().slice(0, 10);
-    const workbook = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
     const userCtx = getUserContext();
 
     const scoreValue = safeNum(score);
@@ -507,19 +507,17 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
       ? Number((latestTrendDelta - earliestTrendDelta).toFixed(1))
       : null;
 
-    const setCols = (sheet: XLSX.WorkSheet, widths: number[]) => {
-      sheet['!cols'] = widths.map((wch) => ({ wch }));
+    const addSheet = (name: string, data: any[], widths: number[]) => {
+      const sheet = workbook.addWorksheet(name);
+      if (data.length > 0) {
+        const keys = Object.keys(data[0]);
+        sheet.columns = keys.map((k, i) => ({ header: k, key: k, width: widths[i] || 20 }));
+        data.forEach(row => sheet.addRow(row));
+        sheet.getRow(1).font = { bold: true };
+      }
     };
 
-    const setHeaderBold = (sheet: XLSX.WorkSheet, cells: string[]) => {
-      cells.forEach((cell) => {
-        if (sheet[cell]) {
-          (sheet[cell] as any).s = { font: { bold: true } };
-        }
-      });
-    };
-
-    const profileSheet = XLSX.utils.json_to_sheet([
+    const profileData = [
       { field: 'User name', value: userCtx.name },
       { field: 'User email', value: userCtx.email },
       { field: 'Chronological age (user age)', value: realAge ?? 'N/A' },
@@ -528,9 +526,21 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
       { field: 'Clinical interpretation', value: classifyDelta(deltaValue) },
       { field: 'Analysis ID', value: insight?.latestAnalysis?.id || 'N/A' },
       { field: 'Assessment date', value: insight?.latestAnalysis?.createdAt ? new Date(insight.latestAnalysis.createdAt).toLocaleString() : 'N/A' },
-    ]);
+    ];
+    addSheet('User_Profile', profileData, [34, 46]);
 
-    const executiveSheet = XLSX.utils.json_to_sheet([
+    const skinAnalysisRows = [
+      {
+        Date: insight?.latestAnalysis?.createdAt ? new Date(insight.latestAnalysis.createdAt).toLocaleDateString() : now.toLocaleDateString(),
+        'Skin Age Score': score ?? 'N/A',
+        'Risk Level': getRiskLevel(scoreValue),
+        'Lifestyle Factors': getLifestyleFactors().join(' | '),
+        Recommendations: buildRecommendedActions().join(' | '),
+      },
+    ];
+    addSheet('Skin Analysis', skinAnalysisRows, [16, 14, 14, 40, 72]);
+
+    const executiveData = [
       { metric: 'Report generated at', value: now.toLocaleString() },
       { metric: 'Analysis ID', value: insight?.latestAnalysis?.id || 'N/A' },
       { metric: 'Chronological age (user age)', value: realAge ?? 'N/A' },
@@ -544,24 +554,10 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
       { metric: 'Trend points', value: trendSeries.length },
       { metric: 'Average trend delta', value: avgTrendDelta ?? 'N/A' },
       { metric: 'Trend shift over period', value: trendShift ?? 'N/A' },
-    ]);
-
-    const lifestyleFactors = getLifestyleFactors();
-    const recommendedActions = buildRecommendedActions();
-    const riskLevel = getRiskLevel(scoreValue);
-
-    const skinAnalysisRows = [
-      {
-        Date: insight?.latestAnalysis?.createdAt ? new Date(insight.latestAnalysis.createdAt).toLocaleDateString() : now.toLocaleDateString(),
-        'Skin Age Score': score ?? 'N/A',
-        'Risk Level': riskLevel,
-        'Lifestyle Factors': lifestyleFactors.join(' | '),
-        Recommendations: recommendedActions.join(' | '),
-      },
     ];
-    const skinAnalysisSheet = XLSX.utils.json_to_sheet(skinAnalysisRows);
+    addSheet('Executive', executiveData, [34, 22]);
 
-    const summarySheet = XLSX.utils.json_to_sheet([
+    const summaryData = [
       { field: 'Generated At', value: now.toLocaleString() },
       { field: 'Analysis ID', value: insight?.latestAnalysis?.id || 'N/A' },
       { field: 'Status', value: insight?.status || 'unknown' },
@@ -572,10 +568,10 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
       { field: 'Headline', value: insight?.headline || 'N/A' },
       { field: 'Score Band', value: classifyScore(scoreValue) },
       { field: 'Interpretation', value: classifyDelta(deltaValue) },
-    ]);
+    ];
+    addSheet('Summary', summaryData, [28, 52]);
 
-    const trendSheet = XLSX.utils.json_to_sheet(
-      (insight?.trend?.series || []).length > 0
+    const trendData = (insight?.trend?.series || []).length > 0
         ? (insight?.trend?.series || []).map((row, index, arr) => {
           const prev = index > 0 ? safeNum(arr[index - 1]?.delta) : null;
           const current = safeNum(row.delta);
@@ -589,27 +585,10 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
             direction,
           };
         })
-        : [{ date: 'N/A', delta: 'No trend data' }],
-    );
-
-    const recommendationSheet = XLSX.utils.json_to_sheet(
-      recommendedActions.map((tip, idx) => ({
-        order: idx + 1,
-        priority: idx < 2 ? 'High' : idx < 5 ? 'Medium' : 'Low',
-        timeline: idx < 2 ? 'Next 7 days' : 'Next 30 days',
-        recommendation: tip,
-      })),
-    );
-
-    const productFocusSheet = XLSX.utils.json_to_sheet(
-      (insight?.productSuggestions?.length ? insight.productSuggestions : ['Hydration support', 'Photoprotection (SPF)', 'Barrier reinforcement']).map((item, idx) => ({
-        order: idx + 1,
-        category: idx === 0 ? 'Core' : idx < 3 ? 'Priority' : 'Support',
-        focus: item,
-      })),
-    );
-
-    const trendDiagnosticsSheet = XLSX.utils.json_to_sheet([
+        : [{ index: 'N/A', date: 'N/A', delta: 'No trend data', changeFromPrevious: 'N/A', direction: 'N/A' }];
+    addSheet('Trend', trendData, [8, 16, 14, 20, 16]);
+    
+    const trendDiagnosticsData = [
       {
         metric: 'Trend points',
         value: trendSeries.length,
@@ -630,9 +609,28 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
         value: classifyScore(scoreValue),
         interpretation: scoreValue != null && scoreValue >= 65 ? 'Solid skin quality baseline' : 'Needs reinforcement plan',
       },
-    ]);
+    ];
+    addSheet('Trend_Diagnostics', trendDiagnosticsData, [24, 16, 44]);
 
-    const benchmarkSheet = XLSX.utils.json_to_sheet([
+    const recommendationData = buildRecommendedActions().map((tip, idx) => ({
+        order: idx + 1,
+        priority: idx < 2 ? 'High' : idx < 5 ? 'Medium' : 'Low',
+        timeline: idx < 2 ? 'Next 7 days' : 'Next 30 days',
+        recommendation: tip,
+      }));
+    if (recommendationData.length === 0) {
+        recommendationData.push({ order: 1 as any, priority: 'N/A', timeline: 'N/A', recommendation: 'None' });
+    }
+    addSheet('Recommendations', recommendationData, [8, 12, 14, 72]);
+
+    const productFocusData = (insight?.productSuggestions?.length ? insight.productSuggestions : ['Hydration support', 'Photoprotection (SPF)', 'Barrier reinforcement']).map((item, idx) => ({
+        order: idx + 1,
+        category: idx === 0 ? 'Core' : idx < 3 ? 'Priority' : 'Support',
+        focus: item,
+      }));
+    addSheet('Product Focus', productFocusData, [8, 14, 60]);
+
+    const benchmarkData = [
       {
         source: 'Personal',
         sampleSize: insight?.userBenchmark?.sampleSize ?? 'N/A',
@@ -660,31 +658,10 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
           ? Number((safeNum(insight?.userBenchmark?.avgDelta)! - safeNum(insight?.datasetBenchmark?.avgDelta)!).toFixed(1))
           : 'N/A',
       },
-    ]);
+    ];
+    addSheet('Benchmarks', benchmarkData, [24, 12, 14, 14, 14]);
 
-    XLSX.utils.book_append_sheet(workbook, profileSheet, 'User_Profile');
-    XLSX.utils.book_append_sheet(workbook, skinAnalysisSheet, 'Skin Analysis');
-    XLSX.utils.book_append_sheet(workbook, executiveSheet, 'Executive');
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-    XLSX.utils.book_append_sheet(workbook, trendSheet, 'Trend');
-    XLSX.utils.book_append_sheet(workbook, trendDiagnosticsSheet, 'Trend_Diagnostics');
-    XLSX.utils.book_append_sheet(workbook, recommendationSheet, 'Recommendations');
-    XLSX.utils.book_append_sheet(workbook, productFocusSheet, 'Product Focus');
-    XLSX.utils.book_append_sheet(workbook, benchmarkSheet, 'Benchmarks');
-
-    setCols(profileSheet, [34, 46]);
-    setCols(skinAnalysisSheet, [16, 14, 14, 40, 72]);
-    setCols(executiveSheet, [34, 22]);
-    setCols(summarySheet, [28, 52]);
-    setCols(trendSheet, [8, 16, 14, 20, 16]);
-    setCols(trendDiagnosticsSheet, [24, 16, 44]);
-    setCols(recommendationSheet, [8, 12, 14, 72]);
-    setCols(productFocusSheet, [8, 14, 60]);
-    setCols(benchmarkSheet, [24, 12, 14, 14, 14]);
-
-    setHeaderBold(skinAnalysisSheet, ['A1', 'B1', 'C1', 'D1', 'E1']);
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const excelBuffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([excelBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });

@@ -11,6 +11,10 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "overrides": {
+    "node-fetch": "^2.6.7",
+    "uuid": "^14.0.0"
+  },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/forms": "^0.5.11",
@@ -19,6 +23,7 @@
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "face-api.js": "^0.22.2",
     "i18next": "^26.0.8",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -36,7 +41,6 @@
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.19",
-    "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },

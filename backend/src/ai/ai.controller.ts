@@ -434,7 +434,7 @@ export class AiController {
       });
 
       // Set appropriate headers and serve the image
-      const contentType = response.headers['content-type'] || 'image/jpeg';
+      const contentType = (response.headers['content-type'] as string) || 'image/jpeg';
       res.set('Content-Type', contentType);
       res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       res.send(response.data);

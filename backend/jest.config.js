@@ -11,6 +11,7 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^@scure/base$': '<rootDir>/node_modules/@scure/base/index.js',
+    '^uuid$': '<rootDir>/src/__mocks__/uuid.js',
   },
   coverageDirectory: 'coverage',
   coverageReporters: ['lcov', 'text'],

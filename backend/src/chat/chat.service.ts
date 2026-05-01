@@ -15,6 +15,12 @@ type SeverityLevel = 'mild' | 'moderate' | 'severe';
 
 export interface ChatContextPayload {
   message: string;
+  sessionTitle?: string;
+  chatLimit?: {
+    limit: number;
+    remaining: number;
+    plan: string;
+  };
   analysis: {
     age: number;
     acne: number;

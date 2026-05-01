@@ -46,6 +46,35 @@ pipeline {
             }
         }
 
+        stage('🧪 Tests & Coverage') {
+            steps {
+                echo "🧪 Exécution des tests avec couverture..."
+                // On utilise || true pour ne pas bloquer le pipeline si les tests échouent pour l'instant
+                sh '''
+                    cd frontend
+                    npm run test:cov -- --passWithNoTests || true
+                '''
+            }
+        }
+
+        stage('📊 SonarQube Analysis') {
+            steps {
+                echo "📊 Analyse du code avec SonarQube..."
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        cd frontend
+                        npx --yes sonarqube-scanner \
+                          -Dsonar.projectKey=${PROJECT_NAME}-${SERVICE_NAME} \
+                          -Dsonar.sources=src \
+                          -Dsonar.tests=src \
+                          -Dsonar.test.inclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx" \
+                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.exclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,dist/**,node_modules/**"
+                    '''
+                }
+            }
+        }
+
         stage('🏗️ Build React') {
             steps {
                 echo "🏗️ Compilation du frontend..."

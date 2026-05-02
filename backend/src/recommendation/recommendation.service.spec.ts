@@ -6,6 +6,8 @@ import { RecommendationService } from './recommendation.service';
 import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
 import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
+import * as child_process from 'child_process';
+import * as fs from 'fs';
 
 describe('RecommendationService', () => {
   let service: RecommendationService;
@@ -194,6 +196,30 @@ describe('RecommendationService', () => {
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should attempt to call Python script via spawn when data exists', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn(),
+      };
+      const spawnSpy = jest.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+
+      const promise = service.getRecommendationsForSkinState('user-1', 'analysis-1', 'oily', ['acne']);
+      
+      // Simulate stdout data
+      const stdoutCallback = mockProcess.stdout.on.mock.calls.find(c => c[0] === 'data')[1];
+      stdoutCallback(Buffer.from(JSON.stringify([{ productId: '101', name: 'Python Product' }])));
+
+      // Simulate process close
+      const closeCallback = mockProcess.on.mock.calls.find(c => c[0] === 'close')[1];
+      closeCallback(0);
+
+      const result = await promise;
+      expect(spawnSpy).toHaveBeenCalled();
+      expect(result[0].name).toBe('Python Product');
     });
   });
 

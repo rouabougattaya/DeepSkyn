@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import Papa from 'papaparse';
 import * as crypto from 'crypto';
+import { spawn } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
 import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
 import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
@@ -35,10 +38,6 @@ export class RecommendationService {
     if (this.pythonDisabled) {
       return this.getDatabaseFallback(userId, analysisId, skinType, concerns);
     }
-
-    const { spawn } = require('child_process');
-    const path = require('path');
-    const fs = require('fs');
 
     const scriptPath = path.join(process.cwd(), 'scripts', 'recommend.py');
     const dataPath = path.join(process.cwd(), 'data', 'skincare_products_clean.csv');
@@ -338,11 +337,8 @@ export class RecommendationService {
    * Initialisation de la base de produits (Seeder partiel)
    */
   async seedProducts() {
-    const { readFileSync, existsSync } = require('fs');
-    const path = require('path');
-
     const dataPath = path.join(process.cwd(), 'data', 'skincare_products_clean.csv');
-    if (!existsSync(dataPath)) {
+    if (!fs.existsSync(dataPath)) {
       this.logger.warn(`seedProducts: dataset introuvable à ${dataPath}`);
       return;
     }
@@ -359,8 +355,7 @@ export class RecommendationService {
     if (count > 50 && missingUrlCount === 0) return;
 
     this.logger.log('Seed produits: chargement du dataset CSV...');
-
-    const csvText = readFileSync(dataPath, 'utf8');
+    const csvText = fs.readFileSync(dataPath, 'utf8');
     const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
     const rows = (parsed.data as any[]).filter(Boolean);

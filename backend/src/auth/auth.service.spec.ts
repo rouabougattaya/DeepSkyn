@@ -29,6 +29,8 @@ import { SessionService } from '../sessions/session.service';
 import { GeminiService } from '../ai/gemini.service';
 import * as bcrypt from 'bcryptjs';
 
+jest.mock('bcryptjs');
+
 describe('AuthService', () => {
   let service: AuthService;
   let userRepository: any;
@@ -99,7 +101,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password is wrong', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(false));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login({ email: 'test@example.com', password: 'wrongpassword' }))
         .rejects.toThrow(UnauthorizedException);
@@ -107,7 +109,7 @@ describe('AuthService', () => {
 
     it('should return tokens if login is successful', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(true));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.login({ email: 'test@example.com', password: 'password123' });
       expect(result).toHaveProperty('accessToken');

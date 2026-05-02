@@ -232,7 +232,13 @@ export class AiController {
         throw new HttpException('User ID is required for skin analysis', HttpStatus.UNAUTHORIZED);
       }
 
-      const parsedWeights = weights ? JSON.parse(weights) : undefined;
+      let parsedWeights;
+      try {
+        parsedWeights = weights ? JSON.parse(weights) : undefined;
+      } catch (e) {
+        throw new HttpException('Invalid weights JSON format', HttpStatus.BAD_REQUEST);
+      }
+      
       const seedNum = seed ? parseInt(seed, 10) : undefined;
       const analysisAge = age ? parseInt(age, 10) : undefined;
 
@@ -270,7 +276,13 @@ export class AiController {
         throw new HttpException('User ID is required for skin analysis', HttpStatus.UNAUTHORIZED);
       }
 
-      const parsedWeights = weights ? JSON.parse(weights) : undefined;
+      let parsedWeights;
+      try {
+        parsedWeights = weights ? JSON.parse(weights) : undefined;
+      } catch (e) {
+        throw new HttpException('Invalid weights JSON format', HttpStatus.BAD_REQUEST);
+      }
+      
       const analysisAge = age ? parseInt(age, 10) : undefined;
 
       const result = await this.aiAnalysisService.analyzeImage(
@@ -420,7 +432,7 @@ export class AiController {
       const allowedDomains = ['cdn.shopify.com', 'fr.svr.com', 'tn.svr.com', 'www.svr.com'];
       const urlObj = new URL(imageUrl);
 
-      if (!allowedDomains.some(domain => urlObj.hostname.includes(domain))) {
+      if (!allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain))) {
         throw new Error('Image URL not allowed');
       }
 

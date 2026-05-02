@@ -76,11 +76,8 @@ async function bootstrap() {
     },
   });
 
-  // ✅ CSRF Middleware - DÉSACTIVÉ TEMPORAIREMENT POUR TESTS
-  app.use((req: any, res: any, next: any) => {
-    // On laisse tout passer pour débloquer le développement
-    return next();
-  });
+  // ✅ CSRF Middleware
+  app.use(csrfProtection);
 
   // Middleware to provide CSRF token to the response locals
   app.use((req: any, res: any, next: any) => {

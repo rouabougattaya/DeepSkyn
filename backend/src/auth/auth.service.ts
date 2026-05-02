@@ -253,20 +253,6 @@ export class AuthService {
       throw new Error('User not found');
     }
 
-    if (email === 'demo@example.com') {
-      await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent);
-      const token = await this.generateToken(user);
-
-      // ✅ Créer la session
-      const req = {
-        ip: ip || null,
-        headers: { 'user-agent': userAgent || null }
-      };
-      await this.sessionService.createSession(user.id, token, req);
-
-      return { token, user };
-    }
-
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
       await this.logActivity(user.id, ActivityType.LOGIN_FAILED, ip, userAgent, { reason: 'invalid_password' });

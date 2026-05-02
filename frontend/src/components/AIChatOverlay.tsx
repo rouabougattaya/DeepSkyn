@@ -82,12 +82,12 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[90] transition-all duration-300 ${isOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+      className={`fixed inset-0 z-[90] transition-all duration-300 ${isOpen ? 'pointer-events-auto opacity-100 visible' : 'pointer-events-none opacity-0 invisible'
         }`}
       aria-hidden={!isOpen}
     >
       <div
-        className="absolute inset-0 bg-gradient-to-br from-slate-950/65 via-slate-900/55 to-slate-950/65 backdrop-blur-md"
+        className="absolute inset-0 bg-slate-500/20 backdrop-blur-md"
         onClick={onClose}
       />
 
@@ -125,7 +125,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                   <>
                     {/* Today */}
                     <div>
-                      <h4 className="px-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Récents</h4>
+                      <h4 className="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Récents</h4>
                       <div className="space-y-1">
                         {history.map((session) => (
                           <div key={session.id} className="group relative">
@@ -179,7 +179,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                                       setEditingSessionId(session.id);
                                       setEditingTitle(session.title || '');
                                     }}
-                                    className="p-2 text-slate-400 hover:text-teal-500 rounded-lg hover:bg-teal-50"
+                                    className="p-2 text-slate-500 hover:text-teal-500 rounded-lg hover:bg-teal-50"
                                     title="Renommer"
                                   >
                                     <Pencil size={14} />
@@ -191,7 +191,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                                         deleteSession(session.id);
                                       }
                                     }}
-                                    className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50"
+                                    className="p-2 text-slate-500 hover:text-red-500 rounded-lg hover:bg-red-50"
                                     title="Supprimer"
                                   >
                                     <Trash2 size={14} />
@@ -245,7 +245,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                       );
                       return (
                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                          <span className="text-slate-500">Messages:</span>
+                          <span className="text-slate-600">Messages:</span>
                           <span className={chat.usage.chat.used >= 15 ? 'text-red-500' : 'text-teal-600'}>
                              {chat.usage.chat.used}/{chat.usage.chat.limit}
                           </span>
@@ -271,7 +271,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
             >
               {contextHints.length > 0 && (
                 <div className="rounded-3xl border border-teal-100/50 bg-teal-50/50 backdrop-blur-md p-5 text-sm text-teal-900 space-y-3 shadow-xl shadow-teal-500/5 animate-in fade-in slide-in-from-top-2 duration-500">
-                  <h4 className="font-bold flex items-center gap-2 text-teal-700 text-xs uppercase tracking-wider">
+                  <h4 className="font-bold flex items-center gap-2 text-teal-800 text-xs uppercase tracking-wider">
                     <Sparkles size={12} /> Notes d'analyse
                   </h4>
                   {contextHints.map((hint, index) => (
@@ -337,7 +337,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                       </div>
                       <p className="text-[13px] leading-relaxed text-slate-300">
                         Vous avez atteint votre quota de <span className="text-white font-bold">20 messages quotidiens</span>. 
-                        Passez au plan <span className="text-teal-400 font-bold uppercase">Pro</span> pour continuer à discuter sans limites avec votre coach.
+                        Passez au plan <span className="text-teal-500 font-bold uppercase">Pro</span> pour continuer à discuter sans limites avec votre coach.
                       </p>
                       <Link 
                         to="/upgrade"

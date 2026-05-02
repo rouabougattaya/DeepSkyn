@@ -126,7 +126,8 @@ export default function ProductsPage() {
                 {hasActiveFilters && (
                     <button
                         onClick={resetFilters}
-                        className="flex items-center gap-1 text-xs text-teal-600 font-bold hover:underline"
+                        aria-label={t('products.reset')}
+                        className="flex items-center gap-1 text-xs text-teal-700 font-bold hover:underline"
                     >
                         <X size={12} /> {t('products.reset')}
                     </button>
@@ -135,15 +136,16 @@ export default function ProductsPage() {
 
             {/* Type */}
             <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
+                <label className="block text-xs font-bold uppercase tracking-widest text-slate-600 mb-2">Type</label>
                 <div className="flex flex-wrap gap-2">
                     {["", ...types].map((typeOpt) => (
                         <button
                             key={typeOpt || "__all__"}
                             onClick={() => setType(typeOpt)}
+                            aria-pressed={type === typeOpt}
                             className={`rounded-full border px-3 py-1 text-xs font-bold capitalize transition ${type === typeOpt
-                                ? "bg-teal-600 border-teal-600 text-white"
-                                : "border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700"
+                                ? "bg-teal-700 border-teal-700 text-white"
+                                : "border-slate-200 text-slate-700 hover:border-teal-400 hover:text-teal-700"
                                 }`}
                         >
                             {typeOpt || t('products.all')}
@@ -154,20 +156,22 @@ export default function ProductsPage() {
 
             {/* Price range */}
             <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Prix (£)</label>
+                <label id="price-range-label" className="block text-xs font-bold uppercase tracking-widest text-slate-600 mb-2">Prix (£)</label>
                 <div className="flex items-center gap-2">
                     <input
                         type="number"
                         placeholder="Min"
+                        aria-label="Prix minimum"
                         value={minPrice}
                         min={0}
                         onChange={(e) => setMinPrice(e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
                     />
-                    <span className="text-slate-400 text-xs font-bold">—</span>
+                    <span className="text-slate-600 text-xs font-bold">—</span>
                     <input
                         type="number"
                         placeholder="Max"
+                        aria-label="Prix maximum"
                         value={maxPrice}
                         min={0}
                         onChange={(e) => setMaxPrice(e.target.value)}
@@ -179,9 +183,11 @@ export default function ProductsPage() {
             {/* Ingredient */}
             {ingredients.length > 0 && (
                 <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Ingrédient</label>
+                    <label htmlFor="ingredient-select" className="block text-xs font-bold uppercase tracking-widest text-slate-600 mb-2">Ingrédient</label>
                     <select
+                        id="ingredient-select"
                         value={ingredient}
+                        aria-label="Filtrer par ingrédient"
                         onChange={(e) => setIngredient(e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
                     >
@@ -195,10 +201,14 @@ export default function ProductsPage() {
 
             {/* Clean only toggle */}
             <div>
-                <label className="flex items-center gap-3 cursor-pointer select-none">
+                <button
+                    role="switch"
+                    aria-checked={cleanOnly}
+                    onClick={() => setCleanOnly((v) => !v)}
+                    className="flex items-center gap-3 cursor-pointer select-none group"
+                >
                     <div
-                        onClick={() => setCleanOnly((v) => !v)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${cleanOnly ? "bg-emerald-500" : "bg-slate-200"
+                        className={`relative h-5 w-9 rounded-full transition-colors ${cleanOnly ? "bg-emerald-600" : "bg-slate-300"
                             }`}
                     >
                         <span
@@ -206,11 +216,11 @@ export default function ProductsPage() {
                                 }`}
                         />
                     </div>
-                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                        <Leaf size={14} className="text-emerald-500" />
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                        <Leaf size={14} className="text-emerald-600" />
                         {t('products.clean_only')}
                     </span>
-                </label>
+                </button>
             </div>
         </div>
     )
@@ -242,8 +252,13 @@ export default function ProductsPage() {
                                     </div>
                                     <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
                                         {t('products.title')}
+                                        {!loading && (
+                                            <span className="ml-3 text-sm text-slate-500 font-medium">
+                                                {products.length} {t('products.results')}{products.length !== 1 ? 's' : ''}
+                                            </span>
+                                        )}
                                     </h1>
-                                    <p className="mt-1 text-sm text-slate-500">
+                                    <p className="mt-1 text-sm text-slate-600">
                                         {t('products.subtitle')}
                                     </p>
                                 </div>
@@ -261,6 +276,7 @@ export default function ProductsPage() {
                                     {search && (
                                         <button
                                             onClick={() => setSearch("")}
+                                            aria-label="Effacer la recherche"
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                                         >
                                             <X size={15} />
@@ -286,30 +302,27 @@ export default function ProductsPage() {
                                     {/* Mobile: open sidebar */}
                                     <button
                                         onClick={() => setSidebarOpen(true)}
-                                        className="lg:hidden flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:border-teal-400 transition"
+                                        aria-label="Ouvrir les filtres"
+                                        className="lg:hidden flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-sm hover:border-teal-400 transition"
                                     >
                                         <SlidersHorizontal size={14} />
                                         Filtres
                                         {hasActiveFilters && (
-                                            <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-teal-600 text-[9px] font-extrabold text-white">!</span>
+                                            <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-teal-700 text-[9px] font-extrabold text-white">!</span>
                                         )}
                                     </button>
 
                                     <div className="flex items-center gap-2 ml-auto">
-                                        {/* Result count */}
-                                        {!loading && (
-                                            <span className="text-xs text-slate-500 font-semibold">
-                                                {products.length} {t('products.results')}{products.length !== 1 ? 's' : ''}
-                                            </span>
-                                        )}
-
+                                        {/* Result count is now in the header, but keeping it here for mobile if needed or just removing if redundant */}
+                                        
                                         {/* Sort */}
                                         <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1.5 shadow-sm">
-                                            {sort.dir === "ASC" ? <SortAsc size={14} className="text-teal-600" /> : <SortDesc size={14} className="text-teal-600" />}
+                                            {sort.dir === "ASC" ? <SortAsc size={14} className="text-teal-700" /> : <SortDesc size={14} className="text-teal-700" />}
                                             <select
                                                 value={sortIdx}
+                                                aria-label="Trier les produits"
                                                 onChange={(e) => setSortIdx(Number(e.target.value))}
-                                                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none pr-1"
+                                                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none pr-1"
                                             >
                                                 {SORT_OPTIONS.map((o, i) => (
                                                     <option key={i} value={i}>{o.label}</option>
@@ -374,7 +387,8 @@ export default function ProductsPage() {
                     <div className="relative ml-auto h-full w-72 overflow-y-auto bg-white p-6 shadow-2xl">
                         <button
                             onClick={() => setSidebarOpen(false)}
-                            className="absolute top-4 right-4 rounded-xl border border-slate-200 p-2 text-slate-500 hover:text-slate-800 transition"
+                            aria-label="Fermer les filtres"
+                            className="absolute top-4 right-4 rounded-xl border border-slate-200 p-2 text-slate-600 hover:text-slate-900 transition"
                         >
                             <X size={16} />
                         </button>

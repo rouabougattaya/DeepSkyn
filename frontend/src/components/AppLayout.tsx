@@ -20,10 +20,10 @@ export function AppLayout() {
           isCollapsed={desktopCollapsed}
           onCollapsedChange={setDesktopCollapsed}
         />
-        <div className={`flex-1 min-h-[calc(100vh-64px)] transition-all duration-300 ease-in-out ${desktopCollapsed ? 'lg:ml-20' : 'lg:ml-64'
+        <main className={`flex-1 min-h-[calc(100vh-64px)] transition-all duration-300 ease-in-out ${desktopCollapsed ? 'lg:ml-20' : 'lg:ml-64'
           }`}>
           <Outlet />
-        </div>
+        </main>
       </div>
       <AIChatOverlay isOpen={isCoachOpen} onClose={() => setIsCoachOpen(false)} chat={sharedChat} />
     </div>

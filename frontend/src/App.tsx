@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
@@ -6,41 +6,51 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
 import { AppLayout } from './components/AppLayout'
 import { AdminLayout } from './components/admin/AdminLayout'
-import LoginPage from './pages/LoginPage'
-import LoginFacePage from "./pages/LoginFacePage"
-import LoginFingerprintPage from "./pages/LoginFingerprintPage"
-import RegisterPage from './pages/RegisterPage'
-import RegisterFingerprintPage from "./pages/RegisterFingerprintPage"
-import GoogleCallback from './pages/GoogleCallback'
-import HomePage from './pages/HomePage'
-import DashboardPage from './pages/DashboardPage'
-import SecurityPage from './pages/SecurityPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import { TwoFactorPage } from './pages/TwoFactorPage'
-import { TwoFactorSetupPage } from './pages/TwoFactorSettingsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import ProfilePage from "./pages/ProfilePage"
-import ActivityHistoryPage from './pages/ActivityHistoryPage'
-import AnalysisPage from './pages/AnalysisPage'
-import ComparisonPage from './pages/ComparisonPage'
-import SkinHistoryPage from './pages/SkinHistoryPage'
-import SkinAnalysisDetailPage from './pages/SkinAnalysisDetailPage'
-import AiDemoPage from './pages/AiDemoPage'
-import { SessionsPage } from './pages/SessionsPage'
-import RoutinesPage from './pages/RoutinesPage'
-import AdminDashboardPage from './pages/AdminDashboardPage'
-import AdminUsersPage from './pages/AdminUsersPage'
-import AdminSettingsPage from './pages/AdminSettingsPage'
-import SkinDigitalTwinPage from './pages/SkinDigitalTwinPage'
+import { Activity } from 'lucide-react'
 import './App.css'
-import ProductsPage from './pages/ProductsPage';
-import ChatPage from './pages/ChatPage';
-import UpgradePage from './pages/UpgradePage';
-import PricingPage from './pages/PricingPage';
-import PaymentSuccess from './pages/PaymentSuccess';
-import PaymentCancel from './pages/PaymentCancel';
-import SkinRecommendationsPage from './pages/SkinRecommendationsPage';
+
+// Lazy loaded pages
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const LoginFacePage = lazy(() => import("./pages/LoginFacePage"))
+const LoginFingerprintPage = lazy(() => import("./pages/LoginFingerprintPage"))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const RegisterFingerprintPage = lazy(() => import("./pages/RegisterFingerprintPage"))
+const GoogleCallback = lazy(() => import('./pages/GoogleCallback'))
+const HomePage = lazy(() => import('./pages/HomePage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const SecurityPage = lazy(() => import('./pages/SecurityPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const TwoFactorPage = lazy(() => import('./pages/TwoFactorPage').then(m => ({ default: m.TwoFactorPage })))
+const TwoFactorSetupPage = lazy(() => import('./pages/TwoFactorSettingsPage').then(m => ({ default: m.TwoFactorSetupPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const ProfilePage = lazy(() => import("./pages/ProfilePage"))
+const ActivityHistoryPage = lazy(() => import('./pages/ActivityHistoryPage'))
+const AnalysisPage = lazy(() => import('./pages/AnalysisPage'))
+const ComparisonPage = lazy(() => import('./pages/ComparisonPage'))
+const SkinHistoryPage = lazy(() => import('./pages/SkinHistoryPage'))
+const SkinAnalysisDetailPage = lazy(() => import('./pages/SkinAnalysisDetailPage'))
+const AiDemoPage = lazy(() => import('./pages/AiDemoPage'))
+const SessionsPage = lazy(() => import('./pages/SessionsPage').then(m => ({ default: m.SessionsPage })))
+const RoutinesPage = lazy(() => import('./pages/RoutinesPage'))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'))
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'))
+const SkinDigitalTwinPage = lazy(() => import('./pages/SkinDigitalTwinPage'))
+const ProductsPage = lazy(() => import('./pages/ProductsPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const UpgradePage = lazy(() => import('./pages/UpgradePage'))
+const PricingPage = lazy(() => import('./pages/PricingPage'))
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
+const PaymentCancel = lazy(() => import('./pages/PaymentCancel'))
+const SkinRecommendationsPage = lazy(() => import('./pages/SkinRecommendationsPage'))
+
+// Loading component
+const PageLoader = () => (
+  <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+    <Activity size={40} className="text-teal-600 animate-spin" />
+  </div>
+);
 
 
 function Home() {
@@ -71,86 +81,88 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <Routes>
-          {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/register" element={<RegisterPage />} />
-        <Route path="/auth/register-fingerprint" element={<RegisterFingerprintPage />} />
-        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/auth/reset-password/:token" element={<ResetPasswordPage />} />
-        <Route path="/auth/callback/google" element={<GoogleCallback />} />
-        <Route path="/auth/2fa" element={<TwoFactorPage />} />
-        <Route path="/auth/login-face" element={<LoginFacePage />} />
-        <Route path="/auth/login-empreinte" element={<LoginFingerprintPage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/auth/register" element={<RegisterPage />} />
+            <Route path="/auth/register-fingerprint" element={<RegisterFingerprintPage />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/auth/callback/google" element={<GoogleCallback />} />
+            <Route path="/auth/2fa" element={<TwoFactorPage />} />
+            <Route path="/auth/login-face" element={<LoginFacePage />} />
+            <Route path="/auth/login-empreinte" element={<LoginFingerprintPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
 
-        {/* Protected Routes inside AppLayout */}
-        <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/2fa" element={<TwoFactorSetupPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/security-history" element={<ActivityHistoryPage />} />
-          <Route path="/home" element={<Home />} />
+            {/* Protected Routes inside AppLayout */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/2fa" element={<TwoFactorSetupPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/security-history" element={<ActivityHistoryPage />} />
+              <Route path="/home" element={<Home />} />
 
-          {/* 👇 AJOUT : Ta nouvelle route pour les sessions */}
-          <Route path="/sessions" element={<SessionsPage />} />
+              {/* 👇 AJOUT : Ta nouvelle route pour les sessions */}
+              <Route path="/sessions" element={<SessionsPage />} />
 
-          <Route path="/analysis" element={<AnalysisPage />} />
-          <Route path="/analysis/history" element={<SkinHistoryPage />} />
-          <Route path="/analysis/details/:id" element={<SkinAnalysisDetailPage />} />
-          <Route path="/analysis/compare" element={<ComparisonPage />} />
-          <Route path="/analysis/recommendations" element={<SkinRecommendationsPage />} />
-          <Route path="/analysis/digital-twin/:analysisId" element={<SkinDigitalTwinPage />} />
-          <Route path="/routines" element={<RoutinesPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/ai-demo" element={<AiDemoPage />} />
+              <Route path="/analysis" element={<AnalysisPage />} />
+              <Route path="/analysis/history" element={<SkinHistoryPage />} />
+              <Route path="/analysis/details/:id" element={<SkinAnalysisDetailPage />} />
+              <Route path="/analysis/compare" element={<ComparisonPage />} />
+              <Route path="/analysis/recommendations" element={<SkinRecommendationsPage />} />
+              <Route path="/analysis/digital-twin/:analysisId" element={<SkinDigitalTwinPage />} />
+              <Route path="/routines" element={<RoutinesPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/ai-demo" element={<AiDemoPage />} />
 
-          <Route path="/upgrade" element={<UpgradePage />} />
-          <Route path="/payment/success" element={<PaymentSuccess />} />
-          <Route path="/payment/cancel" element={<PaymentCancel />} />
-        </Route>
+              <Route path="/upgrade" element={<UpgradePage />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
+            </Route>
 
-        {/* Admin Routes - Protected with role check */}
-        <Route
-          element={
-            <ProtectedAdminRoute>
-              <AdminLayout>
-                <AdminDashboardPage />
-              </AdminLayout>
-            </ProtectedAdminRoute>
-          }
-          path="/admin"
-        />
+            {/* Admin Routes - Protected with role check */}
+            <Route
+              element={
+                <ProtectedAdminRoute>
+                  <AdminLayout>
+                    <AdminDashboardPage />
+                  </AdminLayout>
+                </ProtectedAdminRoute>
+              }
+              path="/admin"
+            />
 
-        <Route
-          element={
-            <ProtectedAdminRoute>
-              <AdminLayout>
-                <AdminUsersPage />
-              </AdminLayout>
-            </ProtectedAdminRoute>
-          }
-          path="/admin/users"
-        />
+            <Route
+              element={
+                <ProtectedAdminRoute>
+                  <AdminLayout>
+                    <AdminUsersPage />
+                  </AdminLayout>
+                </ProtectedAdminRoute>
+              }
+              path="/admin/users"
+            />
 
-        <Route
-          element={
-            <ProtectedAdminRoute>
-              <AdminLayout>
-                <AdminSettingsPage />
-              </AdminLayout>
-            </ProtectedAdminRoute>
-          }
-          path="/admin/settings"
-        />
+            <Route
+              element={
+                <ProtectedAdminRoute>
+                  <AdminLayout>
+                    <AdminSettingsPage />
+                  </AdminLayout>
+                </ProtectedAdminRoute>
+              }
+              path="/admin/settings"
+            />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </Router>
     </ThemeProvider>
   )

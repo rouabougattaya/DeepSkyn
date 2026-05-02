@@ -201,7 +201,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                 key={g.id}
                                 onClick={() => setProfile({ ...profile, gender: g.id as any })}
                                 disabled={disabled}
-                                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${profile.gender === g.id ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${profile.gender === g.id ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-700'
                                     }`}
                             >
                                 {g.label}
@@ -284,7 +284,7 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
                                 }`}
                         >
                             <div className="text-sm font-bold" style={{ color: questionnaire[item.key].enabled ? '#0f766e' : item.color }}>{item.label}</div>
-                            <div className="text-[10px] text-slate-500">{item.desc}</div>
+                            <div className="text-[10px] text-slate-600">{item.desc}</div>
                         </button>
                     ))}
                 </div>

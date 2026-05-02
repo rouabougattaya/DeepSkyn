@@ -13,25 +13,17 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    // Read from localStorage first
-    const saved = localStorage.getItem('deepskyн-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') return saved;
-    // Fall back to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const [theme] = useState<Theme>('light');
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('deepskyн-theme', theme);
-  }, [theme]);
+    root.classList.remove('dark');
+    localStorage.setItem('deepskyн-theme', 'light');
+  }, []);
 
-  const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  const toggleTheme = () => {
+    console.warn('Dark mode is disabled.');
+  };
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

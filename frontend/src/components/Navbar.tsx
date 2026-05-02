@@ -40,11 +40,11 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16 gap-4">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-10 h-10 overflow-hidden rounded-xl bg-transparent flex items-center justify-center">
-              <img src="/logo.png" alt="DeepSkyn Logo" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="DeepSkyn - AI Skin Analysis Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-xl font-bold text-gray-900 tracking-tight">DeepSkyn</span>
-              <span className="text-[11px] font-semibold text-teal-600 uppercase tracking-[0.14em]">{t('nav.skin_intelligence', { defaultValue: 'Skin Intelligence' })}</span>
+              <span className="text-[11px] font-semibold text-teal-800 uppercase tracking-[0.14em]">{t('nav.skin_intelligence', { defaultValue: 'Skin Intelligence' })}</span>
             </div>
           </Link>
 
@@ -94,16 +94,18 @@ export function Navbar() {
                 <Link
                   to="/dashboard"
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Dashboard"
                   title="Dashboard"
                 >
-                  <LayoutDashboard className="w-4 h-4 text-gray-600 hover:text-gray-900" />
+                  <LayoutDashboard className="w-4 h-4 text-gray-700 hover:text-gray-900" />
                 </Link>
                 <Link
                   to="/settings"
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Settings"
                   title="Settings"
                 >
-                  <Settings className="w-4 h-4 text-gray-600 hover:text-gray-900" />
+                  <Settings className="w-4 h-4 text-gray-700 hover:text-gray-900" />
                 </Link>
                 <Button
                   variant="ghost"
@@ -152,7 +154,7 @@ export function Navbar() {
                   </Link>
                 ))}
                 <div className="px-4 py-2">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t('nav.language', { defaultValue: 'Language' })}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('nav.language', { defaultValue: 'Language' })}</p>
                   <LanguageSwitcher />
                 </div>
                 <div className="pt-3 grid grid-cols-1 gap-2">
@@ -186,7 +188,7 @@ export function Navbar() {
                   );
                 })}
                 <div className="px-4 py-2">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t('nav.language', { defaultValue: 'Language' })}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('nav.language', { defaultValue: 'Language' })}</p>
                   <LanguageSwitcher />
                 </div>
                 <div className="pt-2 grid grid-cols-1 gap-2">
@@ -195,7 +197,8 @@ export function Navbar() {
                   </Link>
                   <Button
                     variant="outline"
-                    className="w-full gap-2"
+                    className="w-full gap-2 text-gray-700"
+                    aria-label={t('nav.logout')}
                     onClick={() => {
                       handleLogout();
                       setIsOpen(false);

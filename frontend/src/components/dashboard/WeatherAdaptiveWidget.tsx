@@ -47,7 +47,7 @@ export function WeatherAdaptiveWidget() {
           <AlertCircle size={16} />
           <span className="text-xs font-bold uppercase tracking-wider">Erreur Météo</span>
         </div>
-        <p className="text-xs text-gray-500 mb-4">{error}</p>
+        <p className="text-xs text-gray-600 mb-4">{error}</p>
         <button
           onClick={fetchData}
           className="text-[10px] font-bold text-teal-600 hover:text-teal-700 underline"
@@ -72,14 +72,18 @@ export function WeatherAdaptiveWidget() {
               <Sparkles size={16} />
             </div>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Conseil Météo-IA</h3>
-              <div className="flex items-center gap-1 text-[10px] text-gray-400">
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Conseil Météo-IA</h3>
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
                 <MapPin size={8} />
                 {data.city}
               </div>
             </div>
           </div>
-          <button onClick={fetchData} className="p-1.5 text-gray-300 hover:text-teal-500 transition-colors">
+          <button 
+            onClick={fetchData} 
+            aria-label="Actualiser les données météo"
+            className="p-1.5 text-gray-400 hover:text-teal-600 transition-colors"
+          >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -88,21 +92,21 @@ export function WeatherAdaptiveWidget() {
           <div className="flex gap-4">
             <div className="flex flex-col items-center">
               <div className="text-xl font-black text-gray-800">{Math.round(data.temp)}°</div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase">
                 <Thermometer size={8} /> Temp
               </div>
             </div>
             <div className="w-[1px] bg-gray-100"></div>
             <div className="flex flex-col items-center">
               <div className="text-xl font-black text-gray-800">{data.humidity}%</div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase">
                 <Droplets size={8} /> Humid
               </div>
             </div>
             <div className="w-[1px] bg-gray-100"></div>
             <div className="flex flex-col items-center">
               <div className="text-xl font-black text-gray-800">{data.uvIndex}</div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase">
+              <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase">
                 <Sun size={8} /> UV
               </div>
             </div>
@@ -114,7 +118,7 @@ export function WeatherAdaptiveWidget() {
             <span className="text-2xl pt-1">{advice.icon}</span>
             <div>
               <h4 className="text-sm font-bold text-gray-800 mb-1">{advice.title}</h4>
-              <p className="text-xs text-gray-500 leading-relaxed mb-2">{advice.advice}</p>
+              <p className="text-xs text-gray-600 leading-relaxed mb-2">{advice.advice}</p>
               <div className="py-1.5 px-3 bg-white rounded-lg border border-teal-100 text-[11px] font-bold text-teal-700 shadow-sm inline-block">
                 {advice.recommendation}
               </div>

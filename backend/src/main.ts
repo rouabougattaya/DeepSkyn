@@ -2,8 +2,8 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import * as cookieParser from 'cookie-parser';
-import * as csrf from 'csurf';
+import cookieParser from 'cookie-parser';
+import csrf from 'csurf';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -18,6 +18,7 @@ async function bootstrap() {
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:5175',
+    'http://localhost:4173',
     'http://localhost:3000',
   ].filter(Boolean);
 
@@ -58,6 +59,11 @@ async function bootstrap() {
     '/api/auth/login',
     '/api/auth/signup',
     '/api/auth/register',
+    '/api/auth/google',
+    '/api/auth/login-face',
+    '/api/auth/login-fingerprint',
+    '/api/auth/refresh',
+    '/api/auth/csrf-token',
     '/api/payments/webhook',
     '/api/payments/checkout-session',
     '/api/plans',
@@ -76,8 +82,14 @@ async function bootstrap() {
     },
   });
 
-  // ✅ CSRF Middleware
-  app.use(csrfProtection);
+  // ✅ CSRF Middleware - Skip for public routes
+  app.use((req: any, res: any, next: any) => {
+    const url = req.originalUrl || req.url;
+    if (publicRoutes.some(route => url.includes(route))) {
+      return next();
+    }
+    return csrfProtection(req, res, next);
+  });
 
   // Middleware to provide CSRF token to the response locals
   app.use((req: any, res: any, next: any) => {

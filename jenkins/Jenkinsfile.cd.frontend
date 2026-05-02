@@ -8,12 +8,9 @@ pipeline {
         NETWORK_NAME    = 'deepskyn_network'
         IMAGE_NAME      = "${PROJECT_NAME}-${SERVICE_NAME}"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        // Variables pour le build React
         VITE_API_URL    = "http://localhost:3001/api"
         VITE_GOOGLE_ID  = "203522484031-m9h6cfvjleufa23gir16pujbnctchqch.apps.googleusercontent.com"
     }
-
-   
 
     stages {
         stage('🔍 Diagnostic Réseau') {
@@ -46,36 +43,6 @@ pipeline {
             }
         }
 
-        stage('🧪 Tests & Coverage') {
-            steps {
-                echo "🧪 Exécution des tests avec couverture..."
-                sh '''
-                    cd frontend
-                    npm run test:cov
-                '''
-            }
-        }
-
-        stage('📊 SonarQube Analysis') {
-            steps {
-                echo "📊 Analyse du code avec SonarQube..."
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                        cd frontend
-                        npx --yes sonarqube-scanner \
-                          -Dsonar.projectKey=${PROJECT_NAME}-${SERVICE_NAME} \
-                          -Dsonar.sources=src \
-                          -Dsonar.tests=src \
-                          -Dsonar.inclusions="**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.css" \
-                          -Dsonar.test.inclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx" \
-                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                          -Dsonar.typescript.tsconfigPath=tsconfig.sonar.json \
-                          -Dsonar.exclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,dist/**,node_modules/**"
-                    '''
-                }
-            }
-        }
-
         stage('🏗️ Build React') {
             steps {
                 echo "🏗️ Compilation du frontend..."
@@ -83,10 +50,38 @@ pipeline {
             }
         }
 
+        stage('🐳 Docker Build') {
+            steps {
+                echo "🐳 Construction de l'image Frontend avec variables..."
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest \
+                    --build-arg VITE_API_BASE_URL=${VITE_API_URL} \
+                    --build-arg VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_ID} \
+                    --build-arg VITE_GOOGLE_REDIRECT_URI=http://localhost/auth/callback/google \
+                    --build-arg VITE_RECAPTCHA_SITE_KEY=6Le2AXUsAAAAAH_UQWtmFFqFsJ33EH8yZEfhzqZS \
+                    -f frontend/Dockerfile.prod frontend/
+                """
+            }
+        }
+
+        stage('🚀 Deployment') {
+            steps {
+                echo "🚀 Déploiement du Frontend..."
+                sh '''
+                    docker network create ${NETWORK_NAME} 2>/dev/null || true
+                    docker stop ${CONTAINER_NAME} 2>/dev/null || true
+                    docker rm ${CONTAINER_NAME} 2>/dev/null || true
+                    
+                    docker run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} \
+                        -p 80:80 \
+                        ${IMAGE_NAME}:latest
+                '''
+            }
+        }
     }
 
     post {
-        success { echo "✅ CI Pipeline (Tests & Sonar) réussi !" }
-        failure { echo "❌ CI Pipeline échoué." }
+        success { echo "✅ Frontend déployé ! http://localhost" }
+        failure { echo "❌ Échec du déploiement Frontend." }
     }
 }

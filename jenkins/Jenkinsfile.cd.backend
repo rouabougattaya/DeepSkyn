@@ -25,7 +25,6 @@ pipeline {
         stage('📦 Checkout') {
             steps {
                 echo "📦 Récupération du code depuis GitHub..."
-                // Utilisation de l'IP directe si le DNS échoue
                 script {
                     try {
                         git branch: 'master', url: 'https://github.com/rouabougattaya/DeepSkyn.git'
@@ -48,36 +47,6 @@ pipeline {
             }
         }
 
-        stage('🧪 Tests & Coverage') {
-            steps {
-                echo "🧪 Exécution des tests avec couverture..."
-                sh '''
-                    cd backend
-                    npm run test -- --coverage --config jest.config.js --runInBand --forceExit
-                '''
-            }
-        }
-
-        stage('📊 SonarQube Analysis') {
-            steps {
-                echo "📊 Analyse du code avec SonarQube..."
-                // Utilise le serveur SonarQube configuré dans Jenkins sous le nom 'sonarqube'
-                // Assurez-vous d'avoir installé le plugin SonarQube Scanner sur Jenkins
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                        cd backend
-                        npx --yes sonarqube-scanner \
-                          -Dsonar.projectKey=${PROJECT_NAME}-${SERVICE_NAME} \
-                          -Dsonar.sources=src \
-                          -Dsonar.tests=src \
-                          -Dsonar.test.inclusions="**/*.spec.ts" \
-                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                          -Dsonar.exclusions="**/*.spec.ts,dist/**,node_modules/**"
-                    '''
-                }
-            }
-        }
-
         stage('🏗️ Build NestJS') {
             steps {
                 echo "🏗️ Compilation du backend..."
@@ -85,10 +54,42 @@ pipeline {
             }
         }
 
+        stage('🐳 Docker Build') {
+            steps {
+                echo "🐳 Construction de l'image..."
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ./backend"
+            }
+        }
+
+        stage('🚀 Deployment') {
+            steps {
+                echo "🚀 Déploiement des conteneurs..."
+                sh '''
+                    docker network create ${NETWORK_NAME} 2>/dev/null || true
+                    
+                    # Stop anciens
+                    docker stop ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
+                    docker rm ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
+                    
+                    # DB
+                    docker run -d --name ${DB_CONTAINER} --network ${NETWORK_NAME} \
+                        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=skan2001 -e POSTGRES_DB=deepskyn_db \
+                        -p 5432:5432 postgres:15-alpine
+                    
+                    sleep 10
+                    
+                    # Backend
+                    docker run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} \
+                        -p ${PORT}:${PORT} \
+                        --env-file .env.prod \
+                        ${IMAGE_NAME}:latest
+                '''
+            }
+        }
     }
 
     post {
-        success { echo "✅ CI Pipeline (Tests & Sonar) réussi !" }
-        failure { echo "❌ CI Pipeline échoué." }
+        success { echo "✅ Déploiement réussi ! http://localhost:${PORT}" }
+        failure { echo "❌ Déploiement échoué." }
     }
 }

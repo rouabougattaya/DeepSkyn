@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/15</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/15</span>
             </div>
         
             
@@ -89,44 +89,44 @@
 <a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import { Navigate, useLocation, useNavigate } from "react-router-dom"</span></span></span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { Navigate, useLocation, useNavigate } from "react-router-dom"<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
 <span class="cstat-no" title="statement not covered" >import { hasSession, clearSession } from "@/lib/authSession"</span>
 <span class="cstat-no" title="statement not covered" >import { useInactivityTimeout } from "@/hooks/useInactivityTimeout"</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >/**</span>
-<span class="cstat-no" title="statement not covered" > * Protège les routes : si l'utilisateur n'a pas de session (non connecté),</span>
-<span class="cstat-no" title="statement not covered" > * redirige vers la page de login. Sinon affiche le contenu (children).</span>
-<span class="cstat-no" title="statement not covered" > * Après 1 heure d'inactivité, déconnecte et redirige vers login.</span>
-<span class="cstat-no" title="statement not covered" > */</span>
+&nbsp;
+/**
+ * Protège les routes : si l'utilisateur n'a pas de session (non connecté),
+ * redirige vers la page de login. Sinon affiche le contenu (children).
+ * Après 1 heure d'inactivité, déconnecte et redirige vers login.
+ */
 <span class="cstat-no" title="statement not covered" >export function ProtectedRoute({ children }: { children: React.ReactNode }) {</span>
 <span class="cstat-no" title="statement not covered" >  const location = useLocation()</span>
 <span class="cstat-no" title="statement not covered" >  const navigate = useNavigate()</span>
-<span class="cstat-no" title="statement not covered" ></span>
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  useInactivityTimeout(() =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    clearSession()</span>
 <span class="cstat-no" title="statement not covered" >    navigate("/auth/login", { replace: true, state: { from: location } })</span>
 <span class="cstat-no" title="statement not covered" >  })</span>
-<span class="cstat-no" title="statement not covered" ></span>
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  if (!hasSession()) {</span>
 <span class="cstat-no" title="statement not covered" >    return &lt;Navigate to="/auth/login" state={{ from: location }} replace /&gt;</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
@@ -139,7 +139,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-02T19:34:38.188Z
+                at 2026-05-02T21:18:08.787Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

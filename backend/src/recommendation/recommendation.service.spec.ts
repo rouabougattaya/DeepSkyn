@@ -75,6 +75,7 @@ describe('RecommendationService', () => {
 
   describe('getRecommendationsForSkinState', () => {
     it('should use database fallback when Python is disabled', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'test-user-123';
       const analysisId = 'analysis-456';
       const skinType = 'oily';
@@ -111,6 +112,7 @@ describe('RecommendationService', () => {
     });
 
     it('should include concerns in recommendations when provided', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-xyz';
       const analysisId = 'analysis-789';
       const skinType = 'dry';
@@ -146,6 +148,7 @@ describe('RecommendationService', () => {
     });
 
     it('should handle empty concerns array', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-abc';
       const analysisId = 'analysis-def';
       const skinType = 'combination';
@@ -182,6 +185,7 @@ describe('RecommendationService', () => {
     });
 
     it('should handle undefined concerns (treated as empty array)', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-ghi';
       const analysisId = 'analysis-jkl';
       const skinType = 'sensitive';

@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/deepskyn-frontend:latest
+        image: deepskyn-frontend:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
 ---

@@ -63,26 +63,17 @@ pipeline {
 
         stage('🚀 Deployment') {
             steps {
-                echo "🚀 Déploiement des conteneurs..."
+                echo "🚀 Déploiement sur Kubernetes..."
                 sh '''
-                    docker network create ${NETWORK_NAME} 2>/dev/null || true
+                    # Remplacer le nom de l'image dans le fichier yaml
+                    sed -i "s|deepskyn-backend:latest|${IMAGE_NAME}:latest|g" k8s/backend.yaml
                     
-                    # Stop anciens
-                    docker stop ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
-                    docker rm ${CONTAINER_NAME} ${DB_CONTAINER} 2>/dev/null || true
+                    kubectl apply -f k8s/namespace.yaml
+                    kubectl apply -f k8s/postgres.yaml
+                    kubectl apply -f k8s/backend.yaml
                     
-                    # DB
-                    docker run -d --name ${DB_CONTAINER} --network ${NETWORK_NAME} \
-                        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=skan2001 -e POSTGRES_DB=deepskyn_db \
-                        -p 5432:5432 postgres:15-alpine
-                    
-                    sleep 10
-                    
-                    # Backend
-                    docker run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} \
-                        -p ${PORT}:${PORT} \
-                        --env-file .env.prod \
-                        ${IMAGE_NAME}:latest
+                    # Attendre que le déploiement soit prêt
+                    kubectl rollout status deployment/backend -n deepskyn
                 '''
             }
         }

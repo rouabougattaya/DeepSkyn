@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: backend
-        image: your-registry/deepskyn-backend:latest
+        image: deepskyn-backend:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3001
         env:

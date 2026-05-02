@@ -53,7 +53,7 @@ pipeline {
                 echo "🧪 Exécution des tests avec couverture..."
                 sh '''
                     cd backend
-                    npm run test -- --coverage --config jest.config.js --forceExit
+                    npm run test -- --coverage --config jest.config.js --runInBand --forceExit
                 '''
             }
         }

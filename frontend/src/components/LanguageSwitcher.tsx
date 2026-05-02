@@ -47,11 +47,11 @@ const LanguageSwitcher: React.FC = () => {
           border transition-all duration-200 select-none
           ${open
             ? 'bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-500/20'
-            : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400 hover:text-teal-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300'
+            : 'bg-white border-slate-200 text-slate-700 hover:border-teal-400 hover:text-teal-700'
           }
         `}
       >
-        <Globe size={14} className={open ? 'text-white' : 'text-teal-600 dark:text-teal-400'} />
+        <Globe size={14} className={open ? 'text-white' : 'text-teal-600'} />
         <span>{current.flag}</span>
         <span>{current.short}</span>
         <ChevronDown
@@ -66,9 +66,9 @@ const LanguageSwitcher: React.FC = () => {
           role="listbox"
           className="
             absolute right-0 mt-2 w-44 z-[200]
-            bg-white dark:bg-slate-900
-            border border-slate-200 dark:border-slate-700
-            rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50
+            bg-white
+            border border-slate-200
+            rounded-2xl shadow-xl shadow-slate-200/50
             overflow-hidden
             animate-in fade-in slide-in-from-top-2 duration-150
           "
@@ -89,16 +89,16 @@ const LanguageSwitcher: React.FC = () => {
                     flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold
                     transition-all duration-150 text-left
                     ${isActive
-                      ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      ? 'bg-teal-50 text-teal-700'
+                      : 'text-slate-700 hover:bg-slate-50'
                     }
                   `}
                 >
                   <span className="text-base leading-none">{lang.flag}</span>
                   <span className="flex-1">{lang.label}</span>
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-widest">{lang.short}</span>
+                  <span className="text-[10px] font-black text-slate-500 tracking-widest">{lang.short}</span>
                   {isActive && (
-                    <Check size={13} className="text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                    <Check size={13} className="text-teal-600 flex-shrink-0" />
                   )}
                 </button>
               );

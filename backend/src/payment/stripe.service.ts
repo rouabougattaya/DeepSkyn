@@ -12,8 +12,8 @@ export class StripeService {
     });
   }
 
-  async createCheckoutSession(userId: string, plan: string, amount: number) {
-    const baseUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+  async createCheckoutSession(userId: string, plan: string, amount: number, origin?: string) {
+    const baseUrl = origin || this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     
     const session = await this.stripe.checkout.sessions.create({
       payment_method_types: ['card'],

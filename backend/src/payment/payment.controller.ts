@@ -76,9 +76,9 @@ export class PaymentController {
    * Real Stripe Checkout session creation
    */
   @Post('checkout-session')
-  async createSession(@Body() dto: { userId: string; plan: string }) {
+  async createSession(@Body() dto: { userId: string; plan: string; origin?: string }) {
     const amount = PLAN_PRICES[dto.plan] || 0;
-    return this.stripeService.createCheckoutSession(dto.userId, dto.plan, amount);
+    return this.stripeService.createCheckoutSession(dto.userId, dto.plan, amount, dto.origin);
   }
 
   /**

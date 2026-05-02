@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import Papa from 'papaparse';
+import * as Papa from 'papaparse';
 import * as crypto from 'crypto';
 import { spawn } from 'child_process';
 import * as path from 'path';

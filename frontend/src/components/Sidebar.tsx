@@ -129,7 +129,7 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
           {groups.map((group) => (
             <div key={group.title} className="space-y-2">
               {!isCollapsed && (
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 px-2">{group.title}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 px-2">{group.title}</p>
               )}
               <div className="space-y-1">
                 {group.items.map((item) => {
@@ -175,9 +175,9 @@ export function Sidebar({ onOpenCoach, isCoachOpen = false, onCollapsedChange, i
           {/* Usage Indicator */}
           {status && status.chat && status.analysis && !isCollapsed && (
             <div className="mx-1 mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="flex items-center justify-between mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                 <span>Usage {status.plan}</span>
-                <Link to="/upgrade" className="text-teal-600 hover:underline">UPGRADE</Link>
+                <Link to="/upgrade" className="text-teal-700 hover:underline">UPGRADE</Link>
               </div>
               <div className="space-y-3">
                 <div className="space-y-1.5">

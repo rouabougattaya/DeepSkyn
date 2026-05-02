@@ -50,8 +50,8 @@ export default function ProductCard({ product }: ProductCardProps) {
                     />
                 ) : (
                     <div className="flex flex-col items-center gap-2">
-                        <span className="text-4xl select-none">🧴</span>
-                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{product.type || 'Soin'}</span>
+                        <span className="text-4xl select-none" role="img" aria-label="Product">🧴</span>
+                        <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{product.type || 'Soin'}</span>
                     </div>
                 )}
 
@@ -77,7 +77,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
                 {/* Description */}
                 {product.description && (
-                    <p className="text-xs text-slate-500 line-clamp-2">{product.description}</p>
+                    <p className="text-xs text-slate-600 line-clamp-2">{product.description}</p>
                 )}
 
                 {/* Rating + Price row */}
@@ -104,13 +104,14 @@ export default function ProductCard({ product }: ProductCardProps) {
                         href={buyUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm hover:brightness-105 transition"
+                        aria-label={`Acheter ${product.name} sur le site externe`}
+                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2 text-xs font-extrabold text-white shadow-sm hover:brightness-105 transition"
                     >
                         <ExternalLink size={13} />
                         Buy
                     </a>
                 ) : (
-                    <div className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-400">
+                    <div className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
                         Link unavailable
                     </div>
                 )}

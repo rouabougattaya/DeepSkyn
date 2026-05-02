@@ -48,5 +48,9 @@ export async function getPaymentHistory(userId: string): Promise<PaymentRecord[]
 
 /** POST /payments/checkout-session — Get Stripe checkout URL */
 export async function createCheckoutSession(userId: string, plan: string): Promise<{ url: string }> {
-  return apiPost<{ url: string }>('/payments/checkout-session', { userId, plan });
+  return apiPost<{ url: string }>('/payments/checkout-session', { 
+    userId, 
+    plan,
+    origin: window.location.origin 
+  });
 }

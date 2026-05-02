@@ -221,6 +221,7 @@ describe('RecommendationService', () => {
       closeCallback(0);
 
       const result = await promise;
+      const spawnSpy = child_process.spawn;
       expect(spawnSpy).toHaveBeenCalled();
       expect(result[0].name).toBe('Python Product');
     });

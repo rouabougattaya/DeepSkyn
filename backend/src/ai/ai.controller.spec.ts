@@ -200,7 +200,7 @@ describe('AiController', () => {
       }
       expect(error).toBeDefined();
       expect(error).toBeInstanceOf(HttpException);
-      expect(error.getResponse().error).toContain('Unexpected token');
+      expect(error.getResponse().error).toContain('Invalid weights JSON format');
     });
   });
 });

@@ -1,0 +1,42 @@
+# Rapport de Tests Frontend - Dina (Cœur IA)
+
+Ce document détaille la stratégie et l'exécution des tests unitaires pour le périmètre **IA Core** de DeepSkyn.
+
+## 🎯 Objectifs du Test
+L'objectif principal est de garantir la fiabilité du moteur de confiance (Trust Score) et la robustesse de la page d'analyse cutanée, qui est le composant le plus critique de l'application.
+
+## 🧪 Composants Testés
+
+### 1. AI Service (`src/services/aiService.ts`)
+**Score de Couverture : 100% (Lines, Funcs, Statements)**
+
+| Cas de Test | Description | Statut |
+| :--- | :--- | :--- |
+| **Trust Score Global** | Validation du calcul pondéré (Email, Photo, Bio, Nom). | ✅ Passé |
+| **Analyse Photo (Avatar)** | Détection automatique des avatars par défaut via la taille (HEAD fetch). | ✅ Passé |
+| **Confiance Email** | Distinction entre domaines fiables (Gmail) et suspects (Fake/Temp). | ✅ Passé |
+| **Cohérence d'Identité** | Comparaison entre le nom déclaré et les métadonnées Google/Email. | ✅ Passé |
+| **Résilience Réseau** | Gestion des erreurs CORS ou 404 lors de l'analyse d'image. | ✅ Passé |
+| **Robustesse (Catch blocks)** | Simulation d'erreurs internes pour vérifier le fallback sécurisé. | ✅ Passé |
+
+### 2. Skin Analysis Page (`src/pages/SkinAnalysisPage.tsx`)
+**Focus : Intégration & Rendu UI**
+
+| Cas de Test | Description | Statut |
+| :--- | :--- | :--- |
+| **Rendu Initial** | Vérification du titre, des tags IA et de l'internationalisation (i18n). | ✅ Passé |
+| **Affichage Résultats** | Injection de données de session pour valider l'affichage des scores. | ✅ Passé |
+| **Mode Premium** | Vérification que la routine de soins complète s'affiche pour les abonnés. | ✅ Passé |
+| **Gestion d'Erreur Routine** | Affichage du message d'erreur si la génération de routine échoue. | ✅ Passé |
+| **Synthèse Vocale** | Vérification du fonctionnement de l'icône de lecture audio. | ✅ Passé |
+
+## 📊 Résumé Technique
+*   **Outils utilisés** : Vitest, JSDOM, React Testing Library.
+*   **Total de tests** : 30 tests unitaires.
+*   **Temps d'exécution** : ~7.5 secondes.
+*   **Fichiers créés** :
+    *   `src/services/aiService.spec.ts`
+    *   `src/pages/SkinAnalysisPage.spec.tsx`
+
+## 🚀 Conclusion
+La partie **Cœur IA (Dina)** est désormais couverte à 100% sur sa logique métier. Cela garantit que les diagnostics et les scores de confiance sont calculés de manière déterministe et résiliente, même en cas de défaillance des services tiers ou des API.

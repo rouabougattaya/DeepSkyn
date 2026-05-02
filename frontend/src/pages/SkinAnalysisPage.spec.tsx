@@ -23,6 +23,16 @@ vi.mock('../services/apiClient', () => ({
   apiGet: vi.fn().mockResolvedValue({ plan: 'FREE' }),
 }));
 
+vi.mock('../services/svrRoutineService', () => ({
+  svrRoutineService: {
+    generateRoutine: vi.fn().mockResolvedValue({
+      morning: [{ stepName: 'Cleanser', product: { name: 'SVR Topialyse' }, instruction: 'Wash gently' }],
+      night: [{ stepName: 'Moisturizer', product: { name: 'SVR Sebiaclear' }, instruction: 'Apply before bed' }],
+      generalAdvice: 'Stay hydrated and use SPF.'
+    }),
+  },
+}));
+
 vi.mock('../lib/authSession', () => ({
   getUser: () => ({ id: '123', name: 'Test User' }),
 }));
@@ -61,6 +71,50 @@ describe('SkinAnalysisPage', () => {
     // Should show results if scanPhase is 'done' from sessionStorage
     const elements = screen.getAllByText('85');
     expect(elements.length).toBeGreaterThan(0);
+  });
+
+  it('should show the routine for premium users', async () => {
+    const { apiGet } = await import('../services/apiClient');
+    (apiGet as any).mockResolvedValueOnce({ plan: 'PRO' });
+
+    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
+      globalScore: 85,
+      conditionScores: [],
+      analysis: {}
+    }));
+
+    render(
+      <BrowserRouter>
+        <SkinAnalysisPage />
+      </BrowserRouter>
+    );
+
+    // Wait for the routine to be displayed
+    const routineTitle = await screen.findByText('analysis.pdf.morning_routine');
+    expect(routineTitle).toBeDefined();
+    expect(screen.getByText('SVR Topialyse')).toBeDefined();
+  });
+
+  it('should show an error message when routine generation fails', async () => {
+    const { apiGet } = await import('../services/apiClient');
+    const { svrRoutineService } = await import('../services/svrRoutineService');
+    (apiGet as any).mockResolvedValueOnce({ plan: 'PRO' });
+    (svrRoutineService.generateRoutine as any).mockRejectedValueOnce(new Error('API Error'));
+
+    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
+      globalScore: 85,
+      conditionScores: [],
+      analysis: {}
+    }));
+
+    render(
+      <BrowserRouter>
+        <SkinAnalysisPage />
+      </BrowserRouter>
+    );
+
+    const errorMsg = await screen.findByText(/analysis.errors.routine_load_fail/);
+    expect(errorMsg).toBeDefined();
   });
 
   it('should toggle voice synthesis when clicking the speaker icon', async () => {

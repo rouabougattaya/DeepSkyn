@@ -28,4 +28,25 @@ describe('FakeAiService', () => {
     const detections2 = service.generateRandomDetections(123);
     expect(detections1).toEqual(detections2);
   });
+
+  it('should generate severe test case', () => {
+    const detections = service.generateTestCase('severe');
+    expect(detections.some(d => d.class === 'Acne')).toBe(true);
+    expect(detections.length).toBeGreaterThan(5);
+  });
+
+  it('should generate mild test case', () => {
+    const detections = service.generateTestCase('mild');
+    expect(detections.length).toBeLessThan(10);
+  });
+
+  it('should generate mixed test case (default)', () => {
+    const detections = service.generateTestCase('mixed');
+    expect(detections.length).toBeGreaterThan(0);
+  });
+
+  it('should handle analyzeImage call', async () => {
+    const detections = await service.analyzeImage('some-id');
+    expect(detections.length).toBeGreaterThan(0);
+  });
 });

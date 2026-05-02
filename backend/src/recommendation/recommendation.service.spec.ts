@@ -234,6 +234,56 @@ describe('RecommendationService', () => {
       expect(spawnSpy).toHaveBeenCalled();
       expect(result[0].name).toBe('Python Product');
     });
+
+    it('should handle Python script stderr and still resolve or fallback', async () => {
+      const mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn(),
+      };
+      (child_process.spawn as jest.Mock).mockReturnValue(mockProcess);
+
+      const promise = service.getRecommendationsForSkinState('user-err', 'analysis-err', 'oily');
+      
+      // Simulate stderr data
+      const stderrCallback = mockProcess.stderr.on.mock.calls.find(c => c[0] === 'data')[1];
+      stderrCallback(Buffer.from('Some python warning'));
+
+      // Simulate process close with error code
+      const closeCallback = mockProcess.on.mock.calls.find(c => c[0] === 'close')[1];
+      closeCallback(1); // Error code
+
+      const result = await promise;
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should fallback to database if Python script fails completely', async () => {
+      const mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn(),
+      };
+      (child_process.spawn as jest.Mock).mockReturnValue(mockProcess);
+      
+      // Mock DB products for fallback
+      const mockProducts = [{ id: '99', name: 'Fallback Product' } as any];
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProducts),
+      };
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      const promise = service.getRecommendationsForSkinState('user-fail', 'analysis-fail', 'dry');
+      
+      const closeCallback = mockProcess.on.mock.calls.find(c => c[0] === 'close')[1];
+      closeCallback(1); // Failure
+
+      const result = await promise;
+      expect(result[0].name).toBe('Fallback Product');
+    });
   });
 
   describe('saveFinalRecommendations', () => {

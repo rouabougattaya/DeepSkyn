@@ -209,6 +209,42 @@ describe('AiAnalysisService', () => {
       // SkinAge = 30 + 10 = 40
       expect(result.skinAge).toBe(40);
     });
+
+    it('should handle analysis without photo (user input only)', async () => {
+      const profileNoPhoto = { ...mockProfile, imageBase64: undefined, acneLevel: 80 };
+      mockOpenRouterService.analyzeSkin.mockResolvedValueOnce({
+        globalScore: 0,
+        conditionScores: []
+      });
+      
+      const result = await service.analyzeSkinWithLLM(profileNoPhoto, 'user-1');
+      
+      expect(result.metaWeighting.userWeight).toBe(1);
+      expect(result.metaWeighting.aiWeight).toBe(0);
+      expect(result.conditionScores.some(c => c.type === SkinCondition.ACNE && c.evaluated === true)).toBe(true);
+    });
+  });
+
+  describe('analyzeWithRandomDetections', () => {
+    it('should generate random detections and save if userId exists', async () => {
+      mockFakeAiService.generateRandomDetections.mockReturnValueOnce([{ class: 'Acne', confidence: 0.9 }]);
+      mockDetectionAdapter.aggregateDetections.mockReturnValueOnce([]);
+      mockScoringEngine.computeConditionScores.mockReturnValueOnce([]);
+      mockScoringEngine.calculateGlobalScore.mockReturnValueOnce({ globalScore: 75, conditionScores: [] });
+      
+      await service.analyzeWithRandomDetections(123, {}, 'user-1');
+      
+      expect(mockAnalysisRepo.save).toHaveBeenCalled();
+    });
+
+    it('should not save if userId is missing', async () => {
+      mockFakeAiService.generateRandomDetections.mockReturnValueOnce([]);
+      mockScoringEngine.calculateGlobalScore.mockReturnValueOnce({ globalScore: 75 });
+      
+      await service.analyzeWithRandomDetections(123);
+      
+      expect(mockAnalysisRepo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('predictFutureSkin', () => {

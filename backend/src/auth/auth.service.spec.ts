@@ -30,6 +30,8 @@ import { GeminiService } from '../ai/gemini.service';
 import * as bcrypt from 'bcryptjs';
 import { tempTwoFAStorage } from '../twofactor/temp-2fa-storage';
 
+jest.mock('bcryptjs');
+
 describe('AuthService', () => {
   let service: AuthService;
   let loginAttemptService: LoginAttemptService;
@@ -113,7 +115,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password is wrong', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(false) as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login({ email: 'test@example.com', password: 'wrongpassword' }))
         .rejects.toThrow(UnauthorizedException);
@@ -122,7 +124,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException and block user if max attempts reached', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(false) as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       (loginAttemptService.getRemainingAttempts as jest.Mock).mockReturnValueOnce(0);
 
       await expect(service.login({ email: 'test@example.com', password: 'wrongpassword' }))
@@ -147,7 +149,7 @@ describe('AuthService', () => {
     it('should return 2FA requirement info if 2FA is enabled', async () => {
       const userWith2Fa = { ...mockUser, isTwoFAEnabled: true, totpSecret: 'secret' };
       mockRepository.findOne.mockResolvedValue(userWith2Fa);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(true) as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       const setSpy = jest.spyOn(tempTwoFAStorage, 'set');
 
       const result = await service.login({ email: 'test@example.com', password: 'password123' });
@@ -160,7 +162,7 @@ describe('AuthService', () => {
 
     it('should return tokens if login is successful', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(true) as any);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.login({ email: 'test@example.com', password: 'password123' });
       expect(result).toHaveProperty('accessToken');
@@ -198,7 +200,7 @@ describe('AuthService', () => {
       mockRepository.findOne.mockResolvedValueOnce(null);
       mockRepository.create.mockReturnValueOnce(mockUser);
       mockRepository.save.mockResolvedValueOnce(mockUser);
-      jest.spyOn(bcrypt, 'hash').mockImplementation(() => Promise.resolve('hash') as any);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
 
       const result = await service.register(registerDto);
 

@@ -112,6 +112,31 @@ describe('AiController', () => {
       expect(mockImageValidationService.validateImageBeforeAnalysis).toHaveBeenCalledWith('data:image/jpeg;base64,...');
     });
 
+    it('should handle multiple images analysis', async () => {
+      const profileWithImages = { 
+        ...mockProfile, 
+        imagesBase64: ['img1', 'img2']
+      };
+      
+      mockImageValidationService.validateImageBeforeAnalysis!.mockResolvedValue({ isValid: true, message: 'OK' });
+      mockAiAnalysisService.analyzeSkinWithLLM!.mockResolvedValueOnce({ 
+        globalScore: 88,
+        conditionScores: [],
+        totalDetections: 2,
+        analysis: {
+          dominantCondition: null,
+          bestCondition: null,
+          worstCondition: null,
+        }
+      });
+
+      const result = await controller.analyzeUnified(profileWithImages, mockUser);
+
+      expect(result.success).toBe(true);
+      expect(mockImageValidationService.validateImageBeforeAnalysis).toHaveBeenCalledTimes(2);
+      expect(mockAiAnalysisService.analyzeSkinWithLLM).toHaveBeenCalled();
+    });
+
     it('should throw BAD_REQUEST if image validation fails', async () => {
       const profileWithImage = { ...mockProfile, imageBase64: 'data:image/jpeg;base64,...' };
       mockImageValidationService.validateImageBeforeAnalysis!.mockResolvedValueOnce({ isValid: false, message: 'Invalid face' });

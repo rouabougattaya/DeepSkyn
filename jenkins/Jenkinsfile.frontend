@@ -67,8 +67,10 @@ pipeline {
                           -Dsonar.projectKey=${PROJECT_NAME}-${SERVICE_NAME} \
                           -Dsonar.sources=src \
                           -Dsonar.tests=src \
+                          -Dsonar.inclusions="**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.css" \
                           -Dsonar.test.inclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx" \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.typescript.tsconfigPath=tsconfig.app.json \
                           -Dsonar.exclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,dist/**,node_modules/**"
                     '''
                 }

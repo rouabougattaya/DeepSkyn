@@ -267,14 +267,8 @@ describe('RecommendationService', () => {
       (child_process.spawn as jest.Mock).mockReturnValue(mockProcess);
       
       // Mock DB products for fallback
-      const mockProducts = [{ id: '99', name: 'Fallback Product' } as any];
-      const mockQueryBuilder = {
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockProducts),
-      };
-      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+      const mockProducts = [{ id: '99', name: 'Fallback Product', type: 'Serum', url: 'https://example.com' } as any];
+      mockProductRepository.find.mockResolvedValue(mockProducts);
 
       const promise = service.getRecommendationsForSkinState('user-fail', 'analysis-fail', 'dry');
       
@@ -282,6 +276,8 @@ describe('RecommendationService', () => {
       closeCallback(1); // Failure
 
       const result = await promise;
+      expect(result).toBeDefined();
+      expect(result.length).toBeGreaterThan(0);
       expect(result[0].name).toBe('Fallback Product');
     });
   });

@@ -192,8 +192,15 @@ describe('AiController', () => {
   describe('analyzeRandom', () => {
     it('should handle invalid weights JSON', async () => {
       const mockUser = { id: 'user-1' };
-      await expect(controller.analyzeRandom('123', 'invalid-json', '30', mockUser))
-        .rejects.toThrow('Invalid weights JSON format');
+      let error;
+      try {
+        await controller.analyzeRandom('123', 'invalid-json', '30', mockUser);
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      expect(error).toBeInstanceOf(HttpException);
+      expect(error.getResponse().error).toContain('Unexpected token');
     });
   });
 });

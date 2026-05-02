@@ -9,6 +9,10 @@ import { RecommendationItem } from '../recommendationItem/recommendation-item.en
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 
+jest.mock('child_process', () => ({
+  spawn: jest.fn(),
+}));
+
 describe('RecommendationService', () => {
   let service: RecommendationService;
   let mockProductRepository: jest.Mocked<Repository<Product>>;
@@ -199,13 +203,12 @@ describe('RecommendationService', () => {
     });
 
     it('should attempt to call Python script via spawn when data exists', async () => {
-      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn(),
       };
-      const spawnSpy = jest.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+      (child_process.spawn as jest.Mock).mockReturnValue(mockProcess);
 
       const promise = service.getRecommendationsForSkinState('user-1', 'analysis-1', 'oily', ['acne']);
       

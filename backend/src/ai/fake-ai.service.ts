@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RawDetection } from './detection.interface';
 import { SkinCondition } from './skin-condition.enum';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class FakeAiService {
@@ -52,7 +53,7 @@ export class FakeAiService {
     const detections: RawDetection[] = [];
     
     // Utiliser une seed pour la reproductibilité
-    const random = seed ? this.seededRandom(seed) : Math.random;
+    const random = seed ? this.seededRandom(seed) : () => crypto.randomInt(0, 1000000) / 1000000;
     
     // Génère entre 5 et 20 détections
     const numDetections = Math.floor(random() * 15) + 5;

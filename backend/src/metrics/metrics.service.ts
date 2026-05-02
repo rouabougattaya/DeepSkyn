@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 import { SkinMetric } from '../skinMetric/skin-metric.entity';
+import * as crypto from 'crypto';
 
 /* ════════════════════════════════════════════════════════════════════════
  *  INTERFACES — Metrics Aggregation Engine (Dev 1 — Roua)
@@ -217,13 +218,13 @@ export class MetricsService {
       const now = new Date();
       const records: any[] = [];
       for (let monthsAgo = 5; monthsAgo >= 0; monthsAgo--) {
-        const analysesCount = 3 + Math.floor(Math.random() * 3);
+        const analysesCount = 3 + crypto.randomInt(0, 3);
         for (let j = 0; j < analysesCount; j++) {
           const date = new Date(now);
           date.setMonth(date.getMonth() - monthsAgo);
-          date.setDate(1 + Math.floor(Math.random() * 26));
+          date.setDate(1 + crypto.randomInt(0, 26));
           const baseScore = 50 + (5 - monthsAgo) * 7;
-          const variation = (Math.random() - 0.5) * 15;
+          const variation = (crypto.randomInt(0, 100) / 100 - 0.5) * 15;
           const score = Math.max(20, Math.min(96, baseScore + variation));
           records.push({
             userId,

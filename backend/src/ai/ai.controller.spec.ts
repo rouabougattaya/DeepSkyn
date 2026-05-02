@@ -6,6 +6,10 @@ import { ImageValidationService } from './image-validation.service';
 import { RiskPredictionService } from './risk-prediction.service';
 import { SvrRoutineService } from './svr-routine.service';
 import { SkinCondition } from './skin-condition.enum';
+import axios from 'axios';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 jest.mock('@xenova/transformers', () => {
   return {
@@ -151,6 +155,52 @@ describe('AiController', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('API Down');
+    });
+  });
+
+  describe('proxyImageSvr', () => {
+    it('should allow SVR domains', async () => {
+      const mockRes = {
+        set: jest.fn(),
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      } as any;
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('image-data'),
+        headers: { 'content-type': 'image/jpeg' }
+      });
+
+      await controller.proxyImageSvr('https://fr.svr.com/image.jpg', mockRes);
+      expect(mockRes.send).toHaveBeenCalled();
+    });
+
+    it('should block non-SVR domains', async () => {
+      const mockRes = {
+        set: jest.fn(),
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      } as any;
+
+      await controller.proxyImageSvr('https://malicious.com/image.jpg', mockRes);
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Failed to fetch SVR image' }));
+    });
+  });
+
+  describe('analyzeRandom', () => {
+    it('should handle invalid weights JSON', async () => {
+      const mockUser = { id: 'user-1' };
+      let error;
+      try {
+        await controller.analyzeRandom('123', 'invalid-json', '30', mockUser);
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      expect(error).toBeInstanceOf(HttpException);
+      expect(error.getResponse().error).toContain('Invalid weights JSON format');
     });
   });
 });

@@ -6,6 +6,17 @@ import { RecommendationService } from './recommendation.service';
 import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
 import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
+import * as child_process from 'child_process';
+import * as fs from 'fs';
+
+// Global mock for child_process
+jest.mock('child_process', () => ({
+  spawn: jest.fn().mockReturnValue({
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    on: jest.fn(),
+  }),
+}));
 
 describe('RecommendationService', () => {
   let service: RecommendationService;
@@ -64,6 +75,7 @@ describe('RecommendationService', () => {
 
   describe('getRecommendationsForSkinState', () => {
     it('should use database fallback when Python is disabled', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'test-user-123';
       const analysisId = 'analysis-456';
       const skinType = 'oily';
@@ -100,6 +112,7 @@ describe('RecommendationService', () => {
     });
 
     it('should include concerns in recommendations when provided', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-xyz';
       const analysisId = 'analysis-789';
       const skinType = 'dry';
@@ -135,6 +148,7 @@ describe('RecommendationService', () => {
     });
 
     it('should handle empty concerns array', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-abc';
       const analysisId = 'analysis-def';
       const skinType = 'combination';
@@ -171,6 +185,7 @@ describe('RecommendationService', () => {
     });
 
     it('should handle undefined concerns (treated as empty array)', async () => {
+      (service as any).pythonDisabled = true;
       const userId = 'user-ghi';
       const analysisId = 'analysis-jkl';
       const skinType = 'sensitive';
@@ -194,6 +209,30 @@ describe('RecommendationService', () => {
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should attempt to call Python script via spawn when data exists', async () => {
+      const mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn(),
+      };
+      (child_process.spawn as jest.Mock).mockReturnValue(mockProcess);
+
+      const promise = service.getRecommendationsForSkinState('user-1', 'analysis-1', 'oily', ['acne']);
+      
+      // Simulate stdout data
+      const stdoutCallback = mockProcess.stdout.on.mock.calls.find(c => c[0] === 'data')[1];
+      stdoutCallback(Buffer.from(JSON.stringify([{ productId: '101', name: 'Python Product' }])));
+
+      // Simulate process close
+      const closeCallback = mockProcess.on.mock.calls.find(c => c[0] === 'close')[1];
+      closeCallback(0);
+
+      const result = await promise;
+      const spawnSpy = child_process.spawn;
+      expect(spawnSpy).toHaveBeenCalled();
+      expect(result[0].name).toBe('Python Product');
     });
   });
 

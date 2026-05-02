@@ -31,6 +31,8 @@ const DISPOSABLE_DOMAINS = new Set([
   'inboxkitten.com',
   'tempinbox.com',
   'anonymousemail.me',
+  'guerrillamail.com',
+  'tempmail.org',
 ]);
 
 export interface SuspiciousResult {
@@ -68,9 +70,9 @@ export class EmailSecurityService {
 
   /** Vérifie si le domaine est un fournisseur d'emails temporaires connu */
   private isDisposableDomain(email: string): boolean {
-    const at = email.lastIndexOf('@');
-    if (at === -1) return true;
-    const domain = email.slice(at + 1).toLowerCase();
+    const normalized = email.toLowerCase().trim();
+    const at = normalized.lastIndexOf('@');
+    const domain = at === -1 ? normalized : normalized.slice(at + 1);
     return DISPOSABLE_DOMAINS.has(domain);
   }
 

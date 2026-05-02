@@ -49,10 +49,9 @@ pipeline {
         stage('🧪 Tests & Coverage') {
             steps {
                 echo "🧪 Exécution des tests avec couverture..."
-                // On utilise || true pour ne pas bloquer le pipeline si les tests échouent pour l'instant
                 sh '''
                     cd frontend
-                    npm run test:cov -- --passWithNoTests || true
+                    npm run test:cov
                 '''
             }
         }

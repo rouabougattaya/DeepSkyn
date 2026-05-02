@@ -516,8 +516,8 @@ export default function ActivityTimeline() {
                         </div>
                         {summaryLoading ? (
                             <div style={{ display: 'flex', gap: '6px' }}>
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} style={{ height: '8px', background: 'rgba(0,0,0,0.08)', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: `${60 + i * 30}px` }} />
+                                {[1, 2, 3].map(item => (
+                                    <div key={`summary-skel-${item}`} style={{ height: '8px', background: 'rgba(0,0,0,0.08)', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: `${60 + item * 30}px` }} />
                                 ))}
                             </div>
                         ) : (
@@ -626,8 +626,8 @@ export default function ActivityTimeline() {
 
                 <div style={{ paddingLeft: '28px' }}>
                     {loading ? (
-                        Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} style={{
+                        [1, 2, 3, 4, 5].map((item) => (
+                            <div key={`skeleton-act-${item}`} style={{
                                 height: '84px', borderRadius: '14px', marginBottom: '12px',
                                 background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)',
                                 animation: 'pulse 1.5s infinite',
@@ -679,10 +679,9 @@ export default function ActivityTimeline() {
                             border: '1px solid rgba(255,255,255,0.08)',
                             color: page === 1 ? '#334155' : '#94a3b8', cursor: page === 1 ? 'not-allowed' : 'pointer',
                         }}>← Prev</button>
-                        {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                            const p = i + 1;
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => {
                             return (
-                                <button key={p} onClick={() => setPage(p)} style={{
+                                <button key={`page-${p}`} onClick={() => setPage(p)} style={{
                                     width: '32px', height: '32px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
                                     background: page === p ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
                                     border: page === p ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.07)',

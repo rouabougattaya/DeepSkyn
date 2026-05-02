@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Loader2, Send, Sparkles, X, History, Brain, Trash2, Pencil, Check, Crown, ArrowUpRight } from 'lucide-react';
+import { AlertCircle, Loader2, Send, Sparkles, X, History, Brain, Trash2, Pencil, Check, Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { SharedChatController } from '../hooks/useSharedChat';
 
@@ -8,6 +8,94 @@ interface AIChatOverlayProps {
   onClose: () => void;
   chat: SharedChatController;
 }
+
+const SessionHistoryItem = ({
+  session,
+  sessionId,
+  editingSessionId,
+  editingTitle,
+  setEditingTitle,
+  setEditingSessionId,
+  renameSession,
+  loadSession,
+  deleteSession,
+  setShowHistory
+}: any) => {
+  return (
+    <div className="group relative">
+      {editingSessionId === session.id ? (
+        <div className="flex items-center gap-2 px-4 py-2 bg-white shadow-sm ring-1 ring-teal-500 rounded-xl">
+          <input
+            autoFocus
+            className="flex-1 bg-transparent text-sm outline-none"
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                renameSession(session.id, editingTitle);
+                setEditingSessionId(null);
+              } else if (e.key === 'Escape') {
+                setEditingSessionId(null);
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              renameSession(session.id, editingTitle);
+              setEditingSessionId(null);
+            }}
+            className="p-1 text-teal-600 hover:bg-teal-50 rounded"
+          >
+            <Check size={14} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={() => {
+              loadSession(session.id);
+              if (window.innerWidth < 1024) setShowHistory(false);
+            }}
+            className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 pr-16 ${sessionId === session.id
+              ? 'bg-white shadow-sm ring-1 ring-slate-200 text-slate-900 font-medium'
+              : 'text-slate-600 hover:bg-slate-200/50'
+              }`}
+          >
+            <Brain size={14} className="opacity-40" />
+            <div className="flex-1 truncate">
+              {session.title || `Session du ${new Date(session.createdAt).toLocaleDateString()}`}
+            </div>
+          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingSessionId(session.id);
+                setEditingTitle(session.title || '');
+              }}
+              className="p-2 text-slate-500 hover:text-teal-500 rounded-lg hover:bg-teal-50"
+              title="Renommer"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm('Supprimer cette discussion ?')) {
+                  deleteSession(session.id);
+                }
+              }}
+              className="p-2 text-slate-500 hover:text-red-500 rounded-lg hover:bg-red-50"
+              title="Supprimer"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
   const {
@@ -71,7 +159,7 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
     };
   }, [isOpen, onClose]);
 
-  const handleSendMessage = (e?: React.FormEvent) => {
+  const handleSendMessage = (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     sendMessage();
   };
@@ -127,79 +215,20 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                     <div>
                       <h4 className="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Récents</h4>
                       <div className="space-y-1">
-                        {history.map((session) => (
-                          <div key={session.id} className="group relative">
-                            {editingSessionId === session.id ? (
-                              <div className="flex items-center gap-2 px-4 py-2 bg-white shadow-sm ring-1 ring-teal-500 rounded-xl">
-                                <input
-                                  autoFocus
-                                  className="flex-1 bg-transparent text-sm outline-none"
-                                  value={editingTitle}
-                                  onChange={(e) => setEditingTitle(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      renameSession(session.id, editingTitle);
-                                      setEditingSessionId(null);
-                                    } else if (e.key === 'Escape') {
-                                      setEditingSessionId(null);
-                                    }
-                                  }}
-                                />
-                                <button
-                                  onClick={() => {
-                                    renameSession(session.id, editingTitle);
-                                    setEditingSessionId(null);
-                                  }}
-                                  className="p-1 text-teal-600 hover:bg-teal-50 rounded"
-                                >
-                                  <Check size={14} />
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    loadSession(session.id);
-                                    if (window.innerWidth < 1024) setShowHistory(false);
-                                  }}
-                                  className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 pr-16 ${sessionId === session.id
-                                    ? 'bg-white shadow-sm ring-1 ring-slate-200 text-slate-900 font-medium'
-                                    : 'text-slate-600 hover:bg-slate-200/50'
-                                    }`}
-                                >
-                                  <Brain size={14} className="opacity-40" />
-                                  <div className="flex-1 truncate">
-                                    {session.title || `Session du ${new Date(session.createdAt).toLocaleDateString()}`}
-                                  </div>
-                                </button>
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingSessionId(session.id);
-                                      setEditingTitle(session.title || '');
-                                    }}
-                                    className="p-2 text-slate-500 hover:text-teal-500 rounded-lg hover:bg-teal-50"
-                                    title="Renommer"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (confirm('Supprimer cette discussion ?')) {
-                                        deleteSession(session.id);
-                                      }
-                                    }}
-                                    className="p-2 text-slate-500 hover:text-red-500 rounded-lg hover:bg-red-50"
-                                    title="Supprimer"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                        {history.map((session: any) => (
+                          <SessionHistoryItem
+                            key={session.id}
+                            session={session}
+                            sessionId={sessionId}
+                            editingSessionId={editingSessionId}
+                            editingTitle={editingTitle}
+                            setEditingTitle={setEditingTitle}
+                            setEditingSessionId={setEditingSessionId}
+                            renameSession={renameSession}
+                            loadSession={loadSession}
+                            deleteSession={deleteSession}
+                            setShowHistory={setShowHistory}
+                          />
                         ))}
                       </div>
                     </div>
@@ -274,17 +303,17 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
                   <h4 className="font-bold flex items-center gap-2 text-teal-800 text-xs uppercase tracking-wider">
                     <Sparkles size={12} /> Notes d'analyse
                   </h4>
-                  {contextHints.map((hint, index) => (
-                    <p key={`${hint}-${index}`} className="leading-relaxed opacity-90 pl-4 border-l-2 border-teal-200">
+                  {contextHints.map((hint) => (
+                    <p key={hint} className="leading-relaxed opacity-90 pl-4 border-l-2 border-teal-200">
                       {hint}
                     </p>
                   ))}
                 </div>
               )}
 
-              {messages.map((message, index) => (
+              {messages.map((message: any) => (
                 <div
-                  key={`${message.role}-${index}`}
+                  key={message.id ?? message.content}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}
                 >
                   {message.role === 'assistant' && (
@@ -372,9 +401,9 @@ export function AIChatOverlay({ isOpen, onClose, chat }: AIChatOverlayProps) {
             <footer className="sticky bottom-0 border-t border-slate-100/50 bg-white/95 backdrop-blur-xl px-6 sm:px-10 py-6">
               {/* Suggested Questions */}
               <div className="flex gap-2.5 overflow-x-auto pb-5 mb-1 no-scrollbar mask-fade-right">
-                {suggestedQuestions.map((q, i) => (
+                {suggestedQuestions.map((q) => (
                   <button
-                    key={i}
+                    key={q}
                     onClick={() => handleSuggestedClick(q)}
                     disabled={isLoading || !sessionId}
                     className="flex-none px-5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white hover:border-teal-400 hover:text-teal-700 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none active:scale-95"

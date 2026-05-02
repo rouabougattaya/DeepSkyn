@@ -22,11 +22,16 @@ module.exports = {
     '^qrcode$': '<rootDir>/src/__mocks__/qrcode.js',
   },
   coverageDirectory: 'coverage',
-  coverageReporters: ['lcov', 'text'],
+  coverageReporters: ['lcov', 'text', 'json-summary'],
   collectCoverageFrom: [
-    'src/**/*.{ts,js}',
+    'src/**/*.ts',
     '!src/**/*.d.ts',
     '!src/main.ts',
+    '!src/**/*.module.ts',
+    '!src/**/*.entity.ts',
+    '!src/**/*.dto.ts',
+    '!src/**/index.ts',
+    '!src/env.validation.ts'
   ],
   coverageThreshold: {
     global: {

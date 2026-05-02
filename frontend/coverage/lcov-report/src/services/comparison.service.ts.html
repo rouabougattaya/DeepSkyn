@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">61.53% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>8/13</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">33.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>1/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">61.53% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>8/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -140,7 +140,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -192,27 +192,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * Service de comparaison d'analyses.
  * Les appels passent par apiClient qui ajoute automatiquement le JWT (Authorization: Bearer …)
  * pour les routes protégées comme GET /analysis/user.
  */
-<span class="cstat-no" title="statement not covered" >import { apiGet } from './apiClient';</span>
+import { apiGet } from './apiClient';
 &nbsp;
 export type MetricKey = 'hydration' | 'oil' | 'acne' | 'wrinkles';
 &nbsp;
@@ -264,21 +264,21 @@ export interface PaginatedAnalyses {
   total: number;
 }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >export const comparisonService = {</span>
+export const comparisonService = {
   /** Liste des analyses de l'utilisateur connecté (tri par date décroissante). Token envoyé via apiClient. */
-<span class="cstat-no" title="statement not covered" >  async getUserAnalyses(page: number = 1, limit: number = 10): Promise&lt;PaginatedAnalyses&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    return apiGet&lt;PaginatedAnalyses&gt;(`/analysis/user?page=${page}&amp;limit=${limit}`);</span>
-<span class="cstat-no" title="statement not covered" >  },</span>
+  async getUserAnalyses(page: number = 1, limit: number = 10): Promise&lt;PaginatedAnalyses&gt; {
+    return apiGet&lt;PaginatedAnalyses&gt;(`/analysis/user?page=${page}&amp;limit=${limit}`);
+  },
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  async compare(firstId: string, secondId: string): Promise&lt;CompareAnalysisResult&gt; {</span>
+<span class="fstat-no" title="function not covered" >  async compare(firstId: string, secondId: string): Promise&lt;CompareAnalysisResult&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    const params = new URLSearchParams({ firstId, secondId });</span>
 <span class="cstat-no" title="statement not covered" >    return apiGet&lt;CompareAnalysisResult&gt;(`/analysis/compare?${params.toString()}`);</span>
 <span class="cstat-no" title="statement not covered" >  },</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  async getAnalysis(id: string): Promise&lt;ComparedAnalysisItem&gt; {</span>
+<span class="fstat-no" title="function not covered" >  async getAnalysis(id: string): Promise&lt;ComparedAnalysisItem&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    return apiGet&lt;ComparedAnalysisItem&gt;(`/analysis/${id}`);</span>
 <span class="cstat-no" title="statement not covered" >  },</span>
-<span class="cstat-no" title="statement not covered" >};</span>
+};
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -286,7 +286,7 @@ export interface PaginatedAnalyses {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-02T21:18:08.787Z
+                at 2026-05-02T21:34:18.210Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

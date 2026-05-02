@@ -9,8 +9,13 @@ import { RecommendationItem } from '../recommendationItem/recommendation-item.en
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 
+// Global mock for child_process
 jest.mock('child_process', () => ({
-  spawn: jest.fn(),
+  spawn: jest.fn().mockReturnValue({
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    on: jest.fn(),
+  }),
 }));
 
 describe('RecommendationService', () => {

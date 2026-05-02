@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import Papa from 'papaparse';
+import * as crypto from 'crypto';
 import { Product } from '../products/entities/product.entity';
 import { Recommendation } from './recommendation.entity';
 import { RecommendationItem } from '../recommendationItem/recommendation-item.entity';
@@ -35,7 +36,7 @@ export class RecommendationService {
       return this.getDatabaseFallback(userId, analysisId, skinType, concerns);
     }
 
-    const { exec } = require('child_process');
+    const { spawn } = require('child_process');
     const path = require('path');
     const fs = require('fs');
 
@@ -45,19 +46,22 @@ export class RecommendationService {
     this.logger.debug(`Paths - Script: ${scriptPath}, Data: ${dataPath}`);
     const pythonPath = process.env.PYTHON_PATH || 'python';
 
-    // On prépare les préoccupations (concerns) comme argument
     const concernsArg = (concerns && concerns.length > 0) ? concerns.join(',') : '';
 
-    // Si on a la dataset réelle, on utilise le script Python
     if (fs.existsSync(dataPath)) {
-      this.logger.log(`Dataset trouvée. Exécution de ${scriptPath} avec skinType=${skinType} et concerns=[${concernsArg}]`);
+      this.logger.log(`Dataset trouvée. Exécution de ${scriptPath} via spawn`);
       return new Promise((resolve, reject) => {
-        exec(`"${pythonPath}" "${scriptPath}" ${skinType} "${concernsArg}"`, { cwd: process.cwd() }, (error, stdout, stderr) => {
-          if (error) {
-            const stderrText = String(stderr ?? '');
-            this.logger.error(`Erreur EXEC Python: ${error.message} | STDERR: ${stderrText}`);
-            if (stderrText.includes('ModuleNotFoundError') && stderrText.toLowerCase().includes('pandas')) {
-              this.logger.warn('Python désactivé: dependency pandas manquante. Passage direct au fallback DB.');
+        const pyProcess = spawn(pythonPath, [scriptPath, skinType, concernsArg], { cwd: process.cwd() });
+        let stdout = '';
+        let stderr = '';
+
+        pyProcess.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+        pyProcess.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+        pyProcess.on('close', (code: number) => {
+          if (code !== 0) {
+            this.logger.error(`Python process exited with code ${code} | STDERR: ${stderr}`);
+            if (stderr.includes('ModuleNotFoundError') && stderr.toLowerCase().includes('pandas')) {
               this.pythonDisabled = true;
             }
             this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve).catch(reject);
@@ -67,19 +71,14 @@ export class RecommendationService {
           try {
             const results = JSON.parse(stdout);
             if (results.error) {
-              const errText = String(results.error);
-              this.logger.warn(`Erreur Logique Python: ${errText}`);
-              if (errText.toLowerCase().includes('pandas')) {
-                this.logger.warn('Python désactivé suite à l erreur (pandas).');
-                this.pythonDisabled = true;
-              }
+              this.logger.warn(`Erreur Logique Python: ${results.error}`);
               this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
             } else {
               this.logger.log(`✅ ${results.length} recommandations générées via Python.`);
               resolve(results);
             }
           } catch (e: any) {
-            this.logger.error(`Erreur Parsing STDOUt: ${stdout} | Erreur: ${e?.message || e}`);
+            this.logger.error(`Erreur Parsing STDOUT: ${stdout.slice(0, 100)}... | Erreur: ${e.message}`);
             this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
           }
         });
@@ -255,7 +254,7 @@ export class RecommendationService {
       if (!list.length) return;
       const pool = list.slice(0, topN);
       for (let i = 0; i < count && pool.length > 0; i++) {
-        const idx = Math.floor(Math.random() * pool.length);
+        const idx = crypto.randomInt(0, pool.length);
         const item = pool.splice(idx, 1)[0];
         if (!usedIds.has(item.p.id)) {
           finalSelection.push(item);
@@ -402,7 +401,7 @@ export class RecommendationService {
         p.ingredients = ingredients.split(',').map((s) => s.trim()).filter(Boolean);
         p.price = price;
         p.skinType = this.inferSkinTypeFromIngredients(ingredients);
-        p.cluster = p.cluster ?? Math.floor(Math.random() * 5);
+        p.cluster = p.cluster ?? crypto.randomInt(0, 5);
         updated.push(p);
       }
 
@@ -440,7 +439,7 @@ export class RecommendationService {
         ingredients: ingredients.split(',').map((s) => s.trim()).filter(Boolean),
         price,
         skinType: this.inferSkinTypeFromIngredients(ingredients),
-        cluster: Math.floor(Math.random() * 5),
+        cluster: crypto.randomInt(0, 5),
       });
 
       toInsert.push(product);

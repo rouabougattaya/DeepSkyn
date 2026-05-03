@@ -116,4 +116,29 @@ describe('RoutinePersonalizationService', () => {
         expect(acneAdjustment?.action).toContain('anti-acné');
     });
   });
+
+  describe('Private Methods Fallbacks', () => {
+    it('resolveProduct should fallback to name if ID is not found', async () => {
+      productRepo.findOne.mockResolvedValueOnce(null); // by id fails
+      productRepo.findOne.mockResolvedValueOnce({ id: 'p2', name: 'Product Name' }); // by name succeeds
+
+      const result = await service['resolveProduct']({ id: 'p1', name: 'Product Name' } as any, 'Cleanser', 'oily');
+      expect(result.id).toBe('p2');
+    });
+
+    it('resolveProduct should fallback to category search if name fails', async () => {
+      productRepo.findOne.mockResolvedValueOnce(null); // by id fails
+      productRepo.findOne.mockResolvedValueOnce(null); // by name fails
+      productRepo.findOne.mockResolvedValueOnce({ id: 'p3', type: 'Cleanser' }); // by category + skinType succeeds
+
+      const result = await service['resolveProduct']({ id: 'p1', name: 'Unknown' } as any, 'Cleanser', 'oily');
+      expect(result.id).toBe('p3');
+    });
+
+    it('resolveSerumAdjustmentReason should return correct reasons', () => {
+      expect(service['resolveSerumAdjustmentReason'](new Set(['ACNE_WORSENING']))).toBe('Sérum anti-acné priorisé');
+      expect(service['resolveSerumAdjustmentReason'](new Set(['WRINKLES_INCREASE']))).toBe('Sérum anti-rides priorisé');
+      expect(service['resolveSerumAdjustmentReason'](new Set(['OTHER']))).toBeUndefined();
+    });
+  });
 });

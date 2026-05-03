@@ -97,7 +97,7 @@ describe('DigitalTwinService', () => {
 
     it('should calculate higher improvement rate for high RoutineConsistency in fallback', async () => {
       const dto: CreateDigitalTwinDto = { baseAnalysisId: '1', routineConsistency: 'high' };
-      mockRepo.findOne.mockResolvedValueOnce({ id: '1', userId: 'u1', skinScore: 70, skinAge: 30, hydration: 50, oil: 50, acne: 50, wrinkles: 50 });
+      mockRepo.findOne.mockResolvedValueOnce({ id: '1', userId: 'u1', skinScore: 70, skinAge: 30, hydration: 30, oil: 80, acne: 70, wrinkles: 60 });
       mockRepo.find.mockResolvedValueOnce([]); // No routines
       mockAiService.predictFutureSkin.mockRejectedValueOnce(new Error('AI fail'));
       mockRepo.create.mockReturnValue({ id: 'tw2' });
@@ -137,6 +137,72 @@ describe('DigitalTwinService', () => {
       expect(res).toBeDefined();
       expect(res.trends.bestOutcome).toBe('month6');
       expect(res.trends.overallTrajectory).toBe('improvement');
+    });
+
+    it('should return degradation trajectory when score drops', async () => {
+      mockRepo.findOne.mockResolvedValueOnce({
+        id: 'tw2',
+        baseAnalysisId: 'a2',
+        month1Prediction: { skinScore: 80 },
+        month3Prediction: { skinScore: 70 },
+        month6Prediction: { skinScore: 60 },
+      });
+      mockRepo.findOne.mockResolvedValueOnce({
+        id: 'a2',
+        skinScore: 90,
+        skinAge: 30,
+        hydration: 50,
+        oil: 50,
+        acne: 50,
+        wrinkles: 50,
+      });
+
+      const res = await service.getDigitalTwinTimeline('tw2', 'u2');
+      expect(res.trends.overallTrajectory).toBe('degradation');
+    });
+
+    it('should return stable trajectory when score change is minimal', async () => {
+      mockRepo.findOne.mockResolvedValueOnce({
+        id: 'tw3',
+        baseAnalysisId: 'a3',
+        month1Prediction: { skinScore: 70 },
+        month3Prediction: { skinScore: 70 },
+        month6Prediction: { skinScore: 71 },
+      });
+      mockRepo.findOne.mockResolvedValueOnce({
+        id: 'a3',
+        skinScore: 70,
+        skinAge: 30,
+        hydration: 50,
+        oil: 50,
+        acne: 50,
+        wrinkles: 50,
+      });
+
+      const res = await service.getDigitalTwinTimeline('tw3', 'u3');
+      expect(res.trends.overallTrajectory).toBe('stable');
+    });
+
+    it('should generate overall recommendation for mid-range score', () => {
+      const predictions = {
+        month1: { skinScore: 60, improvements: [] } as any,
+        month3: { skinScore: 70, improvements: [] } as any,
+        month6: { skinScore: 80, improvements: [] } as any,
+      };
+
+      const res = (service as any).generateOverallRecommendation(predictions);
+      expect(res).toContain('Positive trajectory');
+    });
+    
+    it('should generate overall recommendation for low-range score', () => {
+      const predictions = {
+        month1: { skinScore: 50, improvements: [] } as any,
+        month3: { skinScore: 55, improvements: [] } as any,
+        month6: { skinScore: 60, improvements: [] } as any,
+      };
+
+      const res = (service as any).generateOverallRecommendation(predictions);
+      expect(res).toContain('consulting with a dermatologist');
     });
   });
 

@@ -18,6 +18,8 @@ jest.mock('child_process', () => ({
   }),
 }));
 
+jest.mock('fs');
+
 describe('RecommendationService', () => {
   let service: RecommendationService;
   let mockProductRepository: jest.Mocked<Repository<Product>>;
@@ -29,6 +31,9 @@ describe('RecommendationService', () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
       createQueryBuilder: jest.fn(),
+      count: jest.fn(),
+      save: jest.fn(),
+      create: jest.fn().mockImplementation((dto) => dto),
     } as any;
 
     mockRecommendationRepository = {
@@ -213,6 +218,7 @@ describe('RecommendationService', () => {
     });
 
     it('should attempt to call Python script via spawn when data exists', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
@@ -237,6 +243,7 @@ describe('RecommendationService', () => {
     });
 
     it('should handle Python script stderr and still resolve or fallback', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
@@ -260,6 +267,7 @@ describe('RecommendationService', () => {
     });
 
     it('should fallback to database if Python script fails completely', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
@@ -478,6 +486,78 @@ describe('RecommendationService', () => {
       expect(result[0].name).toBe('Product 1');
       expect(result[0].reason).toBe('r1');
       expect(result[0].ranking).toBe(1);
+    });
+  });
+
+  describe('inferSkinTypeFromIngredients', () => {
+    it('should infer dry skin from dry keywords', () => {
+      expect(service.inferSkinTypeFromIngredients('glycerin, butyrospermum, water')).toBe('dry');
+    });
+
+    it('should infer oily skin from oily keywords', () => {
+      expect(service.inferSkinTypeFromIngredients('dimethicone, water')).toBe('oily');
+    });
+
+    it('should infer sensitive skin from sensitive keywords', () => {
+      expect(service.inferSkinTypeFromIngredients('allantoin, water, panthenol')).toBe('sensitive');
+    });
+
+    it('should infer normal skin when no keywords match', () => {
+      expect(service.inferSkinTypeFromIngredients('water, perfum')).toBe('normal');
+    });
+  });
+
+  describe('seedProducts', () => {
+    it('should return early if dataset is missing', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      await service.seedProducts();
+      expect(mockProductRepository.count).not.toHaveBeenCalled();
+    });
+
+    it('should return early if enough products and no missing urls', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      mockProductRepository.count.mockResolvedValue(100);
+      
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+
+      await service.seedProducts();
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should seed new products', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('product_name,product_url,product_type,clean_ingreds,price\nProdA,urlA,typeA,ingA,10.0\n');
+      
+      mockProductRepository.count.mockResolvedValue(0);
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+      mockProductRepository.find.mockResolvedValue([]);
+      
+      await service.seedProducts();
+      expect(mockProductRepository.save).toHaveBeenCalled();
+    });
+    
+    it('should update missing urls', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('product_name,product_url,product_type,clean_ingreds,price\nProdA,http://urlA,typeA,ingA,10.0\n');
+      
+      mockProductRepository.count.mockResolvedValue(100);
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(1),
+        getMany: jest.fn().mockResolvedValue([{ name: 'ProdA', url: null }]),
+      };
+      mockProductRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+      
+      await service.seedProducts();
+      expect(mockProductRepository.save).toHaveBeenCalled();
     });
   });
 });

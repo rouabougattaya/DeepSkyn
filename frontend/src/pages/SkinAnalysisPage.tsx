@@ -288,7 +288,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
                     <div>
                         <div style={{ fontWeight: 700, color: meta.color, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{meta.label}</div>
                         <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 15, letterSpacing: '-0.01em' }}>
-                            {isEvaluated ? interpretation.split(':')[0] : t('analysis.non_evaluated')}
+                            {isEvaluated ? interpretation?.split(':')[0] : t('analysis.non_evaluated')}
                         </div>
                     </div>
                 </div>
@@ -320,7 +320,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
             </div>
 
             <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.5, marginBottom: 14, minHeight: '1.5em' }}>
-                {isEvaluated ? interpretation.split(':')[1].trim() : (condition.notEvaluatedReason || t('analysis.no_data_available'))}
+                {isEvaluated ? interpretation?.split(':')[1]?.trim() : (condition.notEvaluatedReason || t('analysis.no_data_available'))}
             </div>
 
             {/* Premium Progress bar */}

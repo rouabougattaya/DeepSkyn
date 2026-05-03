@@ -95,19 +95,21 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
   }, []);
 
   const buildRiskSpeechText = () => {
-    const header = `Skin Risk Alerts. Overall risk score is ${overallRiskScore} out of 100.`;
+    const risksArr = risks || [];
+    const header = `Skin Risk Alerts. Overall risk score is ${overallRiskScore || 0} out of 100.`;
 
-    const risksText = risks.length === 0
+    const risksText = risksArr.length === 0
       ? 'No significant skin risks detected.'
-      : risks
+      : risksArr
         .slice(0, 5)
         .map((risk, index) => {
-          const tips = risk.prevention.slice(0, 2).join('. ');
-          return `Risk ${index + 1}. ${risk.type}. Score ${risk.risk_score}. Urgency ${risk.urgency || 'medium'}. ${risk.cause}. Prevention tips: ${tips}.`;
+          const tips = (risk.prevention || []).slice(0, 2).join('. ');
+          return `Risk ${index + 1}. ${risk.type || 'unknown'}. Score ${risk.risk_score || 0}. Urgency ${risk.urgency || 'medium'}. ${risk.cause || ''}. Prevention tips: ${tips}.`;
         })
         .join(' ');
 
-    const actions = (immediateActions.length > 0 ? immediateActions : [
+    const actionsArr = immediateActions || [];
+    const actions = (actionsArr.length > 0 ? actionsArr : [
       'Apply daily SPF 30 plus sunscreen',
       'Maintain a consistent skincare routine',
       'Drink at least two liters of water daily',

@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>0/71</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>0/71</span>
             </div>
         
             
@@ -135,69 +135,6 @@
 <a name='L70'></a><a href='#L70'>70</a>
 <a name='L71'></a><a href='#L71'>71</a>
 <a name='L72'></a><a href='#L72'>72</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -205,70 +142,133 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { apiPost } from './apiClient';<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
-&nbsp;
-export interface SvrProductInStep {
-  name: string;
-  category: string;
-  description: string;
-  price: number;
-  url: string;
-  imageUrl?: string;
-  keyIngredients: string[];
-}
-&nbsp;
-export interface SvrRecommendedProduct {
-  name: string;
-  category: string;
-  description: string;
-  price: number;
-  url: string;
-  imageUrl?: string;
-  keyIngredients: string[];
-  reason: string;
-  skinBenefit: string;
-  texture?: string;
-  score: number;
-}
-&nbsp;
-export interface SvrRoutineStep {
-  stepOrder: number;
-  stepName: string;
-  product: SvrProductInStep;
-  instruction: string;
-  reason: string;
-}
-&nbsp;
-export interface SvrRoutineResult {
-  recommendedProducts: SvrRecommendedProduct[];
-  morning: SvrRoutineStep[];
-  night: SvrRoutineStep[];
-  skinProfile: string;
-  generalAdvice: string;
-}
-&nbsp;
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import { apiPost } from './apiClient';</span></span></span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export interface SvrProductInStep {</span>
+<span class="cstat-no" title="statement not covered" >  name: string;</span>
+<span class="cstat-no" title="statement not covered" >  category: string;</span>
+<span class="cstat-no" title="statement not covered" >  description: string;</span>
+<span class="cstat-no" title="statement not covered" >  price: number;</span>
+<span class="cstat-no" title="statement not covered" >  url: string;</span>
+<span class="cstat-no" title="statement not covered" >  imageUrl?: string;</span>
+<span class="cstat-no" title="statement not covered" >  keyIngredients: string[];</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export interface SvrRecommendedProduct {</span>
+<span class="cstat-no" title="statement not covered" >  name: string;</span>
+<span class="cstat-no" title="statement not covered" >  category: string;</span>
+<span class="cstat-no" title="statement not covered" >  description: string;</span>
+<span class="cstat-no" title="statement not covered" >  price: number;</span>
+<span class="cstat-no" title="statement not covered" >  url: string;</span>
+<span class="cstat-no" title="statement not covered" >  imageUrl?: string;</span>
+<span class="cstat-no" title="statement not covered" >  keyIngredients: string[];</span>
+<span class="cstat-no" title="statement not covered" >  reason: string;</span>
+<span class="cstat-no" title="statement not covered" >  skinBenefit: string;</span>
+<span class="cstat-no" title="statement not covered" >  texture?: string;</span>
+<span class="cstat-no" title="statement not covered" >  score: number;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export interface SvrRoutineStep {</span>
+<span class="cstat-no" title="statement not covered" >  stepOrder: number;</span>
+<span class="cstat-no" title="statement not covered" >  stepName: string;</span>
+<span class="cstat-no" title="statement not covered" >  product: SvrProductInStep;</span>
+<span class="cstat-no" title="statement not covered" >  instruction: string;</span>
+<span class="cstat-no" title="statement not covered" >  reason: string;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export interface SvrRoutineResult {</span>
+<span class="cstat-no" title="statement not covered" >  recommendedProducts: SvrRecommendedProduct[];</span>
+<span class="cstat-no" title="statement not covered" >  morning: SvrRoutineStep[];</span>
+<span class="cstat-no" title="statement not covered" >  night: SvrRoutineStep[];</span>
+<span class="cstat-no" title="statement not covered" >  skinProfile: string;</span>
+<span class="cstat-no" title="statement not covered" >  generalAdvice: string;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >export const svrRoutineService = {</span>
 <span class="cstat-no" title="statement not covered" >  async generateRoutine(profile: {</span>
-    skinType: string;
-    age: number;
-    gender?: string;
-    concerns?: string[];
-    acneLevel?: number;
-    blackheadsLevel?: number;
-    poreSize?: number;
-    wrinklesDepth?: number;
-    hydrationLevel?: number;
-    rednessLevel?: number;
-    sensitivityLevel?: number;
-    forceRegenerate?: boolean;
-    seed?: number;
+<span class="cstat-no" title="statement not covered" >    skinType: string;</span>
+<span class="cstat-no" title="statement not covered" >    age: number;</span>
+<span class="cstat-no" title="statement not covered" >    gender?: string;</span>
+<span class="cstat-no" title="statement not covered" >    concerns?: string[];</span>
+<span class="cstat-no" title="statement not covered" >    acneLevel?: number;</span>
+<span class="cstat-no" title="statement not covered" >    blackheadsLevel?: number;</span>
+<span class="cstat-no" title="statement not covered" >    poreSize?: number;</span>
+<span class="cstat-no" title="statement not covered" >    wrinklesDepth?: number;</span>
+<span class="cstat-no" title="statement not covered" >    hydrationLevel?: number;</span>
+<span class="cstat-no" title="statement not covered" >    rednessLevel?: number;</span>
+<span class="cstat-no" title="statement not covered" >    sensitivityLevel?: number;</span>
+<span class="cstat-no" title="statement not covered" >    forceRegenerate?: boolean;</span>
+<span class="cstat-no" title="statement not covered" >    seed?: number;</span>
 <span class="cstat-no" title="statement not covered" >  }): Promise&lt;SvrRoutineResult&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    const { forceRegenerate, seed, ...bodyProfile } = profile;</span>
 <span class="cstat-no" title="statement not covered" >    const queryParams = new URLSearchParams();</span>
 <span class="cstat-no" title="statement not covered" >    if (forceRegenerate) queryParams.append('forceRegenerate', 'true');</span>
 <span class="cstat-no" title="statement not covered" >    if (seed) queryParams.append('seed', seed.toString());</span>
 <span class="cstat-no" title="statement not covered" >    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';</span>
-&nbsp;
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >    const data = await apiPost&lt;{ success: boolean; data: SvrRoutineResult }&gt;(</span>
 <span class="cstat-no" title="statement not covered" >      `/ai/svr-routine${queryString}`,</span>
 <span class="cstat-no" title="statement not covered" >      bodyProfile</span>
@@ -283,7 +283,7 @@ export interface SvrRoutineResult {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-02T21:34:18.210Z
+                at 2026-05-03T12:03:32.299Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

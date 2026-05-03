@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import SkinDigitalTwinPage from './SkinDigitalTwinPage';
 import { digitalTwinService } from '@/services/digitalTwinService';
@@ -72,18 +72,20 @@ describe('SkinDigitalTwinPage Unit Tests', () => {
     (digitalTwinService.getLatestDigitalTwin as any).mockResolvedValue(null);
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     // Keep getLatestDigitalTwin unresolved to test loading
     let resolveMock: any;
     (digitalTwinService.getLatestDigitalTwin as any).mockReturnValue(new Promise(resolve => {
       resolveMock = resolve;
     }));
 
-    render(
-      <BrowserRouter>
-        <SkinDigitalTwinPage />
-      </BrowserRouter>
-    );
+    await act(async () => {
+      render(
+        <BrowserRouter>
+          <SkinDigitalTwinPage />
+        </BrowserRouter>
+      );
+    });
 
     expect(screen.getByText(/Loading your skin future/i)).toBeDefined();
     
@@ -92,11 +94,13 @@ describe('SkinDigitalTwinPage Unit Tests', () => {
   });
 
   it('renders creation form if PRO and no existing twin', async () => {
-    render(
-      <BrowserRouter>
-        <SkinDigitalTwinPage />
-      </BrowserRouter>
-    );
+    await act(async () => {
+      render(
+        <BrowserRouter>
+          <SkinDigitalTwinPage />
+        </BrowserRouter>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Create Your Skin Digital Twin/i)).toBeDefined();
@@ -110,11 +114,13 @@ describe('SkinDigitalTwinPage Unit Tests', () => {
       json: async () => ({ plan: 'FREE' })
     });
 
-    render(
-      <BrowserRouter>
-        <SkinDigitalTwinPage />
-      </BrowserRouter>
-    );
+    await act(async () => {
+      render(
+        <BrowserRouter>
+          <SkinDigitalTwinPage />
+        </BrowserRouter>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Unlock Advanced Skin Simulation/i)).toBeDefined();
@@ -135,11 +141,13 @@ describe('SkinDigitalTwinPage Unit Tests', () => {
       }
     });
 
-    render(
-      <BrowserRouter>
-        <SkinDigitalTwinPage />
-      </BrowserRouter>
-    );
+    await act(async () => {
+      render(
+        <BrowserRouter>
+          <SkinDigitalTwinPage />
+        </BrowserRouter>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Create Your Skin Digital Twin/i)).toBeDefined();

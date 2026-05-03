@@ -806,7 +806,7 @@ export default function ComparisonPage() {
             {result && (
               <div className="stats-pill">
                 <div className="pulse-dot" />
-                {result.summaryText.split(' ').slice(0, 3).join(' ')}...
+                {result.summaryText?.split(' ')?.slice(0, 3)?.join(' ')}...
               </div>
             )}
           </div>

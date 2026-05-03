@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/43</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/43</span>
             </div>
         
             
@@ -107,86 +107,86 @@
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
 <a name='L44'></a><a href='#L44'>44</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { apiGet } from './apiClient';<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
-import type { Product } from './product.service';
-&nbsp;
-export type SkinAgeStatus = 'younger' | 'aligned' | 'older' | 'unknown';
-&nbsp;
-export interface SkinAgeInsightResponse {
-  userId: string;
-  status: SkinAgeStatus;
-  delta: number | null;
-  headline: string;
-  advice: string[];
-  productSuggestions: string[];
-  latestAnalysis?: {
-    id: string;
-    createdAt: string;
-    skinAge: number | null;
-    realAge: number | null;
-    skinScore: number | null;
-  };
-  trend?: {
-    averageDelta: number | null;
-    series: { createdAt: string; delta: number | null }[];
-  };
-  products?: Product[];
-  userBenchmark: {
-    sampleSize: number;
-    avgDelta: number | null;
-    avgSkinAge: number | null;
-    avgRealAge: number | null;
-  };
-  datasetBenchmark: {
-    sampleSize: number;
-    avgDelta: number;
-    avgSkinAge: number;
-    avgRealAge: number;
-  };
-}
-&nbsp;
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import { apiGet } from './apiClient';</span></span></span>
+<span class="cstat-no" title="statement not covered" >import type { Product } from './product.service';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export type SkinAgeStatus = 'younger' | 'aligned' | 'older' | 'unknown';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export interface SkinAgeInsightResponse {</span>
+<span class="cstat-no" title="statement not covered" >  userId: string;</span>
+<span class="cstat-no" title="statement not covered" >  status: SkinAgeStatus;</span>
+<span class="cstat-no" title="statement not covered" >  delta: number | null;</span>
+<span class="cstat-no" title="statement not covered" >  headline: string;</span>
+<span class="cstat-no" title="statement not covered" >  advice: string[];</span>
+<span class="cstat-no" title="statement not covered" >  productSuggestions: string[];</span>
+<span class="cstat-no" title="statement not covered" >  latestAnalysis?: {</span>
+<span class="cstat-no" title="statement not covered" >    id: string;</span>
+<span class="cstat-no" title="statement not covered" >    createdAt: string;</span>
+<span class="cstat-no" title="statement not covered" >    skinAge: number | null;</span>
+<span class="cstat-no" title="statement not covered" >    realAge: number | null;</span>
+<span class="cstat-no" title="statement not covered" >    skinScore: number | null;</span>
+<span class="cstat-no" title="statement not covered" >  };</span>
+<span class="cstat-no" title="statement not covered" >  trend?: {</span>
+<span class="cstat-no" title="statement not covered" >    averageDelta: number | null;</span>
+<span class="cstat-no" title="statement not covered" >    series: { createdAt: string; delta: number | null }[];</span>
+<span class="cstat-no" title="statement not covered" >  };</span>
+<span class="cstat-no" title="statement not covered" >  products?: Product[];</span>
+<span class="cstat-no" title="statement not covered" >  userBenchmark: {</span>
+<span class="cstat-no" title="statement not covered" >    sampleSize: number;</span>
+<span class="cstat-no" title="statement not covered" >    avgDelta: number | null;</span>
+<span class="cstat-no" title="statement not covered" >    avgSkinAge: number | null;</span>
+<span class="cstat-no" title="statement not covered" >    avgRealAge: number | null;</span>
+<span class="cstat-no" title="statement not covered" >  };</span>
+<span class="cstat-no" title="statement not covered" >  datasetBenchmark: {</span>
+<span class="cstat-no" title="statement not covered" >    sampleSize: number;</span>
+<span class="cstat-no" title="statement not covered" >    avgDelta: number;</span>
+<span class="cstat-no" title="statement not covered" >    avgSkinAge: number;</span>
+<span class="cstat-no" title="statement not covered" >    avgRealAge: number;</span>
+<span class="cstat-no" title="statement not covered" >  };</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >export const skinAgeInsightsService = {</span>
 <span class="cstat-no" title="statement not covered" >  async getInsights(userId: string): Promise&lt;SkinAgeInsightResponse&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    return apiGet&lt;SkinAgeInsightResponse&gt;(`/skin-age/insights/${userId}`);</span>
@@ -199,7 +199,7 @@ export interface SkinAgeInsightResponse {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-02T21:34:18.210Z
+                at 2026-05-03T12:03:32.299Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

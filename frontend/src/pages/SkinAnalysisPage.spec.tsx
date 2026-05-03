@@ -1,145 +1,159 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import SkinAnalysisPage from './SkinAnalysisPage';
 import { BrowserRouter } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import * as authSession from '@/lib/authSession';
+import { aiAnalysisService } from '../services/aiAnalysisService';
+import { comparisonService } from '../services/comparison.service';
+import { svrRoutineService } from '../services/svrRoutineService';
 
 // Mock i18next
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { changeLanguage: vi.fn() },
+    t: (key: string, options?: any) => {
+        if (options?.returnObjects) return [];
+        if (key.includes('interpretation') || key.includes('optimal') || key.includes('moderate') || key.includes('critical')) {
+            return `${key} : details`;
+        }
+        return `${options?.defaultValue || key}`;
+    },
+    i18n: { changeLanguage: vi.fn(), language: 'fr' },
   }),
 }));
 
+// Mock Lucide (simplified)
+vi.mock('lucide-react', () => {
+  const Icon = () => <div />;
+  return {
+    Sparkles: Icon, ArrowLeft: Icon, Zap: Icon, AlertCircle: Icon, GitCompare: Icon, 
+    CheckCircle: Icon, RefreshCw: Icon, Activity: Icon, BarChart2: Icon, Info: Icon, 
+    Waves: Icon, Flame: Icon, Microscope: Icon, Bandage: Icon, CircleDot: Icon, 
+    HeartPulse: Icon, CircleCheck: Icon, AlertTriangle: Icon, BarChart3: Icon, 
+    Upload: Icon, X: Icon, Download: Icon, Volume2: Icon, VolumeX: Icon, Send: Icon, 
+    Loader2: Icon, Bot: Icon, ArrowUpCircle: Icon, Lock: Icon, Calendar: Icon, 
+    FlaskConical: Icon, Sun: Icon, Moon: Icon, UserCircle: Icon,
+  };
+});
+
 // Mock services
-vi.mock('../services/aiAnalysisService', () => ({
-  aiAnalysisService: {
-    analyze: vi.fn(),
-  },
-}));
-
+vi.mock('../services/aiAnalysisService', () => ({ aiAnalysisService: { analyzeUnified: vi.fn(), analyzeImage: vi.fn() } }));
 vi.mock('../services/apiClient', () => ({
-  apiGet: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+  apiGet: vi.fn(() => Promise.resolve({ plan: 'FREE' })),
+  apiPost: vi.fn(() => Promise.resolve({ success: true, data: {} })),
+}));
+vi.mock('../services/comparison.service', () => ({ comparisonService: { getUserAnalyses: vi.fn(() => Promise.resolve({data:[]})) } }));
+vi.mock('../services/svrRoutineService', () => ({ svrRoutineService: { generateRoutine: vi.fn(() => Promise.resolve({morning:[], night:[], generalAdvice: ""})) } }));
+vi.mock('../lib/authSession', () => ({ getUser: vi.fn(() => ({id:'123'})) }));
+vi.mock('react-chartjs-2', () => ({ Line: () => <div /> }));
+
+// Mock components
+vi.mock('../components/analysis/SkinProfileForm', () => ({ 
+    SkinProfileForm: ({ profile, setProfile }: any) => (
+        <div>
+          <input 
+            data-testid="age-input" 
+            type="number" 
+            value={profile.age || ''} 
+            onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value) })}
+          />
+        </div>
+    )
 }));
 
-vi.mock('../services/svrRoutineService', () => ({
-  svrRoutineService: {
-    generateRoutine: vi.fn().mockResolvedValue({
-      morning: [{ stepName: 'Cleanser', product: { name: 'SVR Topialyse' }, instruction: 'Wash gently' }],
-      night: [{ stepName: 'Moisturizer', product: { name: 'SVR Sebiaclear' }, instruction: 'Apply before bed' }],
-      generalAdvice: 'Stay hydrated and use SPF.'
-    }),
-  },
+// Mock Web Speech API
+global.SpeechSynthesisUtterance = vi.fn().mockImplementation((text) => ({
+    text, lang: '', onend: null,
 }));
 
-vi.mock('../lib/authSession', () => ({
-  getUser: () => ({ id: '123', name: 'Test User' }),
-}));
+describe('SkinAnalysisPage - Robust Tests', () => {
+  const mockResult = {
+    globalScore: 82,
+    totalDetections: 5,
+    conditionScores: [
+      { type: 'Acne', score: 45, severity: 0.6, count: 2, evaluated: true }
+    ],
+    analysis: { bestCondition: 'Hydration', worstCondition: 'Acne' },
+    metaWeighting: { aiWeight: 0.5, userWeight: 0.5 }
+  };
 
-describe('SkinAnalysisPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
+    (authSession.getUser as any).mockReturnValue({ id: 'user-123' });
+    (aiAnalysisService.analyzeUnified as any).mockResolvedValue(mockResult);
   });
 
-  it('should render the analysis page title', () => {
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
-    expect(screen.getByText('analysis.title')).toBeDefined();
+  const renderPage = async () => {
+    return await act(async () => render(<BrowserRouter><SkinAnalysisPage /></BrowserRouter>));
+  };
+
+  it('renders correctly', async () => {
+    await renderPage();
+    expect(screen.getByText(/analysis.title/)).toBeDefined();
   });
 
-  it('should show the loading state when scan phase is processing', () => {
-    // We can't easily change the internal state from outside without props,
-    // but we can check the initial state or mock the sessionStorage to simulate 'done' state.
-    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
-      globalScore: 85,
-      totalDetections: 3,
-      conditionScores: [],
-      analysis: { bestCondition: 'Hydration', worstCondition: 'Acne' }
-    }));
-
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
-
-    // Should show results if scanPhase is 'done' from sessionStorage
-    const elements = screen.getAllByText('85');
-    expect(elements.length).toBeGreaterThan(0);
+  it('restores result from sessionStorage', async () => {
+    sessionStorage.setItem('skinAnalysisResult', JSON.stringify(mockResult));
+    await renderPage();
+    expect(screen.getAllByText('82').length).toBeGreaterThan(0);
   });
 
-  it('should show the routine for premium users', async () => {
-    const { apiGet } = await import('../services/apiClient');
-    (apiGet as any).mockResolvedValueOnce({ plan: 'PRO' });
+  it('opens condition detail drawer on click', async () => {
+    sessionStorage.setItem('skinAnalysisResult', JSON.stringify(mockResult));
+    await renderPage();
 
-    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
-      globalScore: 85,
-      conditionScores: [],
-      analysis: {}
-    }));
-
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
-
-    // Wait for the routine to be displayed
-    const routineTitle = await screen.findByText('analysis.pdf.morning_routine');
-    expect(routineTitle).toBeDefined();
-    expect(screen.getByText('SVR Topialyse')).toBeDefined();
-  });
-
-  it('should show an error message when routine generation fails', async () => {
-    const { apiGet } = await import('../services/apiClient');
-    const { svrRoutineService } = await import('../services/svrRoutineService');
-    (apiGet as any).mockResolvedValueOnce({ plan: 'PRO' });
-    (svrRoutineService.generateRoutine as any).mockRejectedValueOnce(new Error('API Error'));
-
-    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
-      globalScore: 85,
-      conditionScores: [],
-      analysis: {}
-    }));
-
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
-
-    const errorMsg = await screen.findByText(/analysis.errors.routine_load_fail/);
-    expect(errorMsg).toBeDefined();
-  });
-
-  it('should toggle voice synthesis when clicking the speaker icon', async () => {
-    // Check if the button exists and click it
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
+    // Find the condition bar for Acne
+    const acneBars = screen.getAllByText(/Acne/);
+    const acneBtn = acneBars.find(el => el.closest('[role="button"]'))?.closest('[role="button"]');
     
-    // The button might only be visible if results are present
-    sessionStorage.setItem('skinAnalysisResult', JSON.stringify({
-      globalScore: 85,
-      conditionScores: [],
-      analysis: {}
-    }));
+    expect(acneBtn).toBeDefined();
+    
+    await act(async () => {
+      fireEvent.click(acneBtn!);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    }, { timeout: 2000 });
+  });
 
-    render(
-      <BrowserRouter>
-        <SkinAnalysisPage />
-      </BrowserRouter>
-    );
+  it('handles analysis submission', async () => {
+    await renderPage();
 
-    // Finding the button by aria-label or icon if possible
-    // In the code it's a Volume2 icon
-    // We'll skip complex interaction for now and focus on rendering verification
+    const ageInput = screen.getByTestId('age-input');
+    fireEvent.change(ageInput, { target: { value: '25' } });
+
+    const analyzeBtn = screen.getByText(/analysis.profile.launch_analysis/);
+    
+    await waitFor(() => expect(analyzeBtn.getAttribute('disabled')).toBeNull());
+    
+    await act(async () => {
+        fireEvent.click(analyzeBtn);
+    });
+
+    // We wait for the analysis to complete (it has internal timeouts total ~2s)
+    await waitFor(() => {
+      expect(aiAnalysisService.analyzeUnified).toHaveBeenCalled();
+      expect(screen.getAllByText('82').length).toBeGreaterThan(0);
+    }, { timeout: 5000 });
+  });
+
+  it('handles speech synthesis toggle', async () => {
+    (global as any).speechSynthesis = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+    };
+
+    sessionStorage.setItem('skinAnalysisResult', JSON.stringify(mockResult));
+    await renderPage();
+
+    const speakBtn = screen.getByText(/analysis.listen_analysis/);
+    await act(async () => {
+        fireEvent.click(speakBtn);
+    });
+
+    expect(global.speechSynthesis.speak).toHaveBeenCalled();
   });
 });

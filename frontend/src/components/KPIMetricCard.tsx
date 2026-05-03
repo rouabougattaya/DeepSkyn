@@ -1,5 +1,4 @@
 import React from 'react';
-import { Shield, Camera, Brain, Activity } from 'lucide-react';
 
 interface KPIMetricCardProps {
   title: string;

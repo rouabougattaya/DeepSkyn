@@ -126,7 +126,13 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: `1px solid ${THEME.border}` }}>
           <h4 style={{ fontSize: 13, fontWeight: 700, color: THEME.textSecondary, marginBottom: 12 }}>CURRENT METRICS</h4>
           {Object.entries(currentState.metrics).map(([key, value]) => {
-            const color = key === 'hydration' ? THEME.success : key === 'oil' ? THEME.warning : key === 'acne' ? THEME.danger : '#8b5cf6';
+            const getMetricColor = (metricKey: string) => {
+              if (metricKey === 'hydration') return THEME.success;
+              if (metricKey === 'oil') return THEME.warning;
+              if (metricKey === 'acne') return THEME.danger;
+              return '#8b5cf6';
+            };
+            const color = getMetricColor(key);
             return (
               <div key={key} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>

@@ -81,14 +81,14 @@ export function ChatWidget({ chat }: ChatWidgetProps) {
             {contextHints.length > 0 && (
               <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-700 space-y-1.5">
                 {contextHints.map((hint, index) => (
-                  <p key={`${hint}-${index}`} className="leading-relaxed">{hint}</p>
+                  <p key={`hint-${index}-${hint.substring(0, 15)}`} className="leading-relaxed">{hint}</p>
                 ))}
               </div>
             )}
 
             {messages.map((msg, idx) => (
               <div 
-                key={idx} 
+                key={`msg-${idx}-${msg.role}`} 
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}
               >
                 <div 

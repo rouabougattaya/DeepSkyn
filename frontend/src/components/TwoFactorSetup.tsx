@@ -61,7 +61,7 @@ export function TwoFactorSetup({ onSuccess }: TwoFactorSetupProps) {
     }
   };
 
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -124,6 +124,42 @@ export function TwoFactorSetup({ onSuccess }: TwoFactorSetupProps) {
     }
   };
 
+  const renderStepContent = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0d9488] rounded-full animate-spin"></div>
+          <p className="text-sm text-slate-500">Generating code...</p>
+        </div>
+      );
+    }
+
+    if (qrCode) {
+      return (
+        <img
+          src={qrCode}
+          alt="2FA QR Code"
+          className="w-48 h-48 shadow-sm border border-slate-100 rounded-lg p-2"
+          onLoad={() => console.log('✅ QR Code image loaded successfully')}
+          onError={() => setError("Error displaying QR Code")}
+        />
+      );
+    }
+
+    return (
+      <div className="text-center p-4">
+        <p className="text-slate-500 text-sm mb-4">The QR code could not be loaded.</p>
+        <button
+          type="button"
+          onClick={handleSetup}
+          className="text-[#0d9488] font-semibold text-sm hover:underline"
+        >
+          Retry generation
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
       <Navbar />
@@ -184,31 +220,7 @@ export function TwoFactorSetup({ onSuccess }: TwoFactorSetupProps) {
           ) : (
             <form onSubmit={handleVerify} className="space-y-6">
               <div className="bg-white p-6 rounded-lg border border-slate-200 flex flex-col items-center justify-center min-h-[240px]">
-                {loading ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0d9488] rounded-full animate-spin"></div>
-                    <p className="text-sm text-slate-500">Generating code...</p>
-                  </div>
-                ) : qrCode ? (
-                  <img
-                    src={qrCode}
-                    alt="2FA QR Code"
-                    className="w-48 h-48 shadow-sm border border-slate-100 rounded-lg p-2"
-                    onLoad={() => console.log('✅ QR Code image loaded successfully')}
-                    onError={() => setError("Error displaying QR Code")}
-                  />
-                ) : (
-                  <div className="text-center p-4">
-                    <p className="text-slate-500 text-sm mb-4">The QR code could not be loaded.</p>
-                    <button
-                      type="button"
-                      onClick={handleSetup}
-                      className="text-[#0d9488] font-semibold text-sm hover:underline"
-                    >
-                      Retry generation
-                    </button>
-                  </div>
-                )}
+                {renderStepContent()}
               </div>
 
               {secret && !loading && (

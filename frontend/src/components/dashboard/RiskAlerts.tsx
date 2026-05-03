@@ -115,7 +115,8 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
       'Drink at least two liters of water daily',
     ]).slice(0, 4);
 
-    const actionsText = `Recommended actions. ${actions.map((a, i) => `Action ${i + 1}. ${a}`).join(' ')}`;
+    const formattedActions = actions.map((a, i) => `Action ${i + 1}. ${a}`).join(' ');
+    const actionsText = `Recommended actions. ${formattedActions}`;
 
     return `${header} ${risksText} ${actionsText}`;
   };
@@ -153,52 +154,11 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
     }
 
     try {
-      let latestAnalysisId: string | undefined;
-
-      // 1. Fetch the latest analysis metrics from the backend if available
-      let analysisData: any = {};
-      try {
-        const metricsData = await dashboardService.getMetrics();
-        latestAnalysisId = metricsData?.latestAnalysisId;
-        if (metricsData?.latestAnalysisId) {
-          const fullAnalysis = await analysisService.getAnalysisById(metricsData.latestAnalysisId);
-          if (fullAnalysis?.metrics) {
-            const getScore = (type: string) => fullAnalysis.metrics?.find((m: any) => m.metricType?.toUpperCase() === type)?.score || 0;
-            analysisData = {
-              acneScore: getScore('ACNE'),
-              drynessScore: getScore('DRYNESS'),
-              wrinklesScore: getScore('WRINKLES'),
-              sensitivityScore: getScore('REDNESS'), // Proxying redness for sensitivity
-              pigmentationScore: getScore('PIGMENTATION'),
-              poresScore: getScore('PORES')
-            };
-          }
-        }
-      } catch (e) {
-        console.log('No recent analysis found on server, using defaults');
-      }
+      // 1. Fetch the latest analysis metrics
+      const { analysisData, latestAnalysisId } = await fetchAnalysisData();
 
       // 2. Fetch latest digital twin and blend projected near-future risk factors
-      let digitalTwinData: any = {};
-      let latestDigitalTwinId: string | undefined;
-      try {
-        const latestTwin = await digitalTwinService.getLatestDigitalTwin();
-        if (latestTwin) {
-          latestDigitalTwinId = latestTwin.id;
-          const month1 = latestTwin.month1Prediction?.metrics;
-
-          if (month1) {
-            digitalTwinData = {
-              acneScore: Number(month1.acne) || 0,
-              drynessScore: Math.max(0, 100 - (Number(month1.hydration) || 0)),
-              wrinklesScore: Number(month1.wrinkles) || 0,
-              poresScore: Number(month1.oil) || 0,
-            };
-          }
-        }
-      } catch (e) {
-        console.log('No recent digital twin found on server, using latest analysis only');
-      }
+      const { digitalTwinData, latestDigitalTwinId } = await fetchDigitalTwinData();
 
       if (silentRefresh) {
         const analysisChanged = Boolean(
@@ -390,6 +350,24 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
     return 'bg-green-50 border-green-200';
   };
 
+  const getOverallRiskLevel = (score: number) => {
+    if (score >= 70) return 'high';
+    if (score >= 50) return 'medium';
+    return 'low';
+  };
+
+  const getRiskProgressBarColor = (score: number) => {
+    if (score >= 70) return 'bg-red-500';
+    if (score >= 50) return 'bg-orange-500';
+    return 'bg-green-500';
+  };
+
+  const getIndividualRiskBarColor = (score: number) => {
+    if (score >= 70) return 'bg-red-500';
+    if (score >= 50) return 'bg-orange-500';
+    return 'bg-yellow-500';
+  };
+
   return (
     <div className={`${className || ''}`}>
       <div className="space-y-4">
@@ -436,78 +414,12 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
 
         {/* Habits Settings Form */}
         {showHabitsForm && (
-          <div className="p-4 bg-white border border-indigo-100 shadow-sm rounded-xl space-y-4 mb-4">
-            <div className="flex items-center justify-between border-b pb-2 border-gray-100">
-              <h3 className="text-sm font-semibold text-indigo-900">Mon Rythme de Vie</h3>
-              <button onClick={() => setShowHabitsForm(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Sommeil (heures)</label>
-                <input
-                  type="number" min="3" max="15"
-                  value={habits.sleepHours}
-                  onChange={e => setHabits({ ...habits, sleepHours: Number(e.target.value) })}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Eau (Litres)</label>
-                <input
-                  type="number" min="0.5" max="5" step="0.5"
-                  value={habits.waterIntake}
-                  onChange={e => setHabits({ ...habits, waterIntake: Number(e.target.value) })}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Stress</label>
-                <select
-                  value={habits.stressLevel}
-                  onChange={e => setHabits({ ...habits, stressLevel: e.target.value })}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="low">Bas</option>
-                  <option value="moderate">Modéré</option>
-                  <option value="high">Élevé</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Alimentation</label>
-                <select
-                  value={habits.diet}
-                  onChange={e => setHabits({ ...habits, diet: e.target.value })}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="poor">Mauvaise</option>
-                  <option value="average">Moyenne</option>
-                  <option value="healthy">Saine</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Protection Solaire</label>
-                <select
-                  value={habits.sunProtection}
-                  onChange={e => setHabits({ ...habits, sunProtection: e.target.value })}
-                  className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="none">Aucune</option>
-                  <option value="occasional">Occasionnelle</option>
-                  <option value="regular">Régulière</option>
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSaveHabits}
-              className="w-full mt-2 flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors"
-            >
-              <Check className="w-4 h-4" /> Recalculer les risques
-            </button>
-          </div>
+          <HabitsForm 
+            habits={habits} 
+            setHabits={setHabits} 
+            onSave={handleSaveHabits} 
+            onClose={() => setShowHabitsForm(false)} 
+          />
         )}
 
         {/* Overall Risk Score */}
@@ -526,21 +438,16 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
               <p className="text-xs text-gray-600 mb-1">Risk Level</p>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-semibold ${getUrgencyBadge(
-                  overallRiskScore >= 70 ? 'high' : overallRiskScore >= 50 ? 'medium' : 'low'
+                  getOverallRiskLevel(overallRiskScore)
                 )}`}
               >
-                {overallRiskScore >= 70 ? 'High' : overallRiskScore >= 50 ? 'Medium' : 'Low'}
+                {getOverallRiskLevel(overallRiskScore).toUpperCase()}
               </span>
             </div>
           </div>
           <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
             <div
-              className={`h-2 rounded-full transition-all ${overallRiskScore >= 70
-                ? 'bg-red-500'
-                : overallRiskScore >= 50
-                  ? 'bg-orange-500'
-                  : 'bg-green-500'
-                }`}
+              className={`h-2 rounded-full transition-all ${getRiskProgressBarColor(overallRiskScore)}`}
               style={{ width: `${overallRiskScore}%` }}
             />
           </div>
@@ -559,7 +466,7 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
           ) : (
             risks.map((risk, idx) => (
               <div
-                key={idx}
+                key={risk.type}
                 className={`p-4 rounded-lg border transition-all ${getUrgencyColor(risk.urgency)}`}
               >
                 {/* Risk Header */}
@@ -629,12 +536,7 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
                 {/* Risk Score Bar */}
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                   <div
-                    className={`h-1.5 rounded-full transition-all ${risk.risk_score >= 70
-                      ? 'bg-red-500'
-                      : risk.risk_score >= 50
-                        ? 'bg-orange-500'
-                        : 'bg-yellow-500'
-                      }`}
+                    className={`h-1.5 rounded-full transition-all ${getIndividualRiskBarColor(risk.risk_score)}`}
                     style={{ width: `${risk.risk_score}%` }}
                   />
                 </div>
@@ -663,4 +565,134 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
       </div>
     </div>
   );
+
+  async function fetchAnalysisData() {
+    try {
+      const metricsData = await dashboardService.getMetrics();
+      const latestAnalysisId = metricsData?.latestAnalysisId;
+      if (latestAnalysisId) {
+        const fullAnalysis = await analysisService.getAnalysisById(latestAnalysisId);
+        if (fullAnalysis?.metrics) {
+          const getScore = (type: string) => fullAnalysis.metrics?.find((m: any) => m.metricType?.toUpperCase() === type)?.score || 0;
+          return {
+            latestAnalysisId,
+            analysisData: {
+              acneScore: getScore('ACNE'),
+              drynessScore: getScore('DRYNESS'),
+              wrinklesScore: getScore('WRINKLES'),
+              sensitivityScore: getScore('REDNESS'),
+              pigmentationScore: getScore('PIGMENTATION'),
+              poresScore: getScore('PORES')
+            }
+          };
+        }
+      }
+    } catch (e) {
+      console.log('Analysis fetch failed');
+    }
+    return { analysisData: {} };
+  }
+
+  async function fetchDigitalTwinData() {
+    try {
+      const latestTwin = await digitalTwinService.getLatestDigitalTwin();
+      if (latestTwin?.month1Prediction?.metrics) {
+        const m = latestTwin.month1Prediction.metrics;
+        return {
+          latestDigitalTwinId: latestTwin.id,
+          digitalTwinData: {
+            acneScore: Number(m.acne) || 0,
+            drynessScore: Math.max(0, 100 - (Number(m.hydration) || 0)),
+            wrinklesScore: Number(m.wrinkles) || 0,
+            poresScore: Number(m.oil) || 0,
+          }
+        };
+      }
+    } catch (e) {
+      console.log('Twin fetch failed');
+    }
+    return { digitalTwinData: {} };
+  }
 };
+
+interface HabitsFormProps {
+  habits: UserHabits;
+  setHabits: (h: UserHabits) => void;
+  onSave: () => void;
+  onClose: () => void;
+}
+
+const HabitsForm = ({ habits, setHabits, onSave, onClose }: HabitsFormProps) => (
+  <div className="p-4 bg-white border border-indigo-100 shadow-sm rounded-xl space-y-4 mb-4">
+    <div className="flex items-center justify-between border-b pb-2 border-gray-100">
+      <h3 className="text-sm font-semibold text-indigo-900">Mon Rythme de Vie</h3>
+      <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Sommeil (heures)</label>
+        <input
+          type="number" min="3" max="15"
+          value={habits.sleepHours}
+          onChange={e => setHabits({ ...habits, sleepHours: Number(e.target.value) })}
+          className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Eau (Litres)</label>
+        <input
+          type="number" min="0.5" max="5" step="0.5"
+          value={habits.waterIntake}
+          onChange={e => setHabits({ ...habits, waterIntake: Number(e.target.value) })}
+          className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Stress</label>
+        <select
+          value={habits.stressLevel}
+          onChange={e => setHabits({ ...habits, stressLevel: e.target.value })}
+          className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="low">Bas</option>
+          <option value="moderate">Modéré</option>
+          <option value="high">Élevé</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Alimentation</label>
+        <select
+          value={habits.diet}
+          onChange={e => setHabits({ ...habits, diet: e.target.value })}
+          className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="poor">Mauvaise</option>
+          <option value="average">Moyenne</option>
+          <option value="healthy">Saine</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Protection Solaire</label>
+        <select
+          value={habits.sunProtection}
+          onChange={e => setHabits({ ...habits, sunProtection: e.target.value })}
+          className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="none">Aucune</option>
+          <option value="occasional">Occasionnelle</option>
+          <option value="regular">Régulière</option>
+        </select>
+      </div>
+    </div>
+
+    <button
+      onClick={onSave}
+      className="w-full mt-2 flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-md transition-colors"
+    >
+      <Check className="w-4 h-4" /> Recalculer les risques
+    </button>
+  </div>
+);

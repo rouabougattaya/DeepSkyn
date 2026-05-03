@@ -364,6 +364,7 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
         label: condition.type,
         icon: Info,
         color: '#6b7280',
+        gradient: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)',
         description: t('analysis.no_description_available')
     };
     const baseDetails = CONDITION_DETAILS[condition.type] || {
@@ -960,9 +961,14 @@ export default function SkinAnalysisPage() {
 
 
 
-    const globalScoreColor = result
-        ? result.globalScore >= 75 ? '#10b981' : result.globalScore >= 50 ? '#f59e0b' : '#ef4444'
-        : '#0d9488';
+    const getGlobalScoreColor = (scoreValue: number | undefined) => {
+        if (!scoreValue) return '#0d9488';
+        if (scoreValue >= 75) return '#10b981';
+        if (scoreValue >= 50) return '#f59e0b';
+        return '#ef4444';
+    };
+
+    const globalScoreColor = getGlobalScoreColor(result?.globalScore);
 
     const hasPhoto = Boolean(profile.imagesBase64 && profile.imagesBase64.length > 0);
     const displayMetaWeighting = (() => {
@@ -1891,7 +1897,13 @@ export default function SkinAnalysisPage() {
                                     const details = CONDITION_DETAILS[c.type];
                                     const hasScore = typeof c.score === 'number';
                                     const scoreValue = hasScore ? (c.score as number) : 0;
-                                    const color = !hasScore ? '#64748b' : scoreValue >= 75 ? '#10b981' : scoreValue >= 50 ? '#f59e0b' : '#ef4444';
+                                    const getMetricColor = (s: number | null | undefined) => {
+                                        if (s == null) return '#64748b';
+                                        if (s >= 75) return '#10b981';
+                                        if (s >= 50) return '#f59e0b';
+                                        return '#ef4444';
+                                    };
+                                    const color = !hasScore ? '#64748b' : getMetricColor(scoreValue);
 
                                     return (
                                         <div key={c.type} className="no-break" style={{ padding: 22, borderRadius: 20, border: '1px solid #f1f5f9', background: '#fff', marginBottom: 15, display: 'inline-block', width: '100%', boxSizing: 'border-box' }}>

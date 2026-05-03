@@ -12,10 +12,12 @@ const AiResponseFormatter: React.FC<AiResponseFormatterProps> = ({ response }) =
   const formatText = (text: string) => {
     // 1. Remplacer les points par des sauts de ligne si c'est une liste
     let formatted = text.split('\n').map((line, index) => {
+      const lineKey = `line-${index}-${line.substring(0, 10)}`;
+      
       // Détection des titres ou sections (ex: "Conseils :")
       if (line.includes(':') && line.length < 50) {
         return (
-          <h4 key={index} className="text-primary font-bold mt-4 mb-2">
+          <h4 key={lineKey} className="text-primary font-bold mt-4 mb-2">
             {line}
           </h4>
         );
@@ -24,7 +26,7 @@ const AiResponseFormatter: React.FC<AiResponseFormatterProps> = ({ response }) =
       // Détection des listes à puces
       if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
         return (
-          <li key={index} className="ml-4 mb-1 list-disc text-gray-700">
+          <li key={lineKey} className="ml-4 mb-1 list-disc text-gray-700">
             {line.trim().substring(1).trim()}
           </li>
         );
@@ -33,11 +35,12 @@ const AiResponseFormatter: React.FC<AiResponseFormatterProps> = ({ response }) =
       // Texte normal avec support basique du gras (**texte**)
       const parts = line.split(/(\*\*.*?\*\*)/g);
       return (
-        <p key={index} className="mb-2 text-gray-800 leading-relaxed">
+        <p key={lineKey} className="mb-2 text-gray-800 leading-relaxed">
           {parts.map((part, i) => {
             if (part.startsWith('**') && part.endsWith('**')) {
+              const partKey = `part-${i}-${part.substring(2, 7)}`;
               return (
-                <strong key={i} className="text-secondary font-semibold">
+                <strong key={partKey} className="text-secondary font-semibold">
                   {part.slice(2, -2)}
                 </strong>
               );

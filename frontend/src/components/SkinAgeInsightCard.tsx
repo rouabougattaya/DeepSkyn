@@ -1,11 +1,17 @@
 import React from 'react';
-import { Shield, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface SkinAgeInsightCardProps {
   insight: any;
   loading: boolean;
   onRefresh: () => void;
 }
+
+const getStatusColor = (status: string) => {
+  if (status === 'younger') return '#10b981';
+  if (status === 'older') return '#ef4444';
+  return '#64748b';
+};
 
 export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({ insight, loading, onRefresh }) => {
   if (loading) {
@@ -56,7 +62,7 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({ insight,
         </div>
         <div>
           <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>Skin Age</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: insight.status === 'younger' ? '#10b981' : insight.status === 'older' ? '#ef4444' : '#64748b' }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: getStatusColor(insight.status) }}>
             {insight.skinAge}
           </div>
         </div>

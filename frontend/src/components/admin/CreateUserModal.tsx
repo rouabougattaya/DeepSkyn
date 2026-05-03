@@ -26,7 +26,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setSuccess('')

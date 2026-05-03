@@ -576,7 +576,13 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
           const prev = index > 0 ? safeNum(arr[index - 1]?.delta) : null;
           const current = safeNum(row.delta);
           const change = current != null && prev != null ? Number((current - prev).toFixed(1)) : null;
-          const direction = change == null ? 'N/A' : change < 0 ? 'Improving' : change > 0 ? 'Worsening' : 'Stable';
+          const getTrendDirection = (val: number | null) => {
+            if (val == null) return 'N/A';
+            if (val < 0) return 'Improving';
+            if (val > 0) return 'Worsening';
+            return 'Stable';
+          };
+          const direction = getTrendDirection(change);
           return {
             index: index + 1,
             date: new Date(row.createdAt).toLocaleDateString(),
@@ -588,6 +594,13 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
         : [{ index: 'N/A', date: 'N/A', delta: 'No trend data', changeFromPrevious: 'N/A', direction: 'N/A' }];
     addSheet('Trend', trendData, [8, 16, 14, 20, 16]);
     
+    const getTrendInterpretation = (val: number | null) => {
+      if (val == null) return 'N/A';
+      if (val < 0) return 'Improving trend';
+      if (val > 0) return 'Worsening trend';
+      return 'Stable trend';
+    };
+
     const trendDiagnosticsData = [
       {
         metric: 'Trend points',
@@ -602,7 +615,7 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
       {
         metric: 'Shift over period',
         value: trendShift ?? 'N/A',
-        interpretation: trendShift != null ? (trendShift < 0 ? 'Improving trend' : trendShift > 0 ? 'Worsening trend' : 'Stable trend') : 'N/A',
+        interpretation: getTrendInterpretation(trendShift),
       },
       {
         metric: 'Score band',

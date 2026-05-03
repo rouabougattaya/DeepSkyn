@@ -154,11 +154,12 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
     const scoreValue = safeNum(score);
     const deltaValue = safeNum(delta);
     const latestTrendDelta = trendSeries.length > 0 ? safeNum(trendSeries[trendSeries.length - 1]?.delta) : null;
-    const trendDirection = latestTrendDelta == null
-      ? 'trend unavailable'
-      : latestTrendDelta <= 0
-        ? 'favorable trend'
-        : 'aging-gap trend to monitor';
+    const getTrendDirection = () => {
+      if (latestTrendDelta == null) return 'trend unavailable';
+      if (latestTrendDelta <= 0) return 'favorable trend';
+      return 'aging-gap trend to monitor';
+    };
+    const trendDirection = getTrendDirection();
 
     return [
       `Current skin score is ${fmt(scoreValue, '/100')} (${classifyScore(scoreValue)}).`,
@@ -761,8 +762,8 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
                 </button>
               </div>
               <div className="flex flex-wrap gap-3">
-                {quickTips.map((item, idx) => (
-                  <span key={idx} className="px-4 py-3 rounded-lg bg-white border border-slate-200 text-sm text-slate-800 font-medium shadow-sm hover:shadow-md hover:border-slate-300 transition-all">{item}</span>
+                {quickTips.map((item) => (
+                  <span key={item} className="px-4 py-3 rounded-lg bg-white border border-slate-200 text-sm text-slate-800 font-medium shadow-sm hover:shadow-md hover:border-slate-300 transition-all">{item}</span>
                 ))}
               </div>
             </div>
@@ -796,8 +797,8 @@ export const SkinAgeInsightCard: React.FC<SkinAgeInsightCardProps> = ({
             <div className="p-6 rounded-2xl border border-slate-200 bg-white lg:col-span-2 shadow-sm">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Targeted recommendations</p>
               <div className="flex flex-wrap gap-2">
-                {(insight?.productSuggestions || ['Anti-aging', 'Hydration']).map((item, idx) => (
-                  <span key={idx} className="px-3 py-2 rounded-full bg-teal-50 border border-teal-200 text-xs font-semibold text-teal-700 shadow-xs hover:bg-teal-100 transition-colors">
+                {(insight?.productSuggestions || ['Anti-aging', 'Hydration']).map((item) => (
+                  <span key={item} className="px-3 py-2 rounded-full bg-teal-50 border border-teal-200 text-xs font-semibold text-teal-700 shadow-xs hover:bg-teal-100 transition-colors">
                     {item}
                   </span>
                 ))}

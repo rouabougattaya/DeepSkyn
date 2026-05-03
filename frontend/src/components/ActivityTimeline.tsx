@@ -706,45 +706,49 @@ export default function ActivityTimeline() {
                     width: '2px', background: 'linear-gradient(to bottom, transparent, #e2e8f0 10%, #e2e8f0 90%, transparent)',
                 }} />
 
-                <div style={{ paddingLeft: '28px' }}>
-                    {loading ? (
-                        [1, 2, 3, 4, 5].map((item) => (
-                            <div key={`skeleton-act-${item}`} style={{
-                                height: '84px', borderRadius: '14px', marginBottom: '12px',
-                                background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)',
-                                animation: 'pulse 1.5s infinite',
-                            }} />
-                        ))
-                    ) : activities.length === 0 ? (
-                        <div style={{
-                            textAlign: 'center', padding: '48px 24px',
-                            background: '#f8fafc', borderRadius: '14px',
-                            border: '1px dashed #e2e8f0',
-                        }}>
-                            <Shield size={36} color="#94a3b8" style={{ marginBottom: '12px', opacity: 0.5 }} />
-                            <p style={{ color: '#475569', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '500' }}>
-                                No recent security activities recorded for your account.
-                            </p>
-                            <button
-                                onClick={() => setActivities(mockActivities)}
-                                style={{
-                                    fontSize: '12px', color: '#0d9488', fontWeight: '600',
-                                    background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline'
-                                }}
-                            >
-                                View Sample Security Data
-                            </button>
-                        </div>
-                    ) : (
-                        activities.map(event => (
+                <div style={{ paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                        if (loading) {
+                            return [1, 2, 3, 4, 5].map(id => (
+                                <div key={`skeleton-${id}`} style={{
+                                    height: '84px', borderRadius: '14px',
+                                    background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)',
+                                    animation: 'pulse 1.5s infinite',
+                                }} />
+                            ));
+                        }
+                        if (activities.length === 0) {
+                            return (
+                                <div style={{
+                                    textAlign: 'center', padding: '48px 24px',
+                                    background: '#f8fafc', borderRadius: '14px',
+                                    border: '1px dashed #e2e8f0',
+                                }}>
+                                    <Shield size={36} color="#94a3b8" style={{ marginBottom: '12px', opacity: 0.5 }} />
+                                    <p style={{ color: '#475569', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '500' }}>
+                                        No recent security activities recorded for your account.
+                                    </p>
+                                    <button
+                                        onClick={() => setActivities(mockActivities)}
+                                        style={{
+                                            fontSize: '12px', color: '#0d9488', fontWeight: '600',
+                                            background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline'
+                                        }}
+                                    >
+                                        View Sample Security Data
+                                    </button>
+                                </div>
+                            );
+                        }
+                        return activities.map(event => (
                             <ActivityCard
                                 key={event.id}
                                 event={event}
                                 isExpanded={expandedId === event.id}
                                 onToggle={() => setExpandedId(expandedId === event.id ? null : event.id)}
                             />
-                        ))
-                    )}
+                        ));
+                    })()}
                 </div>
             </div>
 

@@ -182,14 +182,17 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
             const isBest = value === trends.bestOutcome;
             const isWorst = value === trends.worstOutcome;
 
+            const cardBg = isBest ? '#f0fdf4' : isWorst ? '#fef2f2' : THEME.background;
+            const cardBorder = isBest ? THEME.success : isWorst ? THEME.danger : THEME.border;
+
             return (
               <div
                 key={value}
                 style={{
                   padding: 20,
                   borderRadius: 16,
-                  background: isBest ? '#f0fdf4' : isWorst ? '#fef2f2' : THEME.background,
-                  border: `2px solid ${isBest ? THEME.success : isWorst ? THEME.danger : THEME.border}`,
+                  background: cardBg,
+                  border: `2px solid ${cardBorder}`,
                   transition: 'all 0.3s ease',
                   position: 'relative',
                 }}
@@ -212,7 +215,6 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
                     BEST OUTCOME
                   </div>
                 )}
-
                 <h4 style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary, marginBottom: 16 }}>
                   {label}
                 </h4>
@@ -248,8 +250,8 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
                       ✓ Improvements
                     </div>
                     <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: THEME.textSecondary }}>
-                      {prediction.improvements.map((imp, i) => (
-                        <li key={i} style={{ marginBottom: 4 }}>
+                      {prediction.improvements.map((imp) => (
+                        <li key={imp} style={{ marginBottom: 4 }}>
                           {imp}
                         </li>
                       ))}
@@ -264,8 +266,8 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
                       ⚠ Watch Out
                     </div>
                     <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: THEME.textSecondary }}>
-                      {prediction.degradations.map((deg, i) => (
-                        <li key={i} style={{ marginBottom: 4 }}>
+                      {prediction.degradations.map((deg) => (
+                        <li key={deg} style={{ marginBottom: 4 }}>
                           {deg}
                         </li>
                       ))}
@@ -285,19 +287,21 @@ export const DigitalTwinTimeline: React.FC<TimelineProps> = ({ timeline }) => {
                 width: 40,
                 height: 40,
                 borderRadius: '50%',
-                background: trends.overallTrajectory === 'improvement' ? '#f0fdf4' : trends.overallTrajectory === 'degradation' ? '#fef2f2' : '#f0f9ff',
+                background: (() => {
+                  if (trends.overallTrajectory === 'improvement') return '#f0fdf4';
+                  if (trends.overallTrajectory === 'degradation') return '#fef2f2';
+                  return '#f0f9ff';
+                })(),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              {trends.overallTrajectory === 'improvement' ? (
-                <TrendingUp size={20} color={THEME.success} />
-              ) : trends.overallTrajectory === 'degradation' ? (
-                <TrendingDown size={20} color={THEME.danger} />
-              ) : (
-                <Minus size={20} color="#64748b" />
-              )}
+              {(() => {
+                if (trends.overallTrajectory === 'improvement') return <TrendingUp size={20} color={THEME.success} />;
+                if (trends.overallTrajectory === 'degradation') return <TrendingDown size={20} color={THEME.danger} />;
+                return <Minus size={20} color="#64748b" />;
+              })()}
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary, textTransform: 'capitalize' }}>

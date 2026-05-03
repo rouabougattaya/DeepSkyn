@@ -296,7 +296,11 @@ function StepCard({ step, index, completed, locked, onToggle }: {
           color: 'white', fontWeight: 800, fontSize: 14,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          {locked ? <Lock size={16} /> : completed ? <CheckCircle size={18} /> : index + 1}
+          {(() => {
+            if (locked) return <Lock size={16} />;
+            if (completed) return <CheckCircle size={18} />;
+            return index + 1;
+          })()}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
@@ -534,13 +538,6 @@ export function SvrRoutinePanel({
   };
   const activeSteps = getActiveSteps();
 
-  // Group recommended products by category for display
-  const catGroups = routine?.recommendedProducts?.reduce<Record<string, SvrRecommendedProduct[]>>((acc, p) => {
-    const key = p.category;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(p);
-    return acc;
-  }, {}) ?? {};
 
   return (
     <div style={{ marginTop: 40 }} id="svr-routine-section">
@@ -711,6 +708,30 @@ interface RoutineSectionProps extends SectionProps {
   onToggleStep?: (id: string) => void;
 }
 
+const RoutineTabButton = ({ tab, activeTab, onClick, routine, t }: { tab: 'morning' | 'night', activeTab: string, onClick: () => void, routine: any, t: any }) => (
+  <button onClick={onClick} style={{
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    padding: '10px 22px', borderRadius: 50, border: 'none', cursor: 'pointer',
+    fontSize: 13, fontWeight: 700, transition: 'all 0.2s',
+    background: activeTab === tab
+      ? 'linear-gradient(135deg,#0d9488,#6366f1)'
+      : '#f1f5f9',
+    color: activeTab === tab ? 'white' : '#64748b',
+    boxShadow: activeTab === tab ? '0 4px 14px rgba(13,148,136,0.3)' : 'none',
+  }}>
+    {tab === 'morning' ? <Sun size={15} /> : <Moon size={15} />}
+    {tab === 'morning' ? t('svr_routine.morning_tab', { defaultValue: ' Routine Matin (AM)' }) : t('svr_routine.night_tab', { defaultValue: ' Routine Soir (PM)' })}
+    <span style={{
+      fontSize: 10, fontWeight: 800,
+      background: activeTab === tab ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+      color: activeTab === tab ? 'white' : '#64748b',
+      padding: '2px 8px', borderRadius: 99,
+    }}>
+      {t('svr_routine.steps_count', { count: (tab === 'morning' ? routine.morning : routine.night).length, defaultValue: 'étapes' })}
+    </span>
+  </button>
+);
+
 const RoutineSection = ({ routine, t, activeTab, setActiveTab, activeSteps, completedSteps, onToggleStep }: RoutineSectionProps) => (
   <div style={{ marginTop: 32 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -727,29 +748,8 @@ const RoutineSection = ({ routine, t, activeTab, setActiveTab, activeSteps, comp
     </div>
 
     <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-      {(['morning', 'night'] as const).map(tab => (
-        <button key={tab} onClick={() => setActiveTab(tab)} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '10px 22px', borderRadius: 50, border: 'none', cursor: 'pointer',
-          fontSize: 13, fontWeight: 700, transition: 'all 0.2s',
-          background: activeTab === tab
-            ? 'linear-gradient(135deg,#0d9488,#6366f1)'
-            : '#f1f5f9',
-          color: activeTab === tab ? 'white' : '#64748b',
-          boxShadow: activeTab === tab ? '0 4px 14px rgba(13,148,136,0.3)' : 'none',
-        }}>
-          {tab === 'morning' ? <Sun size={15} /> : <Moon size={15} />}
-          {tab === 'morning' ? t('svr_routine.morning_tab', { defaultValue: ' Routine Matin (AM)' }) : t('svr_routine.night_tab', { defaultValue: ' Routine Soir (PM)' })}
-          <span style={{
-            fontSize: 10, fontWeight: 800,
-            background: activeTab === tab ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
-            color: activeTab === tab ? 'white' : '#64748b',
-            padding: '2px 8px', borderRadius: 99,
-          }}>
-            {t('svr_routine.steps_count', { count: (tab === 'morning' ? routine.morning : routine.night).length, defaultValue: 'étapes' })}
-          </span>
-        </button>
-      ))}
+      <RoutineTabButton tab="morning" activeTab={activeTab} onClick={() => setActiveTab('morning')} routine={routine} t={t} />
+      <RoutineTabButton tab="night" activeTab={activeTab} onClick={() => setActiveTab('night')} routine={routine} t={t} />
     </div>
 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -760,7 +760,7 @@ const RoutineSection = ({ routine, t, activeTab, setActiveTab, activeSteps, comp
           .every((_: any, prevIdx: number) => completedSteps.includes(`${activeTab}-${prevIdx}-${activeSteps[prevIdx].stepName}`));
         return (
           <StepCard
-            key={stepId}
+            key={`${activeTab}-${step.stepName}`}
             step={step}
             index={idx}
             completed={completedSteps.includes(stepId)}

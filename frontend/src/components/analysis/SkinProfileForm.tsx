@@ -89,6 +89,18 @@ const getRednessBase = (level: string) => {
     return 48;
 };
 
+const ACNE_LEVEL_LABELS: Record<string, string> = { mild: 'Léger', moderate: 'Modéré', severe: 'Sévère' };
+const ACNE_TYPE_LABELS: Record<string, string> = { whiteheads: 'Points Blancs', cystic: 'Kystique', hormonal: 'Hormonal' };
+const ZONE_LABELS: Record<string, string> = { forehead: 'Front', cheeks: 'Joues', chin: 'Menton', eyes: 'Contour Yeux', mouth: 'Sillons Nasogéniens', nose: 'Nez' };
+const WRINKLE_DEPTH_LABELS: Record<string, string> = { fine: 'Ridules', deep: 'Rides Profondes' };
+const HYDRATION_FEEL_LABELS: Record<string, string> = { tight: 'Tiraillée', normal: 'Normale', 'very-dry': 'Très Sèche' };
+const BLACKHEAD_SEVERITY_LABELS: Record<string, string> = { low: 'Faible', medium: 'Modéré', high: 'Élevé' };
+const PORE_VISIBILITY_LABELS: Record<string, string> = { low: 'Fins', medium: 'Visibles', high: 'Dilatés' };
+const PORE_ZONE_LABELS: Record<string, string> = { tzone: 'Zone T', cheeks: 'Joues', all: 'Global' };
+const SENSITIVITY_LEVEL_LABELS: Record<string, string> = { low: 'Stable', medium: 'Réactive', criticality: 'Critique' };
+const REDNESS_INTENSITY_LABELS: Record<string, string> = { occasional: 'Légère', persistent: 'Diffuse', flaring: 'Intense' };
+const REDNESS_ZONE_LABELS: Record<string, string> = { cheeks: 'Joues', nose: 'Nez', chin: 'Menton' };
+
 /** Detail Components to reduce complexity */
 
 const AcneDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, setSingle: any, toggleMultiSelect: any }) => (
@@ -112,13 +124,14 @@ const AcneDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, setSin
                     >
                         <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center ${data.severity === level ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-slate-50'
                             }`}>
-                            <div className={`rounded-full ${level === 'mild' ? 'h-2 w-2 bg-rose-300' :
+                            <div className={`rounded-full ${
+                                level === 'mild' ? 'h-2 w-2 bg-rose-300' :
                                 level === 'moderate' ? 'h-4 w-4 bg-rose-400' :
-                                    'h-6 w-6 bg-rose-600'
-                                }`} />
+                                'h-6 w-6 bg-rose-600'
+                            }`} />
                         </div>
                         <span className={`text-[10px] font-bold ${data.severity === level ? 'text-rose-700' : ''}`}>
-                            {level === 'mild' ? 'Léger' : level === 'moderate' ? 'Modéré' : 'Sévère'}
+                            {ACNE_LEVEL_LABELS[level]}
                         </span>
                     </button>
                 ))}
@@ -138,7 +151,7 @@ const AcneDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, setSin
                             : 'bg-white border-slate-100 text-slate-500 hover:border-rose-200'
                             }`}
                     >
-                        {kind === 'whiteheads' ? 'Points Blancs' : kind === 'cystic' ? 'Kystique' : 'Hormonal'}
+                        {ACNE_TYPE_LABELS[kind]}
                     </button>
                 ))}
             </div>
@@ -159,7 +172,7 @@ const AcneDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, setSin
                     >
                         <MapPin size={12} className={data.location.includes(zone) ? 'text-rose-500' : 'text-slate-300'} />
                         <span className="text-[10px] font-bold uppercase tracking-tight">
-                            {zone === 'forehead' ? 'Front' : zone === 'cheeks' ? 'Joues' : 'Menton'}
+                            {ZONE_LABELS[zone]}
                         </span>
                     </button>
                 ))}
@@ -200,7 +213,7 @@ const WrinklesDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, se
                             </div>
                         </div>
                         <span className={`text-[10px] font-bold ${data.depth === depth ? 'text-amber-700' : ''}`}>
-                            {depth === 'fine' ? 'Ridules' : 'Rides Profondes'}
+                            {WRINKLE_DEPTH_LABELS[depth]}
                         </span>
                     </button>
                 ))}
@@ -222,7 +235,7 @@ const WrinklesDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, se
                     >
                         {zone === 'eyes' ? <Eye size={12} /> : <MapPin size={12} />}
                         <span className="text-[10px] font-bold uppercase tracking-tight">
-                            {zone === 'eyes' ? 'Contour Yeux' : zone === 'forehead' ? 'Front' : 'Sillons Nasogéniens'}
+                            {ZONE_LABELS[zone]}
                         </span>
                     </button>
                 ))}
@@ -261,7 +274,7 @@ const HydrationDetails = ({ data, setSingle }: { data: any, setSingle: any }) =>
                                 }} />
                         </div>
                         <span className={`text-[10px] font-bold ${data.feel === feel ? 'text-sky-700' : ''}`}>
-                            {feel === 'tight' ? 'Tiraillée' : feel === 'normal' ? 'Normale' : 'Très Sèche'}
+                            {HYDRATION_FEEL_LABELS[feel]}
                         </span>
                     </button>
                 ))}
@@ -303,7 +316,7 @@ const BlackheadsDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, 
                             </div>
                         </div>
                         <span className={`text-[10px] font-bold ${data.severity === level ? 'text-slate-700' : ''}`}>
-                            {level === 'low' ? 'Faible' : level === 'medium' ? 'Modéré' : 'Élevé'}
+                            {BLACKHEAD_SEVERITY_LABELS[level]}
                         </span>
                     </button>
                 ))}
@@ -325,7 +338,7 @@ const BlackheadsDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, 
                     >
                         <MapPin size={12} className={data.location.includes(zone) ? 'text-slate-600' : 'text-slate-300'} />
                         <span className="text-[10px] font-bold uppercase tracking-tight">
-                            {zone === 'nose' ? 'Nez' : zone === 'chin' ? 'Menton' : 'Joues'}
+                            {ZONE_LABELS[zone]}
                         </span>
                     </button>
                 ))}
@@ -363,7 +376,7 @@ const PoresDetails = ({ data, setSingle }: { data: any, setSingle: any }) => (
                             </div>
                         </div>
                         <span className={`text-[10px] font-bold ${data.visibility === level ? 'text-violet-700' : ''}`}>
-                            {level === 'low' ? 'Fins' : level === 'medium' ? 'Visibles' : 'Dilatés'}
+                            {PORE_VISIBILITY_LABELS[level]}
                         </span>
                     </button>
                 ))}
@@ -454,7 +467,7 @@ const RednessDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, set
                                 }`} />
                         </div>
                         <span className={`text-[10px] font-bold ${data.level === level ? 'text-rose-700' : ''}`}>
-                            {level === 'occasional' ? 'Légère' : level === 'persistent' ? 'Diffuse' : 'Intense'}
+                            {REDNESS_INTENSITY_LABELS[level]}
                         </span>
                     </button>
                 ))}
@@ -476,7 +489,7 @@ const RednessDetails = ({ data, setSingle, toggleMultiSelect }: { data: any, set
                     >
                         <MapPin size={12} className={data.location.includes(zone) ? 'text-rose-500' : 'text-slate-300'} />
                         <span className="text-[10px] font-bold uppercase tracking-tight">
-                            {zone === 'cheeks' ? 'Joues' : zone === 'nose' ? 'Nez' : 'Menton'}
+                            {REDNESS_ZONE_LABELS[zone]}
                         </span>
                     </button>
                 ))}
@@ -489,47 +502,72 @@ export const SkinProfileForm: React.FC<SkinProfileFormProps> = ({ profile, setPr
     const derivedInputs = useMemo(() => {
         const concerns: string[] = [];
 
-        const acneBase = questionnaire.acne.enabled ? getAcneBase(questionnaire.acne.severity) : undefined;
-        const acneTypeBoost = questionnaire.acne.type === 'cystic' ? 10 : questionnaire.acne.type === 'hormonal' ? 6 : 0;
-        const acneLocationBoost = (questionnaire.acne.location?.length || 0) * 3;
-        const acneLevel = typeof acneBase === 'number' ? clamp(acneBase + acneTypeBoost + acneLocationBoost) : undefined;
+        const getBoost = (key: keyof SkinQuestionnaireData) => {
+            if (key === 'acne') {
+                const item = questionnaire.acne;
+                if (!item.enabled) return { base: undefined, boost: 0 };
+                const base = getAcneBase(item.severity || '');
+                const boost = (item.type === 'cystic' ? 10 : item.type === 'hormonal' ? 6 : 0) + (item.location?.length || 0) * 3;
+                return { base, boost };
+            }
+            if (key === 'blackheads') {
+                const item = questionnaire.blackheads;
+                if (!item.enabled) return { base: undefined, boost: 0 };
+                const base = getBlackheadsBase(item.severity || '');
+                const boost = (item.location?.length || 0) * 2;
+                return { base, boost };
+            }
+            if (key === 'wrinkles') {
+                const item = questionnaire.wrinkles;
+                if (!item.enabled) return { base: undefined, boost: 0 };
+                const base = getWrinklesBase(item.depth || '');
+                const boost = (item.location?.length || 0) * 4;
+                return { base, boost };
+            }
+            if (key === 'pores') {
+                const item = questionnaire.pores;
+                if (!item.enabled) return { base: undefined, boost: 0 };
+                const base = getPoresBase(item.visibility || '');
+                const boost = item.zone === 'all' ? 10 : item.zone === 'tzone' ? 6 : 0;
+                return { base, boost };
+            }
+            if (key === 'redness') {
+                const item = questionnaire.redness;
+                if (!item.enabled) return { base: undefined, boost: 0 };
+                const base = getRednessBase(item.level || '');
+                const boost = (item.location?.length || 0) * 2;
+                return { base, boost };
+            }
+            return { base: undefined, boost: 0 };
+        };
+
+        const acneRes = getBoost('acne');
         if (questionnaire.acne.enabled) concerns.push('Acné');
-
-        const blackheadsBase = questionnaire.blackheads.enabled ? getBlackheadsBase(questionnaire.blackheads.severity) : undefined;
-        const blackheadsLocationBoost = (questionnaire.blackheads.location?.length || 0) * 2;
-        const blackheadsLevel = typeof blackheadsBase === 'number' ? clamp(blackheadsBase + blackheadsLocationBoost) : undefined;
+        
+        const blackheadsRes = getBoost('blackheads');
         if (questionnaire.blackheads.enabled) concerns.push('Points noirs');
-
-        const wrinklesBase = questionnaire.wrinkles.enabled ? getWrinklesBase(questionnaire.wrinkles.depth) : undefined;
-        const wrinklesLocationBoost = (questionnaire.wrinkles.location?.length || 0) * 4;
-        const wrinklesDepth = typeof wrinklesBase === 'number' ? clamp(wrinklesBase + wrinklesLocationBoost) : undefined;
+        
+        const wrinklesRes = getBoost('wrinkles');
         if (questionnaire.wrinkles.enabled) concerns.push('Rides');
-
-        const poresBase = questionnaire.pores.enabled ? getPoresBase(questionnaire.pores.visibility) : undefined;
-        const poresZoneBoost = questionnaire.pores.zone === 'all' ? 10 : questionnaire.pores.zone === 'tzone' ? 6 : 0;
-        const poreSize = typeof poresBase === 'number' ? clamp(poresBase + poresZoneBoost) : undefined;
+        
+        const poresRes = getBoost('pores');
         if (questionnaire.pores.enabled) concerns.push('Pores dilatés');
 
-        const hydrationLevel = questionnaire.hydration.enabled ? getHydrationLevel(questionnaire.hydration.feel) : undefined;
-        if (questionnaire.hydration.enabled) concerns.push('Déshydratation');
-
-        const sensitivityLevel = questionnaire.sensitivity.enabled ? getSensitivityLevel(questionnaire.sensitivity.level) : undefined;
-        if (questionnaire.sensitivity.enabled) concerns.push('Sensibilité');
-
-        const rednessBase = questionnaire.redness.enabled ? getRednessBase(questionnaire.redness.level) : undefined;
-        const rednessLocationBoost = (questionnaire.redness.location?.length || 0) * 2;
-        const rednessLevel = typeof rednessBase === 'number' ? clamp(rednessBase + rednessLocationBoost) : undefined;
+        const rednessRes = getBoost('redness');
         if (questionnaire.redness.enabled) concerns.push('Rougeurs');
+
+        if (questionnaire.hydration.enabled) concerns.push('Déshydratation');
+        if (questionnaire.sensitivity.enabled) concerns.push('Sensibilité');
 
         return {
             concerns,
-            acneLevel,
-            blackheadsLevel,
-            poreSize,
-            wrinklesDepth,
-            hydrationLevel,
-            sensitivityLevel,
-            rednessLevel,
+            acneLevel: acneRes.base !== undefined ? clamp(acneRes.base + acneRes.boost) : undefined,
+            blackheadsLevel: blackheadsRes.base !== undefined ? clamp(blackheadsRes.base + blackheadsRes.boost) : undefined,
+            poreSize: poresRes.base !== undefined ? clamp(poresRes.base + poresRes.boost) : undefined,
+            wrinklesDepth: wrinklesRes.base !== undefined ? clamp(wrinklesRes.base + wrinklesRes.boost) : undefined,
+            rednessLevel: rednessRes.base !== undefined ? clamp(rednessRes.base + rednessRes.boost) : undefined,
+            hydrationLevel: questionnaire.hydration.enabled ? getHydrationLevel(questionnaire.hydration.feel) : undefined,
+            sensitivityLevel: questionnaire.sensitivity.enabled ? getSensitivityLevel(questionnaire.sensitivity.level) : undefined,
         };
     }, [questionnaire]);
 

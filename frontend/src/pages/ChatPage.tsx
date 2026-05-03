@@ -17,7 +17,7 @@ const ChatPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
 
@@ -55,7 +55,7 @@ const ChatPage: React.FC = () => {
         )}
 
         {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={`${msg.role}-${index}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] ${msg.role === 'user' ? 'bg-primary text-white p-3 rounded-2xl rounded-tr-none' : ''}`}>
               {msg.role === 'user' ? (
                 <p className="text-sm">{msg.content}</p>

@@ -38,7 +38,7 @@ export function TwoFactorVerify({ user, onSuccess }: TwoFactorVerifyProps) {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');

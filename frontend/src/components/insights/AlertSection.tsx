@@ -19,8 +19,8 @@ const AlertSection: React.FC<AlertSectionProps> = ({ insights }) => {
                 Alertes Prioritaires
             </h3>
             <div className="grid grid-cols-1 gap-4">
-                {highSeverityInsights.map((insight, idx) => (
-                    <InsightCard key={idx} insight={insight} />
+                {highSeverityInsights.map((insight) => (
+                    <InsightCard key={`${insight.type}-${insight.title}`} insight={insight} />
                 ))}
             </div>
         </div>

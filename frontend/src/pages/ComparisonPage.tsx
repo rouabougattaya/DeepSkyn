@@ -91,8 +91,12 @@ function AnalysisCard({
   metrics?: { hydration: number; oil: number; acne: number; wrinkles: number } | null;
 }) {
   const metrics = metricsProp ?? DEFAULT_METRICS;
-  const scoreColor =
-    skinScore >= 70 ? 'score-value-high' : skinScore >= 50 ? 'score-value-medium' : 'score-value-low';
+  const getScoreClass = (score: number) => {
+    if (score >= 70) return 'score-value-high';
+    if (score >= 50) return 'score-value-medium';
+    return 'score-value-low';
+  };
+  const scoreColor = getScoreClass(skinScore);
   const date = new Date(createdAt).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
@@ -225,7 +229,7 @@ export default function ComparisonPage() {
   const bothSelected = Boolean(firstId && secondId && firstId !== secondId);
   const canCompare = bothSelected && !compareLoading;
 
-  const handleCompare = (e: React.FormEvent) => {
+  const handleCompare = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!canCompare) return;
     setCompareError(null);

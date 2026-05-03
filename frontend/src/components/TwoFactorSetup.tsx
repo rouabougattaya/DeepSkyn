@@ -61,7 +61,7 @@ export function TwoFactorSetup({ onSuccess }: TwoFactorSetupProps) {
     }
   };
 
-  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleVerify = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');

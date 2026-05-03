@@ -260,7 +260,7 @@ export class AuthService {
     }
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent);
-    const token = await this.generateToken(user);
+    const token = this.generateToken(user);
 
     // ✅ Créer la session
     const req = {
@@ -307,7 +307,7 @@ export class AuthService {
     }
 
     await this.logActivity(user.id, ActivityType.LOGIN_SUCCESS, ip, userAgent, { method: 'google' });
-    const token = await this.generateToken(user);
+    const token = this.generateToken(user);
 
     // ✅ Créer la session
     const req = {
@@ -383,8 +383,6 @@ export class AuthService {
       // For now, let's keep it required as per original logic.
       throw sessionError;
     }
-
-    return tokens;
 
     return tokens;
   }
@@ -675,7 +673,6 @@ export class AuthService {
     }
 
     const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
-    const rpOrigin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
 
     const options = await generateRegistrationOptions({
       rpName: 'DeepSkyn',
@@ -911,7 +908,7 @@ export class AuthService {
       }
 
       // Update counter
-      user.webauthnCounter = verification.authenticationInfo!.newCounter;
+      user.webauthnCounter = verification.authenticationInfo.newCounter;
       await this.userRepository.save(user);
 
       webauthnChallengeStore.delete(tempId);

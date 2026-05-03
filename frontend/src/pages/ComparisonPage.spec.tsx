@@ -140,7 +140,7 @@ describe('ComparisonPage', () => {
         expect(screen.getAllByText(/80/).length).toBeGreaterThan(0);
     });
 
-    const selects = screen.getAllByRole('combobox');
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
     
     await act(async () => {
         fireEvent.change(selects[0], { target: { value: '1' } });

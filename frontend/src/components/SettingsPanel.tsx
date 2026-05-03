@@ -178,7 +178,7 @@ export function SettingsPanel() {
     }
   };
 
-  const handleDisableTwoFA = async (e: React.FormEvent) => {
+  const handleDisableTwoFA = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');

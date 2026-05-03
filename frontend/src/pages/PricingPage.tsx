@@ -58,6 +58,12 @@ const PLAN_VISUALS: Record<string, {
   },
 };
 
+const getPlanTextColor = (planId: string) => {
+  if (planId === 'PRO') return 'text-teal-500';
+  if (planId === 'PREMIUM') return 'text-purple-500';
+  return 'text-slate-500';
+};
+
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
 const FAQS = [
   { q: 'Can I cancel anytime?', a: 'Yes. Cancel anytime from your account settings with no penalties or hidden fees.' },
@@ -223,11 +229,7 @@ export default function PricingPage() {
                     {/* CTA */}
                     <div className="px-6 pt-5">
                       <button
-                        onClick={() =>
-                          plan.price === 0
-                            ? navigate('/auth/register')
-                            : navigate('/auth/register')
-                        }
+                        onClick={() => navigate('/auth/register')}
                         className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 hover:shadow-lg active:scale-95 ${v.btn}`}
                       >
                         {plan.price === 0 ? 'Get started for free' : `Get ${plan.name}`}
@@ -243,7 +245,7 @@ export default function PricingPage() {
                           className={`flex items-start gap-2.5 text-sm ${f.included ? 'text-slate-700' : 'text-slate-300'}`}
                         >
                           {f.included
-                            ? <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${plan.id === 'PRO' ? 'text-teal-500' : plan.id === 'PREMIUM' ? 'text-purple-500' : 'text-slate-500'}`} />
+                            ? <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${getPlanTextColor(plan.id)}`} />
                             : <X size={15} className="mt-0.5 shrink-0" />
                           }
                           {f.label}
@@ -285,7 +287,7 @@ export default function PricingPage() {
                     return (
                       <div key={p.id} className={`p-3.5 flex items-center justify-center ${p.highlighted ? 'bg-teal-50/40' : ''}`}>
                         {feat?.included
-                          ? <CheckCircle2 size={16} className={p.id === 'PRO' ? 'text-teal-500' : p.id === 'PREMIUM' ? 'text-purple-500' : 'text-slate-400'} />
+                          ? <CheckCircle2 size={16} className={getPlanTextColor(p.id)} />
                           : <X size={16} className="text-slate-200" />
                         }
                       </div>

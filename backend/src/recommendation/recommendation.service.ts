@@ -189,69 +189,56 @@ export class RecommendationService {
    * Fallback base de données (si dataset absente ou erreur)
    */
   private async getDatabaseFallback(userId: string, analysisId: string, skinType: string, concerns: string[] = []): Promise<any[]> {
+    const matchedProducts = await this.getMatchedProducts(skinType);
+    const scoredProducts = this.scoreProducts(matchedProducts, concerns);
+    const finalSelection = this.selectDiverseProducts(scoredProducts);
+
+    return finalSelection.map((item) => this.formatRecommendation(item.p));
+  }
+
+  private async getMatchedProducts(skinType: string): Promise<Product[]> {
     const mappedType = skinType.toLowerCase();
-    const normalizedConcerns = concerns.map((c) => String(c || '').toLowerCase()).filter(Boolean);
-
-    // Try 1: Find products with matching skinType
-    let matchedProducts = await this.productRepository.find({
-      where: { skinType: mappedType },
-      take: 20,
-    });
-
-    // Try 2: If no products found, get popular products without skinType filter
-    if (matchedProducts.length === 0) {
+    let products = await this.productRepository.find({ where: { skinType: mappedType }, take: 20 });
+    
+    if (products.length === 0) {
       this.logger.warn(`No products found for skinType '${mappedType}', falling back to top-rated products`);
-      matchedProducts = await this.productRepository.find({
-        order: { rating: 'DESC' },
-        take: 20,
-      });
+      products = await this.productRepository.find({ order: { rating: 'DESC' }, take: 20 });
     }
-
-    // Try 3: If still no products, get any available products
-    if (matchedProducts.length === 0) {
+    
+    if (products.length === 0) {
       this.logger.warn('No products available in database');
-      matchedProducts = await this.productRepository.find({ take: 20 });
+      products = await this.productRepository.find({ take: 20 });
     }
+    
+    return products;
+  }
 
-    const normalizeUrl = (u: unknown): string | null => {
-      if (typeof u !== 'string') return null;
-      const trimmed = u.trim();
-      if (!trimmed || trimmed === '#') return null;
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-      if (trimmed.startsWith('//')) return `https:${trimmed}`;
-      return `https://${trimmed}`;
-    };
-
-    const scoredProducts = matchedProducts
+  private scoreProducts(products: Product[], concerns: string[]) {
+    const normalizedConcerns = concerns.map((c) => String(c || '').toLowerCase()).filter(Boolean);
+    return products
       .map((p) => {
-        const productConcerns = ((p as any).targetIssues || [])
-          .map((issue: string) => String(issue || '').toLowerCase());
+        const productConcerns = ((p as any).targetIssues || []).map((issue: string) => String(issue || '').toLowerCase());
         const concernOverlap = normalizedConcerns.filter((c) => productConcerns.includes(c)).length;
         const ratingScore = typeof (p as any).rating === 'number' ? Number((p as any).rating) : 0;
-        return {
-          p,
-          score: concernOverlap * 3 + ratingScore,
-        };
+        return { p, score: concernOverlap * 3 + ratingScore };
       })
       .sort((a, b) => b.score - a.score);
+  }
 
-    // Group by basic categories to ensure routine variety
+  private selectDiverseProducts(scoredProducts: any[]) {
     const categorized = {
       cleanser: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('cleanser')),
       serum: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('serum')),
       moisturizer: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('moisturizer')),
       sunscreen: scoredProducts.filter(item => (item.p.type || '').toLowerCase().includes('sunscreen')),
-      other: scoredProducts.filter(item =>
-        !['cleanser', 'serum', 'moisturizer', 'sunscreen'].some(cat => (item.p.type || '').toLowerCase().includes(cat))
-      )
+      other: scoredProducts.filter(item => !['cleanser', 'serum', 'moisturizer', 'sunscreen'].some(cat => (item.p.type || '').toLowerCase().includes(cat)))
     };
 
     const finalSelection: any[] = [];
     const usedIds = new Set<string>();
 
-    const pickRandomFromTop = (list: any[], count: number = 1, topN: number = 3) => {
-      if (!list.length) return;
-      const pool = list.slice(0, topN);
+    const pick = (list: any[], count: number = 1) => {
+      const pool = list.slice(0, 3);
       for (let i = 0; i < count && pool.length > 0; i++) {
         const idx = crypto.randomInt(0, pool.length);
         const item = pool.splice(idx, 1)[0];
@@ -262,38 +249,34 @@ export class RecommendationService {
       }
     };
 
-    // Pick 1 from each main category
-    pickRandomFromTop(categorized.cleanser);
-    pickRandomFromTop(categorized.serum);
-    pickRandomFromTop(categorized.moisturizer);
-    pickRandomFromTop(categorized.sunscreen);
+    pick(categorized.cleanser);
+    pick(categorized.serum);
+    pick(categorized.moisturizer);
+    pick(categorized.sunscreen);
 
-    // Fill the rest (up to 6) from "other" or remaining top scored
-    const remainingPool = scoredProducts.filter(item => !usedIds.has(item.p.id));
-    pickRandomFromTop(remainingPool, 6 - finalSelection.length, 10);
+    const remaining = scoredProducts.filter(item => !usedIds.has(item.p.id));
+    pick(remaining, 6 - finalSelection.length);
 
-    const valid = finalSelection
-      .map(({ p }) => {
-        const url = normalizeUrl((p as any).url);
-        if (!url) return null;
+    return finalSelection;
+  }
 
-        // Generate a reason
-        const type = (p.type || 'Skincare').toLowerCase();
-        let reason = "Recommandé pour votre routine quotidienne.";
-        if (type.includes('cleanser')) reason = "Nettoyant doux pour purifier sans agresser.";
-        if (type.includes('serum')) reason = "Sérum concentré pour traiter vos préoccupations ciblées.";
-        if (type.includes('moisturizer')) reason = "Hydratant essentiel pour protéger votre barrière cutanée.";
-        if (type.includes('sunscreen')) reason = "Protection solaire indispensable pour prévenir le vieillissement.";
+  private formatRecommendation(p: Product) {
+    const type = (p.type || 'Skincare').toLowerCase();
+    let reason = "Recommandé pour votre routine quotidienne.";
+    if (type.includes('cleanser')) reason = "Nettoyant doux pour purifier sans agresser.";
+    else if (type.includes('serum')) reason = "Sérum concentré pour traiter vos préoccupations ciblées.";
+    else if (type.includes('moisturizer')) reason = "Hydratant essentiel pour protéger votre barrière cutanée.";
+    else if (type.includes('sunscreen')) reason = "Protection solaire indispensable pour prévenir le vieillissement.";
 
-        return {
-          ...p,
-          url,
-          reason
-        };
-      })
-      .filter(Boolean);
+    return { ...p, url: this.normalizeUrl((p as any).url), reason };
+  }
 
-    return valid;
+  private normalizeUrl(u: unknown): string | null {
+    if (typeof u !== 'string') return null;
+    const trimmed = u.trim();
+    if (!trimmed || trimmed === '#') return null;
+    if (trimmed.startsWith('http')) return trimmed;
+    return `https://${trimmed.replace(/^\/\//, '')}`;
   }
 
   private async resolveProductId(rec: any): Promise<string | null> {

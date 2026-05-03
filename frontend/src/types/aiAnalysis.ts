@@ -68,6 +68,7 @@ export interface UserSkinProfile {
   fitzpatrickType?: 'Type I' | 'Type II' | 'Type III' | 'Type IV' | 'Type V' | 'Type VI';
   age: number;
   gender: 'Male' | 'Female' | 'Other';
+  ethnicity?: string;
   concerns: string[];
   imageBase64?: string;
   imagesBase64?: string[];

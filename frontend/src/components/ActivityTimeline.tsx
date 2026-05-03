@@ -90,6 +90,24 @@ const RISK_CONFIG: Record<RiskLevel, { bg: string; border: string; dot: string; 
     },
 };
 
+const RECOMMENDED_ACTION_CONFIG = {
+    temporary_lock: {
+        bg: 'rgba(239,68,68,0.2)',
+        color: '#ef4444',
+        text: '🔒 Temporarily lock account',
+    },
+    notify: {
+        bg: 'rgba(245,158,11,0.2)',
+        color: '#f59e0b',
+        text: '🔔 Send notification',
+    },
+    none: {
+        bg: 'transparent',
+        color: 'inherit',
+        text: '',
+    }
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatRelativeTime(dateStr: string): string {
     const date = new Date(dateStr);
@@ -114,7 +132,45 @@ function getDeviceEmoji(deviceInfo?: string): string {
     return '🌐';
 }
 
+function getActiveFilterCount(filterType: string, filterRisk: string): string {
+    const activeFilters = [filterType, filterRisk].filter(Boolean);
+    if (activeFilters.length === 0) return '';
+    return ` (${activeFilters.length} active)`;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+function IntegrityButton({ status, onClick }: { status: { valid: boolean; checked: boolean }; onClick: () => void }) {
+    let background = 'rgba(0,0,0,0.03)';
+    let border = '1px solid rgba(0,0,0,0.08)';
+    let color = '#475569';
+    let text = 'Verify';
+
+    if (status.checked) {
+        if (status.valid) {
+            background = 'rgba(16,185,129,0.1)';
+            border = '1px solid rgba(16,185,129,0.3)';
+            color = '#10b981';
+            text = 'Chain OK';
+        } else {
+            background = 'rgba(239,68,68,0.1)';
+            border = '1px solid rgba(239,68,68,0.3)';
+            color = '#ef4444';
+            text = 'Chain Broken';
+        }
+    }
+
+    return (
+        <button onClick={onClick} title="Verify chain integrity" style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '8px 14px', borderRadius: '9px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+            background, border, color, transition: 'all 0.2s',
+        }}>
+            {status.checked && status.valid ? <CheckCircle size={13} /> : <Shield size={13} />}
+            {text}
+        </button>
+    );
+}
 
 function StatCard({ label, value, color, icon: Icon }: { label: string; value: number | string; color: string; icon: React.ElementType }) {
     return (
@@ -142,6 +198,19 @@ function RiskBadge({ level }: { level: RiskLevel }) {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cfg.dot, display: 'inline-block' }} />
             {level}
         </span>
+    );
+}
+
+function PaginationButton({ isActive, onClick, children }: { isActive: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button onClick={onClick} style={{
+            width: '32px', height: '32px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
+            background: isActive ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
+            border: isActive ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.07)',
+            color: isActive ? '#818cf8' : '#64748b', cursor: 'pointer',
+        }}>
+            {children}
+        </button>
     );
 }
 
@@ -266,10 +335,10 @@ function ActivityCard({ event, isExpanded, onToggle }: { event: ActivityEvent; i
                                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>Recommended:</span>
                                     <span style={{
                                         fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px',
-                                        background: event.recommendedAction === 'temporary_lock' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
-                                        color: event.recommendedAction === 'temporary_lock' ? '#ef4444' : '#f59e0b',
+                                        background: RECOMMENDED_ACTION_CONFIG[event.recommendedAction as keyof typeof RECOMMENDED_ACTION_CONFIG]?.bg || 'transparent',
+                                        color: RECOMMENDED_ACTION_CONFIG[event.recommendedAction as keyof typeof RECOMMENDED_ACTION_CONFIG]?.color || 'inherit',
                                     }}>
-                                        {event.recommendedAction === 'temporary_lock' ? '🔒 Temporarily lock account' : '🔔 Send notification'}
+                                        {RECOMMENDED_ACTION_CONFIG[event.recommendedAction as keyof typeof RECOMMENDED_ACTION_CONFIG]?.text}
                                     </span>
                                 </div>
                             )}
@@ -317,8 +386,8 @@ function ActivityCard({ event, isExpanded, onToggle }: { event: ActivityEvent; i
     );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function ActivityTimeline() {
+// ─── Logic Hook ──────────────────────────────────────────────────────────────
+function useActivityTimeline() {
     const [activities, setActivities] = useState<ActivityEvent[]>([]);
     const [summary, setSummary] = useState<SecuritySummary | null>(null);
     const [loading, setLoading] = useState(true);
@@ -334,7 +403,6 @@ export default function ActivityTimeline() {
     const [actionFeedback, setActionFeedback] = useState<string | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
-    // ── Load activities ──
     const loadActivities = useCallback(async () => {
         setLoading(true);
         try {
@@ -347,7 +415,6 @@ export default function ActivityTimeline() {
             setTotalPages(data.totalPages);
             setTotal(data.total);
         } catch {
-            // Fallback to mock data when backend is unavailable
             setActivities(mockActivities);
             setTotalPages(1);
             setTotal(mockActivities.length);
@@ -356,7 +423,6 @@ export default function ActivityTimeline() {
         }
     }, [page, filterType, filterRisk]);
 
-    // ── Load summary ──
     const loadSummary = useCallback(async () => {
         setSummaryLoading(true);
         try {
@@ -375,7 +441,6 @@ export default function ActivityTimeline() {
     useEffect(() => { loadActivities(); }, [loadActivities]);
     useEffect(() => { loadSummary(); }, [loadSummary]);
 
-    // ── Integrity check ──
     const checkIntegrity = async () => {
         try {
             const result = await activityService.verifyIntegrity();
@@ -390,7 +455,6 @@ export default function ActivityTimeline() {
         setTimeout(() => setActionFeedback(null), 5000);
     };
 
-    // ── CSV Export ──
     const handleExport = async () => {
         setExportLoading(true);
         try {
@@ -414,7 +478,109 @@ export default function ActivityTimeline() {
         setTimeout(() => setActionFeedback(null), 6000);
     };
 
-    // ── Derived Stats ──
+    return {
+        activities, setActivities, summary, loading, summaryLoading, expandedId, setExpandedId,
+        page, setPage, totalPages, total, filterType, setFilterType, filterRisk, setFilterRisk,
+        exportLoading, integrityStatus, actionFeedback, setActionFeedback, showFilters, setShowFilters,
+        loadActivities, loadSummary, checkIntegrity, handleExport, handleAction
+    };
+}
+
+const SecurityActions = ({ onAction }: { onAction: (a: string) => void }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
+        {[
+            { label: 'Terminate Other Sessions', icon: LogOut, color: '#f59e0b', action: 'terminate_sessions' },
+            { label: 'Report Suspicious Activity', icon: AlertTriangle, color: '#ef4444', action: 'report_suspicious' },
+            { label: 'Lock My Account', icon: Lock, color: '#8b5cf6', action: 'lock_account' },
+        ].map(({ label, icon: Icon, color, action }) => (
+            <button key={action} onClick={() => onAction(action)} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                background: `${color}10`, border: `1px solid ${color}30`,
+                color, fontSize: '12px', fontWeight: '600', textAlign: 'center',
+                transition: 'all 0.2s', lineHeight: '1.3',
+            }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}20`; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}10`; }}
+            >
+                <Icon size={20} />
+                {label}
+            </button>
+        ))}
+    </div>
+);
+
+const ActivityFilters = ({
+    showFilters, setShowFilters, filterType, setFilterType, filterRisk, setFilterRisk, setPage
+}: any) => (
+    <div style={{ marginBottom: '16px' }}>
+        <button onClick={() => setShowFilters(!showFilters)} style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '8px 14px', borderRadius: '9px', fontSize: '12px', fontWeight: '600',
+            background: showFilters ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)',
+            border: showFilters ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            color: showFilters ? '#818cf8' : '#94a3b8', cursor: 'pointer', transition: 'all 0.2s',
+        }}>
+            <Filter size={13} />
+            {`Filters${getActiveFilterCount(filterType, filterRisk)}`}
+        </button>
+
+        {showFilters && (
+            <div style={{
+                display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap',
+                padding: '14px', background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px',
+            }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Event Type</label>
+                    <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} style={{
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px', padding: '8px 10px', color: '#e2e8f0', fontSize: '13px', cursor: 'pointer',
+                    }}>
+                        <option value="">All Types</option>
+                        {(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'PASSWORD_CHANGED', 'EMAIL_CHANGED',
+                            'SESSION_CREATED', 'SESSION_TERMINATED', 'ROLE_UPDATED', 'ACCOUNT_LOCKED',
+                            'SENSITIVE_ACTION', 'PASSWORD_RESET_REQUEST'] as ActivityType[]).map(t => (
+                                <option key={t} value={t}>{ACTIVITY_LABELS[t]}</option>
+                            ))}
+                    </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Risk Level</label>
+                    <select value={filterRisk} onChange={e => { setFilterRisk(e.target.value); setPage(1); }} style={{
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px', padding: '8px 10px', color: '#e2e8f0', fontSize: '13px', cursor: 'pointer',
+                    }}>
+                        <option value="">All Risks</option>
+                        <option value="low">🟢 Low</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="high">🔴 High</option>
+                    </select>
+                </div>
+                {(filterType || filterRisk) && (
+                    <button onClick={() => { setFilterType(''); setFilterRisk(''); setPage(1); }} style={{
+                        alignSelf: 'flex-end', padding: '8px 12px', borderRadius: '8px',
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                        color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                    }}>
+                        <X size={12} /> Clear
+                    </button>
+                )}
+            </div>
+        )}
+    </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function ActivityTimeline() {
+    const {
+        activities, setActivities, summary, loading, summaryLoading, expandedId, setExpandedId,
+        page, setPage, totalPages, total, filterType, setFilterType, filterRisk, setFilterRisk,
+        exportLoading, integrityStatus, actionFeedback, setActionFeedback, showFilters, setShowFilters,
+        loadActivities, loadSummary, checkIntegrity, handleExport, handleAction
+    } = useActivityTimeline();
+
     const stats = summary?.stats || { total, high: 0, medium: 0, low: 0, loginFailures: 0, uniqueIps: 0 };
 
     return (
@@ -456,21 +622,7 @@ export default function ActivityTimeline() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button onClick={checkIntegrity} title="Verify chain integrity" style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '8px 14px', borderRadius: '9px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                        background: integrityStatus.checked
-                            ? (integrityStatus.valid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)')
-                            : 'rgba(0,0,0,0.03)',
-                        border: integrityStatus.checked
-                            ? (integrityStatus.valid ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(239,68,68,0.3)')
-                            : '1px solid rgba(0,0,0,0.08)',
-                        color: integrityStatus.checked ? (integrityStatus.valid ? '#10b981' : '#ef4444') : '#475569',
-                        transition: 'all 0.2s',
-                    }}>
-                        {integrityStatus.checked && integrityStatus.valid ? <CheckCircle size={13} /> : <Shield size={13} />}
-                        {integrityStatus.checked ? (integrityStatus.valid ? 'Chain OK' : 'Chain Broken') : 'Verify'}
-                    </button>
+                    <IntegrityButton status={integrityStatus} onClick={checkIntegrity} />
 
                     <button onClick={handleExport} disabled={exportLoading} style={{
                         display: 'flex', alignItems: 'center', gap: '6px',
@@ -534,87 +686,17 @@ export default function ActivityTimeline() {
                 </div>
             </div>
 
-            {/* ── Security Actions ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                {[
-                    { label: 'Terminate Other Sessions', icon: LogOut, color: '#f59e0b', action: 'terminate_sessions' },
-                    { label: 'Report Suspicious Activity', icon: AlertTriangle, color: '#ef4444', action: 'report_suspicious' },
-                    { label: 'Lock My Account', icon: Lock, color: '#8b5cf6', action: 'lock_account' },
-                ].map(({ label, icon: Icon, color, action }) => (
-                    <button key={action} onClick={() => handleAction(action)} style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                        padding: '16px', borderRadius: '12px', cursor: 'pointer',
-                        background: `${color}10`, border: `1px solid ${color}30`,
-                        color, fontSize: '12px', fontWeight: '600', textAlign: 'center',
-                        transition: 'all 0.2s', lineHeight: '1.3',
-                    }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}20`; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}10`; }}
-                    >
-                        <Icon size={20} />
-                        {label}
-                    </button>
-                ))}
-            </div>
+            <SecurityActions onAction={handleAction} />
 
-            {/* ── Filters ── */}
-            <div style={{ marginBottom: '16px' }}>
-                <button onClick={() => setShowFilters(!showFilters)} style={{
-                    display: 'flex', alignItems: 'center', gap: '7px',
-                    padding: '8px 14px', borderRadius: '9px', fontSize: '12px', fontWeight: '600',
-                    background: showFilters ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)',
-                    border: showFilters ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                    color: showFilters ? '#818cf8' : '#94a3b8', cursor: 'pointer', transition: 'all 0.2s',
-                }}>
-                    <Filter size={13} />
-                    {`Filters${(filterType || filterRisk) ? ` (${[filterType, filterRisk].filter(Boolean).length} active)` : ''}`}
-                </button>
-
-                {showFilters && (
-                    <div style={{
-                        display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap',
-                        padding: '14px', background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px',
-                    }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Event Type</label>
-                            <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} style={{
-                                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '8px', padding: '8px 10px', color: '#e2e8f0', fontSize: '13px', cursor: 'pointer',
-                            }}>
-                                <option value="">All Types</option>
-                                {(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'PASSWORD_CHANGED', 'EMAIL_CHANGED',
-                                    'SESSION_CREATED', 'SESSION_TERMINATED', 'ROLE_UPDATED', 'ACCOUNT_LOCKED',
-                                    'SENSITIVE_ACTION', 'PASSWORD_RESET_REQUEST'] as ActivityType[]).map(t => (
-                                        <option key={t} value={t}>{ACTIVITY_LABELS[t]}</option>
-                                    ))}
-                            </select>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Risk Level</label>
-                            <select value={filterRisk} onChange={e => { setFilterRisk(e.target.value); setPage(1); }} style={{
-                                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '8px', padding: '8px 10px', color: '#e2e8f0', fontSize: '13px', cursor: 'pointer',
-                            }}>
-                                <option value="">All Risks</option>
-                                <option value="low">🟢 Low</option>
-                                <option value="medium">🟡 Medium</option>
-                                <option value="high">🔴 High</option>
-                            </select>
-                        </div>
-                        {(filterType || filterRisk) && (
-                            <button onClick={() => { setFilterType(''); setFilterRisk(''); setPage(1); }} style={{
-                                alignSelf: 'flex-end', padding: '8px 12px', borderRadius: '8px',
-                                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-                                color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', gap: '5px',
-                            }}>
-                                <X size={12} /> Clear
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
+            <ActivityFilters 
+                showFilters={showFilters} 
+                setShowFilters={setShowFilters} 
+                filterType={filterType} 
+                setFilterType={setFilterType} 
+                filterRisk={filterRisk} 
+                setFilterRisk={setFilterRisk} 
+                setPage={setPage} 
+            />
 
             {/* ── Timeline ── */}
             <div style={{ position: 'relative' }}>
@@ -624,45 +706,49 @@ export default function ActivityTimeline() {
                     width: '2px', background: 'linear-gradient(to bottom, transparent, #e2e8f0 10%, #e2e8f0 90%, transparent)',
                 }} />
 
-                <div style={{ paddingLeft: '28px' }}>
-                    {loading ? (
-                        [1, 2, 3, 4, 5].map((item) => (
-                            <div key={`skeleton-act-${item}`} style={{
-                                height: '84px', borderRadius: '14px', marginBottom: '12px',
-                                background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)',
-                                animation: 'pulse 1.5s infinite',
-                            }} />
-                        ))
-                    ) : activities.length === 0 ? (
-                        <div style={{
-                            textAlign: 'center', padding: '48px 24px',
-                            background: '#f8fafc', borderRadius: '14px',
-                            border: '1px dashed #e2e8f0',
-                        }}>
-                            <Shield size={36} color="#94a3b8" style={{ marginBottom: '12px', opacity: 0.5 }} />
-                            <p style={{ color: '#475569', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '500' }}>
-                                No recent security activities recorded for your account.
-                            </p>
-                            <button
-                                onClick={() => setActivities(mockActivities)}
-                                style={{
-                                    fontSize: '12px', color: '#0d9488', fontWeight: '600',
-                                    background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline'
-                                }}
-                            >
-                                View Sample Security Data
-                            </button>
-                        </div>
-                    ) : (
-                        activities.map(event => (
+                <div style={{ paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                        if (loading) {
+                            return [1, 2, 3, 4, 5].map(id => (
+                                <div key={`skeleton-${id}`} style={{
+                                    height: '84px', borderRadius: '14px',
+                                    background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)',
+                                    animation: 'pulse 1.5s infinite',
+                                }} />
+                            ));
+                        }
+                        if (activities.length === 0) {
+                            return (
+                                <div style={{
+                                    textAlign: 'center', padding: '48px 24px',
+                                    background: '#f8fafc', borderRadius: '14px',
+                                    border: '1px dashed #e2e8f0',
+                                }}>
+                                    <Shield size={36} color="#94a3b8" style={{ marginBottom: '12px', opacity: 0.5 }} />
+                                    <p style={{ color: '#475569', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '500' }}>
+                                        No recent security activities recorded for your account.
+                                    </p>
+                                    <button
+                                        onClick={() => setActivities(mockActivities)}
+                                        style={{
+                                            fontSize: '12px', color: '#0d9488', fontWeight: '600',
+                                            background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline'
+                                        }}
+                                    >
+                                        View Sample Security Data
+                                    </button>
+                                </div>
+                            );
+                        }
+                        return activities.map(event => (
                             <ActivityCard
                                 key={event.id}
                                 event={event}
                                 isExpanded={expandedId === event.id}
                                 onToggle={() => setExpandedId(expandedId === event.id ? null : event.id)}
                             />
-                        ))
-                    )}
+                        ));
+                    })()}
                 </div>
             </div>
 
@@ -681,12 +767,13 @@ export default function ActivityTimeline() {
                         }}>← Prev</button>
                         {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => {
                             return (
-                                <button key={`page-${p}`} onClick={() => setPage(p)} style={{
-                                    width: '32px', height: '32px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
-                                    background: page === p ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
-                                    border: page === p ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.07)',
-                                    color: page === p ? '#818cf8' : '#64748b', cursor: 'pointer',
-                                }}>{p}</button>
+                                <PaginationButton 
+                                    key={`page-${p}`} 
+                                    isActive={page === p} 
+                                    onClick={() => setPage(p)}
+                                >
+                                    {p}
+                                </PaginationButton>
                             );
                         })}
                         <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} style={{

@@ -113,41 +113,13 @@ export class ChatService {
     }
 
     const resolvedUserId = await this.resolveUserId(input);
-    
-    // ✅ VERIFICATION STRICTE DES LIMITES (DEV 4)
-    if (resolvedUserId) {
-      const { allowed, remaining, limit } = await this.subscriptionService.checkChatLimit(resolvedUserId);
-      console.log(`[Chat-Limit] User: ${resolvedUserId} | Remaining: ${remaining}/${limit}`);
-      
-      if (!allowed) {
-        console.warn(`[Chat-Limit] ❌ BLOCKED: User ${resolvedUserId} reached limit.`);
-        throw new HttpException('LIMIT_REACHED', HttpStatus.FORBIDDEN);
-      }
-      
-      // ✅ INCRÉMENTATION IMMÉDIATE
-      await this.subscriptionService.incrementMessages(resolvedUserId);
-      console.log(`[Chat-Usage] ⬆️ Counter incremented.`);
-    } else {
-      console.warn(`[Chat-Limit] ⚠️ No resolved user ID for session ${input.sessionId}`);
-      throw new Error('AUTH_REQUIRED');
-    }
+    await this.checkUserLimits(resolvedUserId, sessionId);
 
     const userSkinContext = await this.buildUserSkinContext(resolvedUserId);
-    let plan = 'FREE';
-    if (resolvedUserId) {
-        const sub = await this.subscriptionService.getSubscription(resolvedUserId);
-        plan = sub.plan;
-    }
+    const plan = await this.getUserPlan(resolvedUserId);
 
-    // Save user message
     if (sessionId) {
-      await this.messageRepo.save(
-        this.messageRepo.create({
-          sessionId,
-          role: 'user',
-          content: message,
-        }),
-      );
+      await this.saveMessage(sessionId, 'user', message);
     }
 
     // Fetch message history for context (last 6 messages)
@@ -160,49 +132,19 @@ export class ChatService {
         take: 6,
       });
       messageCount = history.length;
-      historyContext = history
-        .reverse()
+      const reversedHistory = [...history].reverse();
+      historyContext = reversedHistory
         .map(m => `${m.role === 'user' ? 'Utilisateur' : 'Assistant'}: ${m.content}`)
         .join('\n');
     }
 
     // Generate title if it's the first message or if title is still default
-    let sessionTitle: string | undefined;
-    if (sessionId) {
-      const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
-      if (session && (!session.title || session.title === 'Nouvelle discussion')) {
-        try {
-          sessionTitle = await this.updateSessionTitle(sessionId, message);
-        } catch (err) {
-          this.logger.error(`Failed to update session title: ${err.message}`);
-        }
-      }
-    }
-
-    const systemPrompt = `
-      Tu es un dermatologue virtuel intelligent pour DeepSkyn.
-      Réponds avec courtoisie et professionnalisme en français.
-      Aide l'utilisateur à comprendre les résultats de son analyse de peau et donne des conseils de routine.
-      Mentionne toujours que tes conseils ne remplacent pas une consultation médicale réelle.
-      
-      Historique récent de la conversation :
-      ${historyContext}
-
-      Contexte utilisateur (JSON structuré):
-      ${JSON.stringify(userSkinContext, null, 2)}
-    `;
-
+    const sessionTitle = await this.handleSessionTitle(sessionId, message);
+    const systemPrompt = this.buildSystemPrompt(historyContext, userSkinContext);
     const aiMessage = await this.openRouterService.chat(message, systemPrompt, plan);
 
-    // Save assistant message
     if (sessionId) {
-      await this.messageRepo.save(
-        this.messageRepo.create({
-          sessionId,
-          role: 'assistant',
-          content: aiMessage,
-        }),
-      );
+      await this.saveMessage(sessionId, 'assistant', aiMessage);
     }
 
     const { allowed, remaining, limit } = await this.subscriptionService.checkChatLimit(resolvedUserId);
@@ -450,5 +392,57 @@ export class ChatService {
         acne: this.extractAcneCondition(questionnaire?.answers, userProfile?.skinConcerns, acne),
       },
     };
+  }
+
+  private async checkUserLimits(userId: string, sessionId?: string) {
+    if (!userId) {
+      console.warn(`[Chat-Limit] ⚠️ No resolved user ID for session ${sessionId}`);
+      throw new Error('AUTH_REQUIRED');
+    }
+    const { allowed, remaining, limit } = await this.subscriptionService.checkChatLimit(userId);
+    console.log(`[Chat-Limit] User: ${userId} | Remaining: ${remaining}/${limit}`);
+    if (!allowed) {
+      console.warn(`[Chat-Limit] ❌ BLOCKED: User ${userId} reached limit.`);
+      throw new HttpException('LIMIT_REACHED', HttpStatus.FORBIDDEN);
+    }
+    await this.subscriptionService.incrementMessages(userId);
+  }
+
+  private async getUserPlan(userId: string): Promise<string> {
+    if (!userId) return 'FREE';
+    const sub = await this.subscriptionService.getSubscription(userId);
+    return sub.plan;
+  }
+
+  private async saveMessage(sessionId: string, role: 'user' | 'assistant', content: string) {
+    await this.messageRepo.save(this.messageRepo.create({ sessionId, role, content }));
+  }
+
+  private async handleSessionTitle(sessionId?: string, message?: string): Promise<string | undefined> {
+    if (!sessionId || !message) return undefined;
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (session && (!session.title || session.title === 'Nouvelle discussion')) {
+      try {
+        return await this.updateSessionTitle(sessionId, message);
+      } catch (err) {
+        this.logger.error(`Failed to update session title: ${err.message}`);
+      }
+    }
+    return undefined;
+  }
+
+  private buildSystemPrompt(history: string, context: any): string {
+    return `
+      Tu es un dermatologue virtuel intelligent pour DeepSkyn.
+      Réponds avec courtoisie et professionnalisme en français.
+      Aide l'utilisateur à comprendre les résultats de son analyse de peau et donne des conseils de routine.
+      Mentionne toujours que tes conseils ne remplacent pas une consultation médicale réelle.
+      
+      Historique récent de la conversation :
+      ${history}
+
+      Contexte utilisateur (JSON structuré):
+      ${JSON.stringify(context, null, 2)}
+    `;
   }
 }

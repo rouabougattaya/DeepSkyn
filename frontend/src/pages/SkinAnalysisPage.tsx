@@ -397,14 +397,17 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
             : tier === 'moderate' ? '#f59e0b'
                 : '#ef4444';
 
-    // Dynamic content based on tier
-    const dynamicDescription = !isEvaluated
-        ? baseDetails.detailedDescription
-        : tier === 'excellent'
-            ? `${baseDetails.detailedDescription} ${t('analysis.desc_excellent')}`
-            : tier === 'moderate'
-                ? `${baseDetails.detailedDescription} ${t('analysis.desc_moderate', { score: scoreValue })}`
-                : `${baseDetails.detailedDescription} ${t('analysis.desc_critical', { score: scoreValue, detections: detectionCount > 0 ? (detectionCount > 1 ? t('analysis.detections_plural', { count: detectionCount }) : t('analysis.detections_singular', { count: detectionCount })) : t('analysis.several_signals') })}`;
+    const getDynamicDescription = () => {
+        if (result.totalDetections === 0) return t('analysis.no_detection_summary', { condition: meta.label.toLowerCase() });
+        if (tier === 'excellent') return `${baseDetails.detailedDescription} ${t('analysis.desc_excellent')}`;
+        if (tier === 'moderate') return `${baseDetails.detailedDescription} ${t('analysis.desc_moderate', { score: scoreValue })}`;
+        
+        const detectionsStr = detectionCount > 0 
+            ? (detectionCount > 1 ? t('analysis.detections_plural', { count: detectionCount }) : t('analysis.detections_singular', { count: detectionCount }))
+            : t('analysis.several_signals');
+        return `${baseDetails.detailedDescription} ${t('analysis.desc_critical', { score: scoreValue, detections: detectionsStr })}`;
+    };
+    const dynamicDescription = getDynamicDescription();
 
     const dynamicCauses = tier === 'excellent'
         ? baseDetails.causes.slice(0, 2)
@@ -558,7 +561,7 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                         <h3 style={drawerSectionTitleStyle}>{t('analysis.causes')}</h3>
                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                             {dynamicCauses.map((cause: string, index: number) => (
-                                <li key={`cause-${index}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: index < dynamicCauses.length - 1 ? '1px solid #f5f5f5' : 'none', fontSize: 13.5, color: '#555', lineHeight: 1.5 }}>
+                                <li key={cause} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: index < dynamicCauses.length - 1 ? '1px solid #f5f5f5' : 'none', fontSize: 13.5, color: '#555', lineHeight: 1.5 }}>
                                     <span style={{ width: 20, height: 20, background: `${severityColor}22`, color: severityColor, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>
                                         {index + 1}
                                     </span>
@@ -571,8 +574,8 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
                     <section style={{ marginBottom: 16 }}>
                         <h3 style={drawerSectionTitleStyle}>{t('analysis.recommendations')}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {dynamicRecos.map((reco: string, index: number) => (
-                                <div key={`reco-${index}`} style={{ background: recoBg, border: `1px solid ${recoBorder}`, borderLeft: `3px solid ${recoBorderColor}`, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, color: '#374151', lineHeight: 1.55 }}>
+                            {dynamicRecos.map((reco: string) => (
+                                <div key={reco} style={{ background: recoBg, border: `1px solid ${recoBorder}`, borderLeft: `3px solid ${recoBorderColor}`, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, color: '#374151', lineHeight: 1.55 }}>
                                     {reco}
                                 </div>
                             ))}
@@ -854,7 +857,7 @@ export default function SkinAnalysisPage() {
         }
     }, [chatMessages]);
 
-    const sendChatMessage = async (e: React.FormEvent) => {
+    const sendChatMessage = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!chatInput.trim() || chatLoading) return;
 
@@ -964,9 +967,14 @@ export default function SkinAnalysisPage() {
 
 
 
-    const globalScoreColor = result
-        ? result.globalScore >= 75 ? '#10b981' : result.globalScore >= 50 ? '#f59e0b' : '#ef4444'
-        : '#0d9488';
+    const getGlobalScoreColor = (scoreValue: number | undefined) => {
+        if (!scoreValue) return '#0d9488';
+        if (scoreValue >= 75) return '#10b981';
+        if (scoreValue >= 50) return '#f59e0b';
+        return '#ef4444';
+    };
+
+    const globalScoreColor = getGlobalScoreColor(result?.globalScore);
 
     const hasPhoto = Boolean(profile.imagesBase64 && profile.imagesBase64.length > 0);
     const displayMetaWeighting = (() => {
@@ -1895,7 +1903,13 @@ export default function SkinAnalysisPage() {
                                     const details = CONDITION_DETAILS[c.type];
                                     const hasScore = typeof c.score === 'number';
                                     const scoreValue = hasScore ? (c.score as number) : 0;
-                                    const color = !hasScore ? '#64748b' : scoreValue >= 75 ? '#10b981' : scoreValue >= 50 ? '#f59e0b' : '#ef4444';
+                                    const getMetricColor = (s: number | null | undefined) => {
+                                        if (s == null) return '#64748b';
+                                        if (s >= 75) return '#10b981';
+                                        if (s >= 50) return '#f59e0b';
+                                        return '#ef4444';
+                                    };
+                                    const color = !hasScore ? '#64748b' : getMetricColor(scoreValue);
 
                                     return (
                                         <div key={c.type} className="no-break" style={{ padding: 22, borderRadius: 20, border: '1px solid #f1f5f9', background: '#fff', marginBottom: 15, display: 'inline-block', width: '100%', boxSizing: 'border-box' }}>
@@ -1920,8 +1934,8 @@ export default function SkinAnalysisPage() {
                                                     <div>
                                                         <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>{t('analysis.pdf.probable_causes', { defaultValue: 'Causes Probables' })}</div>
                                                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                                                            {details.causes.map((cause, i) => (
-                                                                <li key={i} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
+                                                            {details.causes.map((cause) => (
+                                                                <li key={cause} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
                                                                     <span style={{ color: color }}>•</span> {cause}
                                                                 </li>
                                                             ))}
@@ -1930,8 +1944,8 @@ export default function SkinAnalysisPage() {
                                                     <div>
                                                         <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>{t('analysis.pdf.care_advice', { defaultValue: 'Conseils de Soins' })}</div>
                                                         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                                                            {details.careRecommendations.map((reco, i) => (
-                                                                <li key={i} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
+                                                            {details.careRecommendations.map((reco) => (
+                                                                <li key={reco} style={{ fontSize: 12, color: '#64748b', marginBottom: 4, display: 'flex', gap: 6 }}>
                                                                     <span style={{ color: color }}>✔</span> {reco}
                                                                 </li>
                                                             ))}

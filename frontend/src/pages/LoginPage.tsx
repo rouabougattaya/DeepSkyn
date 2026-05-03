@@ -34,7 +34,7 @@ export default function LoginPage() {
     console.log('🔐 Captcha validated:', token ? 'Yes' : 'No')
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
     setError("")
     setFieldErrors({})

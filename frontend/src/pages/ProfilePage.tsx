@@ -115,7 +115,7 @@ export default function ProfilePage() {
   }, [])
 
   // handleSave
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.SyntheticEvent) => {
   e.preventDefault()
   setError("")
   setSuccess("")
@@ -271,11 +271,17 @@ export default function ProfilePage() {
           </div>
         ) : (
           <form onSubmit={handleSave} className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
-            {(error || success) && (
-              <p className={`text-sm p-3 rounded-lg ${error && !success ? "text-red-600 bg-red-50" : (error && success ? "text-yellow-700 bg-yellow-50" : "text-emerald-700 bg-emerald-50")}`}>
-                {error || success}
-              </p>
-            )}
+            {(() => {
+              if (!error && !success) return null;
+              let style = "text-emerald-700 bg-emerald-50";
+              if (error && !success) style = "text-red-600 bg-red-50";
+              if (error && success) style = "text-yellow-700 bg-yellow-50";
+              return (
+                <p className={`text-sm p-3 rounded-lg ${style}`}>
+                  {error || success}
+                </p>
+              );
+            })()}
 
             {me?.aiScore !== undefined && (
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
@@ -283,7 +289,11 @@ export default function ProfilePage() {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Score d'identité IA</p>
                   <p className="text-sm text-slate-600">Basé sur la cohérence de vos informations</p>
                 </div>
-                <div className={`text-2xl font-black ${me.aiScore > 0.7 ? "text-[#0d9488]" : me.aiScore > 0.4 ? "text-yellow-600" : "text-red-600"}`}>
+                <div className={`text-2xl font-black ${(() => {
+                  if (me.aiScore > 0.7) return "text-[#0d9488]";
+                  if (me.aiScore > 0.4) return "text-yellow-600";
+                  return "text-red-600";
+                })()}`}>
                   {Math.round(me.aiScore * 100)}%
                 </div>
               </div>

@@ -153,45 +153,8 @@ export class AiController {
     try {
       const userId = user?.id || user?.userId;
       console.log(`[AiController] analyzeUnified called | userId: ${userId}`);
-      console.log(`[AiController] Profile received:`, {
-        skinType: profile.skinType,
-        age: profile.age,
-        hasImageBase64: !!profile.imageBase64,
-        hasImagesBase64: !!profile.imagesBase64,
-        imagesCount: profile.imagesBase64?.length || 0,
-      });
 
-      if (profile.imagesBase64 && profile.imagesBase64.length > 0) {
-        console.log(`[AiController] Validating ${profile.imagesBase64.length} images...`);
-        for (let idx = 0; idx < profile.imagesBase64.length; idx++) {
-          const img = profile.imagesBase64[idx];
-          try {
-            console.log(`[AiController] Validating image ${idx + 1}...`);
-            const validation = await this.imageValidationService.validateImageBeforeAnalysis(img);
-            console.log(`[AiController] Image ${idx + 1} validation result:`, validation);
-            if (!validation.isValid) {
-              throw new Error('NOT_A_FACE');
-            }
-          } catch (imgErr: any) {
-            console.error(`[AiController] Image ${idx + 1} validation error:`, imgErr.message);
-            throw imgErr;
-          }
-        }
-      } else if (profile.imageBase64) {
-        console.log(`[AiController] Validating single image...`);
-        try {
-          const validation = await this.imageValidationService.validateImageBeforeAnalysis(profile.imageBase64);
-          console.log(`[AiController] Image validation result:`, validation);
-          if (!validation.isValid) {
-            throw new Error('NOT_A_FACE');
-          }
-        } catch (imgErr: any) {
-          console.error(`[AiController] Image validation error:`, imgErr.message);
-          throw imgErr;
-        }
-      } else {
-        console.log(`[AiController] No images provided - proceeding with form data only`);
-      }
+      await this.validateProfileImages(profile);
 
       console.log(`[AiController] Image validation passed, calling analyzeSkinWithLLM...`);
       const result = await this.aiAnalysisService.analyzeSkinWithLLM(profile, userId);
@@ -203,18 +166,27 @@ export class AiController {
       };
     } catch (error: any) {
       if (error.message && error.message.includes('NOT_A_FACE')) {
-        console.error('[AiController] NOT_A_FACE error caught');
         throw new HttpException(
           { success: false, message: "Veuillez fournir une photo d'un visage humain valide." },
           HttpStatus.BAD_REQUEST
         );
       }
-      console.error('[AiController] Error in analyzeUnified:', error.message);
-      console.error('[AiController] Full error stack:', error.stack);
       throw new HttpException(
         { success: false, error: error.message, stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined },
         HttpStatus.INTERNAL_SERVER_ERROR
       );
+    }
+  }
+
+  private async validateProfileImages(profile: UserSkinProfile): Promise<void> {
+    const images = profile.imagesBase64 || (profile.imageBase64 ? [profile.imageBase64] : []);
+    
+    for (const [idx, img] of images.entries()) {
+      console.log(`[AiController] Validating image ${idx + 1}...`);
+      const validation = await this.imageValidationService.validateImageBeforeAnalysis(img);
+      if (!validation.isValid) {
+        throw new Error('NOT_A_FACE');
+      }
     }
   }
 
@@ -466,7 +438,7 @@ export class AiController {
   @Public()
   async debugSvrRoutine() {
     try {
-      const products = await this.svrRoutineService.getDebugProducts();
+      const products = this.svrRoutineService.getDebugProducts();
 
       return {
         success: true,

@@ -87,7 +87,7 @@ export default function RegisterPage() {
 
   /* ================= REGISTER ================= */
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
 
     if (!faceDescriptor) {

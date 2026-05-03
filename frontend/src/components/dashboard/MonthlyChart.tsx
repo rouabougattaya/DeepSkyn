@@ -28,8 +28,8 @@ export const MonthlyChart: React.FC<MonthlyChartProps> = ({ data }) => {
           <div className="ml-8 h-full relative">
             {/* Grid lines */}
             <div className="absolute inset-0 flex flex-col justify-between">
-              {[0, 1, 2, 3, 4].map(i => (
-                <div key={i} className="border-b border-gray-200" />
+              {[0, 25, 50, 75, 100].map(val => (
+                <div key={`grid-y-${val}`} className="border-b border-gray-200" />
               ))}
             </div>
 
@@ -52,7 +52,7 @@ export const MonthlyChart: React.FC<MonthlyChartProps> = ({ data }) => {
                 const y = 100 - (d.averageScore / maxScore) * 100;
                 return (
                   <circle
-                    key={i}
+                    key={`point-${d.month}`}
                     cx={`${x}%`}
                     cy={`${y}%`}
                     r="4"

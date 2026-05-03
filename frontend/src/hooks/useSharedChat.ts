@@ -61,7 +61,7 @@ export interface SharedChatController {
   error: string | null;
   setInput: (value: string) => void;
   ensureSession: () => Promise<void>;
-  sendMessage: (event?: React.FormEvent | string) => Promise<void>;
+  sendMessage: (event?: React.SyntheticEvent | string) => Promise<void>;
   fetchHistory: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   startNewSession: () => Promise<void>;
@@ -213,7 +213,7 @@ export function useSharedChat(): SharedChatController {
   }, [sessionId, isInitializing, fetchHistory]);
 
   const sendMessage = useCallback(
-    async (eventOrMessage?: React.FormEvent | string) => {
+    async (eventOrMessage?: React.SyntheticEvent | string) => {
       let messageContent = '';
       if (typeof eventOrMessage === 'string') {
         messageContent = eventOrMessage;

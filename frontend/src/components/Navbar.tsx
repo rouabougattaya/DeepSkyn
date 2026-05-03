@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LogOut, Settings, LayoutDashboard, Sparkles, Globe } from "lucide-react"
+import { Menu, X, LogOut, Settings, LayoutDashboard, Sparkles } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import LanguageSwitcher from "./LanguageSwitcher"
 import { getUser, logout } from "@/lib/authSession"

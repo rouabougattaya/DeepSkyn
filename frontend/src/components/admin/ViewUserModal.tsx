@@ -12,6 +12,12 @@ interface ViewUserModalProps {
   onClose: () => void
 }
 
+const getRoleBadgeClass = (role: string) => {
+  if (role === 'admin') return 'bg-red-100 text-red-800';
+  if (role === 'moderator') return 'bg-yellow-100 text-yellow-800';
+  return 'bg-blue-100 text-blue-800';
+};
+
 export function ViewUserModal({ user, isOpen, onClose }: ViewUserModalProps) {
   if (!isOpen || !user) return null
 
@@ -49,13 +55,7 @@ export function ViewUserModal({ user, isOpen, onClose }: ViewUserModalProps) {
           <div className="space-y-3 border-y border-slate-200 py-4">
             <div className="flex justify-between">
               <span className="text-sm text-slate-600">Rôle:</span>
-              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                user.role === 'admin'
-                  ? 'bg-red-100 text-red-800'
-                  : user.role === 'moderator'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-blue-100 text-blue-800'
-              }`}>
+              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getRoleBadgeClass(user.role)}`}>
                 {user.role}
               </span>
             </div>

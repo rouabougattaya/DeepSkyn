@@ -9,7 +9,7 @@ describe('SkinProfileForm Component', () => {
     skinType: 'Normal',
     gender: 'Female',
     age: 25,
-    ethnicity: 'Type III',
+    fitzpatrickType: 'Type III',
     concerns: []
   };
 

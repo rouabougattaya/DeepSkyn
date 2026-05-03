@@ -3,11 +3,14 @@ import { OpenRouterService } from './openrouter.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export type SvrSkinType = 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
+export type SvrCategory = 'cleanser' | 'toner' | 'serum' | 'moisturizer' | 'sunscreen' | 'eye-cream' | 'mask' | 'exfoliant' | 'treatment';
+
 export interface SvrProduct {
   id: string;
   name: string;
-  category: 'cleanser' | 'toner' | 'serum' | 'moisturizer' | 'sunscreen' | 'eye-cream' | 'mask' | 'exfoliant' | 'treatment';
-  suitableSkinTypes: Array<'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal'>;
+  category: SvrCategory;
+  suitableSkinTypes: SvrSkinType[];
   suitableConcerns: string[];
   ingredients: string[];
   description: string;
@@ -440,71 +443,28 @@ export class SvrRoutineService {
 
   constructor(private readonly openRouterService: OpenRouterService) {}
 
-  /**
-   * Main entry point — filters catalog based on profile, calls LLM for
-   * personalized product recommendations + AM/PM routine
-   */
-  async generateRoutine(profile: {
-    skinType: string;
-    age: number;
-    gender?: string;
-    concerns?: string[];
-    acneLevel?: number;
-    blackheadsLevel?: number;
-    poreSize?: number;
-    wrinklesDepth?: number;
-    hydrationLevel?: number;
-    rednessLevel?: number;
-    sensitivityLevel?: number;
-    goals?: string[];
-  }): Promise<SvrRoutineResult> {
-    this.logger.log(`🧴 Generating personalized SVR recommendations + routine for ${profile.skinType} skin, age ${profile.age}`);
+  async generateRoutine(profile: any): Promise<SvrRoutineResult> {
+    this.logger.log(`🧴 Generating personalized SVR recommendations for ${profile.skinType} skin`);
 
-    // Step 1: Map sliders → concern tags
-    const derivedConcerns: string[] = [...(profile.concerns || [])];
-    if ((profile.acneLevel ?? 0) > 50) derivedConcerns.push('acne');
-    if ((profile.blackheadsLevel ?? 0) > 50) derivedConcerns.push('blackheads');
-    if ((profile.poreSize ?? 0) > 50) derivedConcerns.push('pores');
-    if ((profile.wrinklesDepth ?? 0) > 50) derivedConcerns.push('wrinkles');
-    if ((profile.hydrationLevel ?? 100) < 50) derivedConcerns.push('dryness', 'hydration');
-    if ((profile.rednessLevel ?? 0) > 50) derivedConcerns.push('redness', 'sensitivity');
-    if ((profile.sensitivityLevel ?? 0) > 60) derivedConcerns.push('sensitivity', 'irritation');
-    const uniqueConcerns = [...new Set(derivedConcerns.map(c => c.toLowerCase()))];
+    const uniqueConcerns = this.deriveConcerns(profile);
+    const catalog = this.getMergedCatalog();
+    const finalPool = this.buildPersonalizedPool(catalog, profile, uniqueConcerns);
 
-    // Step 2: Build merged catalog (static + scraped) and personalized scoring
-    const mergedCatalog = this.getMergedCatalog();
-    const finalPool = this.buildPersonalizedPool(mergedCatalog, profile, uniqueConcerns);
-
-    this.logger.log(`📦 Catalog filtered: ${finalPool.length} relevant products found`);
-
-    // Step 3: Call LLM
     try {
-      const result = await this.openRouterService.generateSVRRoutine(finalPool, {
-        ...profile,
-        concerns: uniqueConcerns,
-      });
-      return result;
+      return await this.openRouterService.generateSVRRoutine(finalPool, { ...profile, concerns: uniqueConcerns });
     } catch (error: any) {
-      this.logger.error('❌ SVR routine LLM failed, using fallback:', error.message);
+      this.logger.error('❌ LLM failed, using fallback');
       return this.buildFallbackResult(finalPool, profile.skinType);
     }
   }
 
   private buildFallbackResult(products: SvrProduct[], skinType: string): SvrRoutineResult {
-    const findByCat = (cat: SvrProduct['category']) =>
-      products.filter(p => p.category === cat).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    const findByCat = (cat: SvrCategory) => products.filter(p => p.category === cat).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-    const cleaners = findByCat('cleanser');
-    const serums = findByCat('serum');
-    const moisturizers = findByCat('moisturizer');
-    const sunscreens = findByCat('sunscreen');
-    const toners = findByCat('toner');
-
-    const cleanser = cleaners[0] || SVR_CATALOG.find(p => p.category === 'cleanser')!;
-    const serum1 = serums[0] || SVR_CATALOG.find(p => p.category === 'serum')!;
-    const serum2 = serums[1];
-    const moisturizer = moisturizers[0] || SVR_CATALOG.find(p => p.category === 'moisturizer')!;
-    const sunscreen = sunscreens[0] || SVR_CATALOG.find(p => p.category === 'sunscreen')!;
+    const [cleanser] = findByCat('cleanser');
+    const [serum1] = findByCat('serum');
+    const [moisturizer] = findByCat('moisturizer');
+    const [sunscreen] = findByCat('sunscreen');
 
     const toRecommended = (p: SvrProduct, reason: string): SvrRecommendedProduct => ({
       name: p.name,
@@ -523,121 +483,69 @@ export class SvrRoutineService {
     const toStep = (order: number, stepName: string, p: SvrProduct, instruction: string, reason: string): SvrRoutineStep => ({
       stepOrder: order,
       stepName,
-      product: {
-        name: p.name,
-        category: p.category,
-        description: p.description,
-        price: p.price,
-        url: p.url,
-        imageUrl: p.imageUrl,
-        keyIngredients: p.ingredients
-      },
+      product: { name: p.name, category: p.category, description: p.description, price: p.price, url: p.url, imageUrl: p.imageUrl, keyIngredients: p.ingredients },
       instruction,
       reason,
     });
 
-    const recommended: SvrRecommendedProduct[] = [
-      toRecommended(cleanser, `Nettoyant idéal pour peau ${skinType}.`),
-      toRecommended(serum1, 'Sérum concentré ciblant vos préoccupations principales.'),
-      toRecommended(moisturizer, 'Hydratant adapté à votre type de peau.'),
-      toRecommended(sunscreen, 'Protection solaire indispensable au quotidien.'),
-    ];
-    if (serum2) recommended.push(toRecommended(serum2, 'Sérum complémentaire pour booster les résultats.'));
-    if (toners[0]) recommended.push(toRecommended(toners[0], "Lotion préparatrice qui optimise l'absorption des soins suivants."));
-
     return {
-      recommendedProducts: recommended,
+      recommendedProducts: [cleanser, serum1, moisturizer, sunscreen].filter(Boolean).map(p => toRecommended(p!, 'Adapté')),
       morning: [
-        toStep(1, 'Nettoyage', cleanser, "Appliquer sur peau humide, masser 30s, rincer à l'eau tiède.", `Commence la journée avec une base propre, essentiel pour peau ${skinType}.`),
-        toStep(2, 'Sérum', serum1, 'Appliquer 3-4 gouttes sur peau sèche. Presser délicatement.', 'Les actifs concentrés ciblent vos problèmes en profondeur.'),
-        toStep(3, 'Hydratant', moisturizer, "Appliquer une noisette uniformément sur visage et cou.", "Scelle l'hydratation et prépare la peau pour la journée."),
-        toStep(4, 'Protection SPF', sunscreen, "Appliquer généreusement en dernier geste. Renouveler toutes les 2h.", "Le SPF est non-négociable pour prévenir le vieillissement prématuré."),
+        toStep(1, 'Nettoyage', cleanser!, "Appliquer sur peau humide.", 'Nettoyage doux.'),
+        toStep(2, 'Sérum', serum1!, 'Appliquer 3 gouttes.', 'Traitement.'),
+        toStep(3, 'Hydratant', moisturizer!, "Appliquer.", 'Hydratation.'),
+        toStep(4, 'SPF', sunscreen!, "Appliquer.", 'Protection.'),
       ],
       night: [
-        toStep(1, 'Nettoyage', cleanser, 'Double-nettoyage si maquillage. Masser 60s pour éliminer pollution et résidus.', 'Le soin de nuit commence par une peau parfaitement propre.'),
-        toStep(2, 'Sérum', serum1, 'Appliquer le sérum sur peau propre et sèche. Laisser pénétrer 2 minutes.', 'La nuit, la peau est en mode réparation — les actifs pénètrent plus profondément.'),
-        toStep(3, 'Hydratant', moisturizer, 'Appliquer une couche légèrement plus généreuse pour la nuit.', 'La crème nuit travaille avec le cycle naturel de renouvellement cutané.'),
+        toStep(1, 'Nettoyage', cleanser!, 'Appliquer.', 'Nettoyage.'),
+        toStep(2, 'Sérum', serum1!, 'Appliquer.', 'Traitement.'),
+        toStep(3, 'Hydratant', moisturizer!, 'Appliquer.', 'Hydratation.'),
       ],
-      skinProfile: `Peau ${skinType} — routine personnalisée`,
-      generalAdvice: 'La régularité est clé. Introduisez un produit à la fois si vous avez la peau sensible. Résultats visibles en 4 à 6 semaines.',
+      skinProfile: `Peau ${skinType}`,
+      generalAdvice: 'La régularité est clé.',
     };
   }
 
   private getMergedCatalog(): SvrProduct[] {
     const scraped = this.getScrapedCatalog();
     const merged = new Map<string, SvrProduct>();
-
-    const addOrReplace = (product: SvrProduct) => {
-      const key = product.name.trim().toLowerCase();
-      const existing = merged.get(key);
-      if (!existing || (product.score ?? 0) > (existing.score ?? 0)) {
-        merged.set(key, product);
-      }
-    };
-
-    for (const p of SVR_CATALOG) addOrReplace(p);
-    for (const p of scraped) addOrReplace(p);
-
+    [...SVR_CATALOG, ...scraped].forEach(p => {
+      const key = p.name.trim().toLowerCase();
+      if (!merged.has(key) || (p.score ?? 0) > (merged.get(key)!.score ?? 0)) merged.set(key, p);
+    });
     return Array.from(merged.values());
   }
 
   private getScrapedCatalog(): SvrProduct[] {
-    if (this.scrapedCatalogCache) {
-      return this.scrapedCatalogCache;
-    }
-
+    if (this.scrapedCatalogCache) return this.scrapedCatalogCache;
     try {
       const jsonPath = path.join(process.cwd(), 'data', 'svr_products.json');
-      if (!fs.existsSync(jsonPath)) {
-        this.scrapedCatalogCache = [];
-        return this.scrapedCatalogCache;
-      }
-
-      const raw = fs.readFileSync(jsonPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        this.scrapedCatalogCache = [];
-        return this.scrapedCatalogCache;
-      }
-
-      this.scrapedCatalogCache = parsed
-        .map((item: any, idx: number) => this.mapScrapedToSvrProduct(item, idx))
-        .filter((p: SvrProduct | null): p is SvrProduct => !!p);
-      this.logger.log(`🕸️ Loaded ${this.scrapedCatalogCache.length} SVR products from scraping dataset`);
+      if (!fs.existsSync(jsonPath)) return [];
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      this.scrapedCatalogCache = Array.isArray(data) ? data.map((item, idx) => this.mapScrapedToSvrProduct(item, idx)).filter(Boolean) as SvrProduct[] : [];
       return this.scrapedCatalogCache;
-    } catch (error: any) {
-      this.logger.warn(`Could not load scraped SVR catalog: ${error.message}`);
-      this.scrapedCatalogCache = [];
-      return this.scrapedCatalogCache;
-    }
+    } catch { return []; }
   }
 
   private mapScrapedToSvrProduct(item: any, idx: number): SvrProduct | null {
-    const name = String(item?.name ?? '').trim();
-    const description = String(item?.description ?? '').trim();
-    const url = String(item?.url ?? '').trim();
-    if (!name || !url) return null;
-
-    const normalizedConcerns = this.normalizeScrapedConcerns(item?.target_concerns);
-    const category = this.inferCategoryFromText(`${name} ${description}`);
-    const skinTypes = this.inferSkinTypesFromText(`${name} ${description} ${normalizedConcerns.join(' ')}`);
-
+    if (!item?.name || !item?.url) return null;
     return {
       id: `svr-scraped-${idx + 1}`,
-      name,
-      category,
-      suitableSkinTypes: skinTypes,
-      suitableConcerns: normalizedConcerns.length ? normalizedConcerns : ['hydration'],
+      name: item.name.trim(),
+      category: this.inferCategoryFromText(`${item.name} ${item.description}`),
+      suitableSkinTypes: this.inferSkinTypesFromText(`${item.name} ${item.description}`),
+      suitableConcerns: this.normalizeScrapedConcerns(item.target_concerns),
       ingredients: [],
-      description: description || 'Produit SVR issu du catalogue officiel.',
+      description: item.description || 'Produit SVR',
       price: 15.0,
-      url,
-      imageUrl: String(item?.image ?? '').trim(),
-      ageGroup: this.inferAgeGroupFromText(`${name} ${description}`),
-      texture: this.inferTextureFromText(`${name} ${description}`),
+      url: item.url.trim(),
+      imageUrl: item.image,
+      ageGroup: this.inferAgeGroupFromText(`${item.name} ${item.description}`),
+      texture: this.inferTextureFromText(`${item.name} ${item.description}`),
       score: 7.8,
     };
   }
+
 
   private normalizeScrapedConcerns(input: unknown): string[] {
     const map: Record<string, string[]> = {
@@ -680,6 +588,18 @@ export class SvrRoutineService {
     return 'treatment';
   }
 
+  private deriveConcerns(profile: any): string[] {
+    const derivedConcerns: string[] = [...(profile.concerns || [])];
+    if ((profile.acneLevel ?? 0) > 50) derivedConcerns.push('acne');
+    if ((profile.blackheadsLevel ?? 0) > 50) derivedConcerns.push('blackheads');
+    if ((profile.poreSize ?? 0) > 50) derivedConcerns.push('pores');
+    if ((profile.wrinklesDepth ?? 0) > 50) derivedConcerns.push('wrinkles');
+    if ((profile.hydrationLevel ?? 100) < 50) derivedConcerns.push('dryness', 'hydration');
+    if ((profile.rednessLevel ?? 0) > 50) derivedConcerns.push('redness', 'sensitivity');
+    if ((profile.sensitivityLevel ?? 0) > 60) derivedConcerns.push('sensitivity', 'irritation');
+    return [...new Set(derivedConcerns.map(c => c.toLowerCase()))];
+  }
+
   private inferSkinTypesFromText(text: string): Array<'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal'> {
     const t = text.toLowerCase();
     const types = new Set<'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal'>();
@@ -720,84 +640,82 @@ export class SvrRoutineService {
 
   private buildPersonalizedPool(
     catalog: SvrProduct[],
-    profile: {
-      skinType: string;
-      age: number;
-      concerns?: string[];
-      acneLevel?: number;
-      blackheadsLevel?: number;
-      poreSize?: number;
-      wrinklesDepth?: number;
-      hydrationLevel?: number;
-      rednessLevel?: number;
-      sensitivityLevel?: number;
-    },
+    profile: any,
     uniqueConcerns: string[],
   ): SvrProduct[] {
-    const concernBoosts: Record<string, number> = {};
-    if ((profile.acneLevel ?? 0) > 50) concernBoosts.acne = 2;
-    if ((profile.blackheadsLevel ?? 0) > 50) concernBoosts.blackheads = 1.5;
-    if ((profile.poreSize ?? 0) > 50) concernBoosts.pores = 1.5;
-    if ((profile.wrinklesDepth ?? 0) > 50) concernBoosts.wrinkles = 2;
+    const concernBoosts = this.getConcernBoosts(profile);
+    const scored = this.scoreCatalog(catalog, profile, uniqueConcerns, concernBoosts);
+    
+    return this.selectProductsFromScored(scored);
+  }
+
+  private getConcernBoosts(profile: any): Record<string, number> {
+    const boosts: Record<string, number> = {};
+    if ((profile.acneLevel ?? 0) > 50) boosts.acne = 2;
+    if ((profile.blackheadsLevel ?? 0) > 50) boosts.blackheads = 1.5;
+    if ((profile.poreSize ?? 0) > 50) boosts.pores = 1.5;
+    if ((profile.wrinklesDepth ?? 0) > 50) boosts.wrinkles = 2;
     if ((profile.hydrationLevel ?? 100) < 50) {
-      concernBoosts.hydration = 2;
-      concernBoosts.dryness = 2;
+      boosts.hydration = 2;
+      boosts.dryness = 2;
     }
     if ((profile.rednessLevel ?? 0) > 50 || (profile.sensitivityLevel ?? 0) > 60) {
-      concernBoosts.redness = 2;
-      concernBoosts.sensitivity = 2;
-      concernBoosts.irritation = 1.5;
+      boosts.redness = 2;
+      boosts.sensitivity = 2;
+      boosts.irritation = 1.5;
     }
+    return boosts;
+  }
 
-    const scored = catalog
-      .filter((product) => {
-        const ageMatch =
-          !product.ageGroup ||
-          product.ageGroup === 'all' ||
-          (product.ageGroup === 'mature' && profile.age >= 40) ||
-          (product.ageGroup === 'young' && profile.age < 40);
-        return ageMatch;
-      })
-      .map((product) => {
-        const skinMatch = product.suitableSkinTypes.includes(profile.skinType as any) ? 3 : 0;
-        const concerns = product.suitableConcerns.map((c) => c.toLowerCase());
+  private scoreCatalog(catalog: SvrProduct[], profile: any, uniqueConcerns: string[], concernBoosts: Record<string, number>) {
+    return catalog
+      .filter((p) => this.isAgeAppropriate(p, profile.age))
+      .map((p) => {
+        const skinMatch = p.suitableSkinTypes.includes(profile.skinType as any) ? 3 : 0;
+        const concerns = p.suitableConcerns.map((c) => c.toLowerCase());
         const overlap = concerns.filter((c) => uniqueConcerns.includes(c)).length;
         const overlapScore = overlap * 2;
         const boosted = concerns.reduce((sum, c) => sum + (concernBoosts[c] ?? 0), 0);
-        const base = product.score ?? 7;
+        const base = p.score ?? 7;
         const finalScore = base + skinMatch + overlapScore + boosted;
-        return { product, finalScore };
+        return { product: p, finalScore };
       })
       .sort((a, b) => b.finalScore - a.finalScore);
+  }
 
-    const mustHave: Array<SvrProduct['category']> = ['cleanser', 'serum', 'moisturizer', 'sunscreen'];
+  private isAgeAppropriate(product: SvrProduct, age: number): boolean {
+    if (!product.ageGroup || product.ageGroup === 'all') return true;
+    return (product.ageGroup === 'mature' && age >= 40) || (product.ageGroup === 'young' && age < 40);
+  }
+
+  private selectProductsFromScored(scored: Array<{ product: SvrProduct; finalScore: number }>): SvrProduct[] {
     const selected: SvrProduct[] = [];
     const used = new Set<string>();
+    const perCategoryCount = new Map<string, number>();
+
+    const mustHave: SvrCategory[] = ['cleanser', 'serum', 'moisturizer', 'sunscreen'];
 
     for (const cat of mustHave) {
       const candidate = scored.find((s) => s.product.category === cat && !used.has(s.product.name));
       if (candidate) {
-        selected.push(candidate.product);
-        used.add(candidate.product.name);
+        this.addProductToSelection(candidate.product, selected, used, perCategoryCount);
       }
-    }
-
-    const perCategoryCount = new Map<string, number>();
-    for (const p of selected) {
-      perCategoryCount.set(p.category, (perCategoryCount.get(p.category) ?? 0) + 1);
     }
 
     for (const entry of scored) {
       if (selected.length >= 18) break;
       const p = entry.product;
-      if (used.has(p.name)) continue;
-      const count = perCategoryCount.get(p.category) ?? 0;
-      if (count >= 3) continue;
-      selected.push(p);
-      used.add(p.name);
-      perCategoryCount.set(p.category, count + 1);
+      if (used.has(p.name) || (perCategoryCount.get(p.category) ?? 0) >= 3) continue;
+      this.addProductToSelection(p, selected, used, perCategoryCount);
     }
 
-    return selected.length >= 8 ? selected : scored.slice(0, Math.min(18, scored.length)).map((s) => s.product);
+    return selected;
   }
+
+  private addProductToSelection(p: SvrProduct, selected: SvrProduct[], used: Set<string>, perCategoryCount: Map<string, number>) {
+    selected.push(p);
+    used.add(p.name);
+    perCategoryCount.set(p.category, (perCategoryCount.get(p.category) ?? 0) + 1);
+  }
+
 }

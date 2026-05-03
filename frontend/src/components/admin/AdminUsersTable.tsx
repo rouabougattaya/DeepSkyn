@@ -29,6 +29,20 @@ const ROLES: { value: UserRole; label: string; color: string }[] = [
   { value: 'user', label: 'Utilisateur', color: 'bg-blue-100 text-blue-800' },
 ]
 
+function PlanBadge({ user }: { user: AdminUser }) {
+  const plan = (user as any).plan || 'FREE';
+  const planColors: Record<string, string> = {
+    FREE: 'bg-slate-100 text-slate-600',
+    PRO: 'bg-teal-100 text-teal-700',
+    PREMIUM: 'bg-purple-100 text-purple-700',
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${planColors[plan] || planColors.FREE}`}>
+      {plan}
+    </span>
+  );
+}
+
 export function AdminUsersTable({
   users,
   isLoading,
@@ -43,7 +57,7 @@ export function AdminUsersTable({
   onRefresh,
 }: AdminUsersTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedRole, setSelectedRole] = useState<UserRole | undefined>(undefined)
+  const [selectedRole, setSelectedRole] = useState<UserRole>()
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
   /** Gère la recherche avec debounce */
@@ -91,7 +105,7 @@ export function AdminUsersTable({
           <Button
             variant={selectedRole ? 'default' : 'outline'}
             size="sm"
-            onClick={() => handleRoleFilter(undefined)}
+            onClick={() => handleRoleFilter()}
             className={selectedRole ? '' : 'bg-slate-100'}
           >
             Tous ({users.length})
@@ -184,19 +198,7 @@ export function AdminUsersTable({
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {(() => {
-                          const plan = (user as any).plan || 'FREE';
-                          const planColors: Record<string, string> = {
-                            FREE: 'bg-slate-100 text-slate-600',
-                            PRO: 'bg-teal-100 text-teal-700',
-                            PREMIUM: 'bg-purple-100 text-purple-700',
-                          };
-                          return (
-                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${planColors[plan] || planColors.FREE}`}>
-                              {plan}
-                            </span>
-                          );
-                        })()}
+                        <PlanBadge user={user} />
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {formatDate(user.createdAt)}
@@ -267,15 +269,7 @@ export function AdminUsersTable({
                   <div className="mt-3 ml-13 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Plan:</span>
-                      {(() => {
-                        const plan = (user as any).plan || 'FREE';
-                        const planColors: Record<string, string> = {
-                          FREE: 'bg-slate-100 text-slate-600',
-                          PRO: 'bg-teal-100 text-teal-700',
-                          PREMIUM: 'bg-purple-100 text-purple-700',
-                        };
-                        return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-bold ${planColors[plan] || planColors.FREE}`}>{plan}</span>;
-                      })()}
+                      <PlanBadge user={user} />
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Rôle:</span>

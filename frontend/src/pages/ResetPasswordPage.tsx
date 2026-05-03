@@ -21,12 +21,12 @@ export default function ResetPasswordPage() {
         let s = 0
         if (password.length >= 8) s++
         if (/[A-Z]/.test(password)) s++
-        if (/[0-9]/.test(password)) s++
+        if (/\d/.test(password)) s++
         if (/[^A-Za-z0-9]/.test(password)) s++
         setStrength(s)
     }, [password])
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault()
         if (password !== confirmPassword) {
             setError("Passwords do not match")

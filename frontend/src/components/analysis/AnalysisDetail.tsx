@@ -11,6 +11,12 @@ interface AnalysisDetailProps {
   analysisId: string;
 }
 
+const getScoreLabel = (score: number) => {
+  if (score >= 70) return 'Excellent';
+  if (score >= 50) return 'Moyen';
+  return 'À améliorer';
+};
+
 export const AnalysisDetail: React.FC<AnalysisDetailProps> = ({ analysisId }) => {
   const [analysis, setAnalysis] = useState<SkinAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +59,12 @@ export const AnalysisDetail: React.FC<AnalysisDetailProps> = ({ analysisId }) =>
   }
 
   const score = analysis.skinScore || 0;
-  const scoreColor = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const getScoreColor = (s: number) => {
+    if (s >= 70) return '#10b981';
+    if (s >= 50) return '#f59e0b';
+    return '#ef4444';
+  };
+  const scoreColor = getScoreColor(score);
 
   return (
     <div style={{ padding: 24 }}>
@@ -73,7 +84,7 @@ export const AnalysisDetail: React.FC<AnalysisDetailProps> = ({ analysisId }) =>
         <div style={{ fontSize: 48, fontWeight: 800, color: scoreColor }}>{score}</div>
         <div style={{ fontSize: 14, color: '#6b7280' }}>/ 100</div>
         <div style={{ fontSize: 13, color: scoreColor, fontWeight: 600, marginTop: 4 }}>
-          {score >= 70 ? 'Excellent' : score >= 50 ? 'Moyen' : 'À améliorer'}
+          {getScoreLabel(score)}
         </div>
       </div>
 

@@ -436,7 +436,7 @@ export default function UpgradePage() {
               </div>
 
               {/* Features */}
-              <div className={`flex-1 px-6 pb-6 border-t ${c.bg === 'bg-white' ? 'border-slate-100' : 'border-slate-100'} pt-4 space-y-2`}>
+              <div className="flex-1 px-6 pb-6 border-t border-slate-100 pt-4 space-y-2">
                 {plan.features.map(f => (
                   <div key={f} className="flex items-start gap-2 text-sm text-slate-700">
                     <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${c.text}`} />

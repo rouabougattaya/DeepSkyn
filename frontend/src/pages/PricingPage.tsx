@@ -229,11 +229,7 @@ export default function PricingPage() {
                     {/* CTA */}
                     <div className="px-6 pt-5">
                       <button
-                        onClick={() =>
-                          plan.price === 0
-                            ? navigate('/auth/register')
-                            : navigate('/auth/register')
-                        }
+                        onClick={() => navigate('/auth/register')}
                         className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 hover:shadow-lg active:scale-95 ${v.btn}`}
                       >
                         {plan.price === 0 ? 'Get started for free' : `Get ${plan.name}`}

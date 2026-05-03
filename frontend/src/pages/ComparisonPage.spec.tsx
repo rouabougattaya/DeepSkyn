@@ -147,8 +147,8 @@ describe('ComparisonPage', () => {
         fireEvent.change(selects[1], { target: { value: '2' } });
     });
 
-    expect(selects[0].value).toBe('1');
-    expect(selects[1].value).toBe('2');
+    expect((selects[0] as HTMLSelectElement).value).toBe('1');
+    expect((selects[1] as HTMLSelectElement).value).toBe('2');
 
     const mockCompareResult = {
         summaryText: 'Manual compare result.',

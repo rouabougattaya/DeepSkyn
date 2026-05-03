@@ -256,6 +256,7 @@ function ConditionBar({ condition, onSelect }: { condition: ConditionScore; onSe
     return (
         <div
             className="skin-condition-bar"
+            data-testid={`condition-bar-${condition.type}`}
             role="button"
             tabIndex={0}
             onClick={() => onSelect?.(condition)}
@@ -364,7 +365,9 @@ function ConditionDetailDrawer({ condition, result, profile, onClose }: Conditio
         label: condition.type,
         icon: Info,
         color: '#6b7280',
-        gradient: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)',
+        bg: 'rgba(107,114,128,0.08)',
+        border: 'rgba(107,114,128,0.2)',
+        gradient: '',
         description: t('analysis.no_description_available')
     };
     const baseDetails = CONDITION_DETAILS[condition.type] || {

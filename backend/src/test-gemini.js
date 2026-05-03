@@ -1,4 +1,4 @@
-const apiKey = "AIzaSyBneYSyhP9K3kX5PMMuXnr5eY-a8JbvItY";
+const apiKey = process.env.GOOGLE_GENAI_API_KEY;
 const modelName = "gemini-2.0-flash";
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 

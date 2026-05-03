@@ -11,7 +11,6 @@ import {
   DigitalTwinResponseDto, 
   DigitalTwinTimelineDto,
   MonthPrediction,
-  PredictionMetrics
 } from './digital-twin.dto';
 
 @Injectable()

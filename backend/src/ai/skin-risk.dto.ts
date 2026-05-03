@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsString, IsObject, ValidateNested } from 'class-validator';
+import { IsOptional, IsNumber, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class EnvironmentDto {

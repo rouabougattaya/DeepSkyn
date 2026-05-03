@@ -56,21 +56,47 @@ export class IncompatibilityService {
 
   private checkPairConflict(p1: any, p2: any) {
     const solution = "Utiliser l'un le matin et l'autre le soir, ou alterner un jour sur deux.";
-    let problem: string | null = null;
-
-    if ((p1.hasRetinol && p2.hasAHA) || (p1.hasAHA && p2.hasRetinol)) {
-      problem = "Rétinol + AHA (risque élevé d'irritation et d'exfoliation excessive)";
-    } else if ((p1.hasRetinol && p2.hasBHA) || (p1.hasBHA && p2.hasRetinol)) {
-      problem = "Rétinol + BHA (assèchement et irritation de la peau)";
-    } else if ((p1.hasRetinol && p2.hasVitC) || (p1.hasVitC && p2.hasRetinol)) {
-      problem = "Rétinol + Vitamine C (différence de pH, risque d'irritation redoublé)";
-    } else if ((p1.hasVitC && p2.hasAHA) || (p1.hasAHA && p2.hasVitC)) {
-      problem = "Vitamine C + AHA (déstabilise la vitamine C et irrite la peau)";
-    } else if ((p1.hasBP && p2.hasRetinol) || (p1.hasRetinol && p2.hasBP)) {
-      problem = "Benzoyl Peroxide + Rétinol (s'annulent mutuellement et assèchent fortement la peau)";
-    }
-
+    const problem = this.identifyConflictProblem(p1, p2);
     return problem ? { prod1: p1.name, prod2: p2.name, problem, solution } : null;
+  }
+
+  private identifyConflictProblem(p1: any, p2: any): string | null {
+    if (this.hasRetinolAHAConflict(p1, p2)) {
+      return "Rétinol + AHA (risque élevé d'irritation et d'exfoliation excessive)";
+    }
+    if (this.hasRetinolBHAConflict(p1, p2)) {
+      return "Rétinol + BHA (assèchement et irritation de la peau)";
+    }
+    if (this.hasRetinolVitCConflict(p1, p2)) {
+      return "Rétinol + Vitamine C (différence de pH, risque d'irritation redoublé)";
+    }
+    if (this.hasVitCAHAConflict(p1, p2)) {
+      return "Vitamine C + AHA (déstabilise la vitamine C et irrite la peau)";
+    }
+    if (this.hasBPConflict(p1, p2)) {
+      return "Benzoyl Peroxide + Rétinol (s'annulent mutuellement et assèchent fortement la peau)";
+    }
+    return null;
+  }
+
+  private hasRetinolAHAConflict(p1: any, p2: any): boolean {
+    return (p1.hasRetinol && p2.hasAHA) || (p1.hasAHA && p2.hasRetinol);
+  }
+
+  private hasRetinolBHAConflict(p1: any, p2: any): boolean {
+    return (p1.hasRetinol && p2.hasBHA) || (p1.hasBHA && p2.hasRetinol);
+  }
+
+  private hasRetinolVitCConflict(p1: any, p2: any): boolean {
+    return (p1.hasRetinol && p2.hasVitC) || (p1.hasVitC && p2.hasRetinol);
+  }
+
+  private hasVitCAHAConflict(p1: any, p2: any): boolean {
+    return (p1.hasVitC && p2.hasAHA) || (p1.hasAHA && p2.hasVitC);
+  }
+
+  private hasBPConflict(p1: any, p2: any): boolean {
+    return (p1.hasBP && p2.hasRetinol) || (p1.hasRetinol && p2.hasBP);
   }
 
   private formatConflictMessage(conflicts: any[]): string {

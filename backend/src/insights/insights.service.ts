@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SkinMetricService } from '../skinMetric/skin-metric.service';
-import { SkinAnalysis } from '../skinAnalysis/skin-analysis.entity';
 
 export interface Insight {
     type: 'stagnation' | 'improvement' | 'fluctuation' | 'info';

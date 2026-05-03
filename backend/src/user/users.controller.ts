@@ -1,7 +1,6 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards, Body, Patch, Delete } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
-import { Body, Patch, Delete  } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';

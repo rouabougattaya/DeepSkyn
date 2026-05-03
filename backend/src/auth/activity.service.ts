@@ -66,14 +66,14 @@ export class ActivityService {
             ActivityType.SENSITIVE_ACTION,
         ];
 
-        if (highRiskTypes.includes(activity.type!)) {
+        if (activity.type && highRiskTypes.includes(activity.type)) {
             return {
                 riskLevel: 'high',
                 explanation: `${activity.type} is a high-risk security event.`,
                 recommendedAction: 'notify',
             };
         }
-        if (mediumRiskTypes.includes(activity.type!)) {
+        if (activity.type && mediumRiskTypes.includes(activity.type)) {
             return {
                 riskLevel: 'medium',
                 explanation: `${activity.type} requires attention.`,

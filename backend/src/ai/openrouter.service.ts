@@ -40,19 +40,31 @@ export class OpenRouterService {
      * Analyse de peau via OpenRouter (The Unified Interface for LLMs)
      */
     async analyzeSkin(profile: UserSkinProfile, plan: string = 'FREE'): Promise<GlobalScoreResult> {
+        this.validateApiKey();
+        this.logger.log(`📡 Appel OpenRouter pour: ${profile.skinType}, ${profile.age} ans`);
+
+        const model = 'google/gemini-2.0-flash-001';
+        const prompt = this.buildAnalyzeSkinPrompt(profile, plan);
+        const content = this.buildAnalyzeSkinContent(prompt, profile);
+
+        try {
+            const response = await this.executeChatCompletion(model, [{ role: 'user', content }]);
+            return this.parseAnalyzeSkinResponse(response);
+        } catch (error) {
+            this.logger.error('❌ Erreur OpenRouter:', error.message);
+            throw error;
+        }
+    }
+
+    private validateApiKey() {
         if (!this.apiKey) {
             this.logger.error('❌ OPENROUTER_API_KEY manquante');
             throw new Error('AI analysis unavailable - Missing API Key');
         }
+    }
 
-        try {
-            this.logger.log(`📡 Appel OpenRouter pour: ${profile.skinType}, ${profile.age} ans`);
-
-            // On utilise gemini-2.0-flash-lite par défaut via OpenRouter
-            // On utilise gemini-2.0-flash-001 pour un compromis idéal vitesse/intelligence
-            const model = 'google/gemini-2.0-flash-001';
-
-            const prompt = `
+    private buildAnalyzeSkinPrompt(profile: UserSkinProfile, plan: string): string {
+        return `
                 Tu es un expert dermatologue de classe mondiale. Tu vas réaliser une analyse pour DeepSkyn en DEUX ÉTAPES SÉPARÉES ET CLAIRES.
 
                 ═══════════════════════════════════════════════════════════════════
@@ -104,7 +116,7 @@ export class OpenRouterService {
                 ═══════════════════════════════════════════════════════════════════
 
                 - Type de peau influence la cohérence : Oily -> attendre pores/points noirs élevés | Dry -> attendre hydration basse
-                - Âge ${profile.age} : ${profile.age < 25 ? 'peut avoir acné, ridules légères' : profile.age < 45 ? 'équilibre acne/rides/taches' : 'rides/taches probables, hydration clé'}
+                - Âge ${profile.age} : ${this.getAgeSpecificAdvice(profile.age)}
                 - Hydration et Wrinkles INVERSEMENT corrélés : peau sèche = plus de rides
                 - PONDÉRATION : Auto-évaluation ~60%, visuel ~40% (quand les deux existent)
 
@@ -146,96 +158,75 @@ export class OpenRouterService {
                 - Pas d'analyse pour une condition non visible ET non mentionnée
                 - Si incertitude, marquer evaluated=false plutôt que de forcer une note
             `;
+    }
 
-            const content: any[] = [{ type: 'text', text: prompt }];
+    private getAgeSpecificAdvice(age: number): string {
+        if (age < 25) return 'peut avoir acné, ridules légères';
+        if (age < 45) return 'équilibre acne/rides/taches';
+        return 'rides/taches probables, hydration clé';
+    }
 
-            // Add all images to the content
-            const images = profile.imagesBase64 || (profile.imageBase64 ? [profile.imageBase64] : []);
+    private buildAnalyzeSkinContent(prompt: string, profile: UserSkinProfile): any[] {
+        const content: any[] = [{ type: 'text', text: prompt }];
+        const images = profile.imagesBase64 || (profile.imageBase64 ? [profile.imageBase64] : []);
 
-            for (const imgBase64 of images) {
-                const base64Data = imgBase64.includes('base64,')
-                    ? imgBase64.split('base64,')[1]
-                    : imgBase64;
-
-                content.push({
-                    type: 'image_url',
-                    image_url: {
-                        url: `data:image/jpeg;base64,${base64Data}`
-                    }
-                });
-            }
-
-            console.log(`[OpenRouterService] Calling model: ${model} with content text length: ${content[0].text.length} | Images: ${images.length}`);
-
-            let response;
-            try {
-                response = await axios.post(
-                    `${this.baseUrl}/chat/completions`,
-                    {
-                        model: model,
-                        messages: [{ role: 'user', content: content }],
-                        response_format: { type: 'json_object' },
-                        max_tokens: 1000 // Réduit de 2000 à 1000 pour éviter l'erreur 402 (crédits insuffisants)
-                    },
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${this.apiKey}`,
-                            'HTTP-Referer': 'https://deepskyn.app', // Obligatoire pour OpenRouter
-                            'X-Title': 'DeepSkyn AI',
-                        },
-                        timeout: 120000 // 2 minutes timeout
-                    }
-                );
-            } catch (axiosErr: any) {
-                const statusCode = axiosErr.response?.status;
-                const errorData = axiosErr.response?.data;
-                const errorMessage = errorData?.error?.message || errorData?.error || axiosErr.message;
-
-                console.error(`[OpenRouterService] API Error (${statusCode}):`, errorMessage);
-                console.error('[OpenRouterService] Full error response:', JSON.stringify(errorData, null, 2));
-
-                // Provide helpful diagnostic message
-                if (statusCode === 401) {
-                    throw new Error('OpenRouter authentification failed - Check OPENROUTER_API_KEY');
-                } else if (statusCode === 429) {
-                    throw new Error('OpenRouter rate limit exceeded - Please try again later');
-                } else if (statusCode === 400) {
-                    throw new Error(`OpenRouter bad request: ${errorMessage}`);
-                } else if (statusCode === 503) {
-                    throw new Error('OpenRouter service temporarily unavailable');
-                }
-
-                throw new Error(`OpenRouter API error (${statusCode}): ${errorMessage}`);
-            }
-
-            console.log('[OpenRouterService] Response status:', response.status);
-
-            if (!response.data?.choices?.[0]?.message?.content) {
-                console.error('[OpenRouterService] Unexpected response structure:', JSON.stringify(response.data, null, 2));
-                throw new Error('OpenRouter returned invalid response structure');
-            }
-
-            const text = response.data.choices[0].message.content;
-            console.log('[OpenRouterService] Response content length:', text.length);
-
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                if (parsed.error === 'NOT_A_FACE') {
-                    throw new Error('NOT_A_FACE');
-                }
-                return parsed as GlobalScoreResult;
-            }
-
-            console.error('[OpenRouterService] No JSON found in response:', text.substring(0, 500));
-            throw new Error('Failed to parse OpenRouter response - No JSON found');
-
-        } catch (error: any) {
-            const errorMsg = error.message || String(error);
-            this.logger.error('❌ Erreur OpenRouter:', errorMsg);
-            throw error; // Re-throw with original error for better details
+        for (const imgBase64 of images) {
+            const base64Data = imgBase64.includes('base64,') ? imgBase64.split('base64,')[1] : imgBase64;
+            content.push({
+                type: 'image_url',
+                image_url: { url: `data:image/jpeg;base64,${base64Data}` }
+            });
         }
+        return content;
+    }
+
+    private async executeChatCompletion(model: string, messages: any[]): Promise<any> {
+        try {
+            return await axios.post(
+                `${this.baseUrl}/chat/completions`,
+                {
+                    model,
+                    messages,
+                    response_format: { type: 'json_object' },
+                    max_tokens: 1000
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'HTTP-Referer': 'https://deepskyn.app',
+                        'X-Title': 'DeepSkyn AI',
+                    },
+                    timeout: 120000
+                }
+            );
+        } catch (axiosErr: any) {
+            this.handleAxiosError(axiosErr);
+        }
+    }
+
+    private handleAxiosError(axiosErr: any) {
+        const statusCode = axiosErr.response?.status;
+        const errorData = axiosErr.response?.data;
+        const errorMessage = errorData?.error?.message || errorData?.error || axiosErr.message;
+
+        console.error(`[OpenRouterService] API Error (${statusCode}):`, errorMessage);
+        if (statusCode === 401) throw new Error('OpenRouter authentification failed - Check OPENROUTER_API_KEY');
+        if (statusCode === 429) throw new Error('OpenRouter rate limit exceeded - Please try again later');
+        if (statusCode === 400) throw new Error(`OpenRouter bad request: ${errorMessage}`);
+        if (statusCode === 503) throw new Error('OpenRouter service temporarily unavailable');
+        throw new Error(`OpenRouter API error (${statusCode}): ${errorMessage}`);
+    }
+
+    private parseAnalyzeSkinResponse(response: any): GlobalScoreResult {
+        const text = response.data?.choices?.[0]?.message?.content;
+        if (!text) throw new Error('OpenRouter returned invalid response structure');
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Failed to parse OpenRouter response - No JSON found');
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.error === 'NOT_A_FACE') throw new Error('NOT_A_FACE');
+        return parsed as GlobalScoreResult;
     }
 
     /**
@@ -508,17 +499,31 @@ Retourne UNIQUEMENT ce JSON:
      * Generate personalized SVR product recommendations + AM/PM routine via LLM
      */
     async generateSVRRoutine(products: any[], profile: any): Promise<any> {
-        if (!this.apiKey) {
-            throw new Error('AI analysis unavailable - Missing API Key');
-        }
-
+        this.validateApiKey();
         const model = 'google/gemini-2.0-flash-001';
 
-        const productList = products.map(p =>
+        const productList = this.formatSVRProductList(products);
+        const concernsSummary = this.buildSVRConcernsSummary(profile);
+        const prompt = this.buildSVRRoutinePrompt(profile, concernsSummary, productList);
+
+        try {
+            const response = await this.executeChatCompletion(model, [{ role: 'user', content: prompt }]);
+            const parsed = this.parseSVRRoutineResponse(response);
+            return this.enrichSVRRoutineWithImages(parsed, products);
+        } catch (error) {
+            this.logger.error('❌ SVR routine generation failed:', error.message);
+            throw error;
+        }
+    }
+
+    private formatSVRProductList(products: any[]): string {
+        return products.map(p =>
             `- [${p.category.toUpperCase()}] "${p.name}" | Texture: ${p.texture || 'N/A'} | Score: ${p.score ?? 'N/A'}/10 | Ingredients: ${p.ingredients.join(', ')} | Price: €${p.price} | URL: ${p.url} | Image: ${p.imageUrl || ''} | Description: ${p.description} | Suits: ${p.suitableSkinTypes.join(', ')} | Concerns: ${p.suitableConcerns.join(', ')}`
         ).join('\n');
+    }
 
-        const concernsSummary = [
+    private buildSVRConcernsSummary(profile: any): string {
+        return [
             profile.concerns?.length ? `Concerns: ${profile.concerns.join(', ')}` : '',
             profile.acneLevel > 50 ? `Acne level: ${profile.acneLevel}/100` : '',
             profile.blackheadsLevel > 50 ? `Blackheads: ${profile.blackheadsLevel}/100` : '',
@@ -528,8 +533,10 @@ Retourne UNIQUEMENT ce JSON:
             profile.rednessLevel > 50 ? `Redness: ${profile.rednessLevel}/100` : '',
             profile.sensitivityLevel > 60 ? `High sensitivity: ${profile.sensitivityLevel}/100` : '',
         ].filter(Boolean).join(' | ');
+    }
 
-        const prompt = `
+    private buildSVRRoutinePrompt(profile: any, concernsSummary: string, productList: string): string {
+        return `
 You are a certified SVR skincare specialist and expert dermatologist with 20 years of experience.
 Your task is TWO-FOLD:
 1) Recommend the BEST SVR products for this user from the catalog below (varied, multi-product per category)
@@ -600,88 +607,58 @@ Return ONLY valid JSON in EXACTLY this format:
   ]
 }
 `;
+    }
 
-        try {
-            const response = await axios.post(
-                `${this.baseUrl}/chat/completions`,
-                {
-                    model,
-                    messages: [{ role: 'user', content: prompt }],
-                    response_format: { type: 'json_object' },
-                    temperature: 0.35,
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'HTTP-Referer': 'https://deepskyn.app',
-                        'X-Title': 'DeepSkyn SVR Routine',
-                    },
-                }
-            );
+    private parseSVRRoutineResponse(response: any): any {
+        const text = response.data?.choices?.[0]?.message?.content;
+        if (typeof text !== 'string') throw new Error('No content from LLM');
 
-            const text = response.data?.choices?.[0]?.message?.content;
-            if (typeof text !== 'string') throw new Error('No content from LLM');
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Failed to parse SVR routine JSON');
 
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error('Failed to parse SVR routine JSON');
-
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (!Array.isArray(parsed.morning) || !Array.isArray(parsed.night)) {
-                throw new Error('Invalid SVR routine structure');
-            }
-            if (!Array.isArray(parsed.recommendedProducts)) {
-                parsed.recommendedProducts = [];
-            }
-
-            // === ENHANCEMENT: Enrich with imageUrl from products catalog ===
-            const enrichImageUrl = (product: any, catalogProducts: any[]) => {
-                if (!product || !product.name) return product;
-
-                const productName = product.name.trim();
-
-                // Find matching product in catalog
-                let match = catalogProducts.find(p =>
-                    p.name.trim().toLowerCase() === productName.toLowerCase()
-                );
-
-                // If no exact match, try partial match
-                if (!match) {
-                    match = catalogProducts.find(p =>
-                        productName.toLowerCase().includes(p.name.trim().toLowerCase()) ||
-                        p.name.trim().toLowerCase().includes(productName.toLowerCase())
-                    );
-                }
-
-                // Add imageUrl from catalog if found
-                if (match?.imageUrl) {
-                    product.imageUrl = match.imageUrl;
-                }
-
-                return product;
-            };
-
-            // Enrich all products with imageUrl from the original products array
-            parsed.recommendedProducts = parsed.recommendedProducts.map((p: any) =>
-                enrichImageUrl(p, products)
-            );
-
-            parsed.morning = (parsed.morning || []).map((step: any) => ({
-                ...step,
-                product: enrichImageUrl(step.product, products)
-            }));
-
-            parsed.night = (parsed.night || []).map((step: any) => ({
-                ...step,
-                product: enrichImageUrl(step.product, products)
-            }));
-
-            this.logger.log(`✅ SVR routine: ${parsed.recommendedProducts?.length} products recommended with ${parsed.recommendedProducts.filter((p: any) => p.imageUrl).length} images`);
-            return parsed;
-
-        } catch (error: any) {
-            this.logger.error('❌ SVR routine generation failed:', error.message);
-            throw error;
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (!Array.isArray(parsed.morning) || !Array.isArray(parsed.night)) {
+            throw new Error('Invalid SVR routine structure');
         }
+        if (!Array.isArray(parsed.recommendedProducts)) {
+            parsed.recommendedProducts = [];
+        }
+        return parsed;
+    }
+
+    private enrichSVRRoutineWithImages(parsed: any, products: any[]): any {
+        parsed.recommendedProducts = parsed.recommendedProducts.map((p: any) =>
+            this.enrichImageUrl(p, products)
+        );
+
+        parsed.morning = (parsed.morning || []).map((step: any) => ({
+            ...step,
+            product: this.enrichImageUrl(step.product, products)
+        }));
+
+        parsed.night = (parsed.night || []).map((step: any) => ({
+            ...step,
+            product: this.enrichImageUrl(step.product, products)
+        }));
+
+        this.logger.log(`✅ SVR routine: ${parsed.recommendedProducts?.length} products recommended with ${parsed.recommendedProducts.filter((p: any) => p.imageUrl).length} images`);
+        return parsed;
+    }
+
+    private enrichImageUrl(product: any, catalogProducts: any[]) {
+        if (!product || !product.name) return product;
+        const productName = product.name.trim();
+
+        let match = catalogProducts.find(p => p.name.trim().toLowerCase() === productName.toLowerCase());
+        if (!match) {
+            match = catalogProducts.find(p =>
+                productName.toLowerCase().includes(p.name.trim().toLowerCase()) ||
+                p.name.trim().toLowerCase().includes(productName.toLowerCase())
+            );
+        }
+
+        if (match?.imageUrl) product.imageUrl = match.imageUrl;
+        return product;
     }
 
     private getDefaultSessionAnalysis() {

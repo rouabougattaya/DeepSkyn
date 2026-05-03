@@ -7,7 +7,8 @@ import {
   Get,
   Put,
   Req,
-  Res,  Delete,
+  Res,
+  Delete,
   UseGuards,
   UnauthorizedException,
   InternalServerErrorException,
@@ -40,7 +41,7 @@ import { RecaptchaService } from './services/recaptcha.service'; // ← IMPORT A
 
 function getSessionMetadata(req: Request): { ipAddress: string | null; userAgent: string | null } {
   const ip = req.ip ?? req.socket?.remoteAddress ?? null;
-  const userAgent = (req.headers['user-agent'] as string) ?? null;
+  const userAgent = (req.headers['user-agent']) ?? null;
   return { ipAddress: ip, userAgent };
 }
 
@@ -426,7 +427,6 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<any> {
-    const metadata = getSessionMetadata(req);
     const tempId = body.tempId || '';
     const result = await this.authService.verifyAdminBiometricLogin(body.credential, tempId);
 

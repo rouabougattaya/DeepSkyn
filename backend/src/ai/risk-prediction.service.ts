@@ -62,7 +62,10 @@ export class RiskPredictionService {
       { label: 'Pigmentation', value: input.pigmentationScore },
       { label: 'Pores', value: input.poresScore },
     ];
-    const lines = scores.map(s => `- ${s.label} Score: ${s.value !== undefined ? `${s.value}/100` : 'Not provided'}`);
+    const lines = scores.map(s => {
+      const valueStr = s.value !== undefined ? `${s.value}/100` : 'Not provided';
+      return `- ${s.label} Score: ${valueStr}`;
+    });
     return `CURRENT SKIN CONDITION:\n${lines.join('\n')}`;
   }
 
@@ -208,36 +211,80 @@ export class RiskPredictionService {
 
   private getEnvironmentImpact(env?: SkinRiskInput['environment']): number {
     if (!env) return 0;
-    const uv = env.uvIndex ?? 5;
-    const humidity = env.humidity ?? 55;
-    const pollution = (env.pollution || 'moderate').toLowerCase();
-
+    
     let impact = 0;
-    impact += uv >= 8 ? 7 : uv >= 6 ? 4 : uv <= 2 ? -1 : 0;
-    impact += humidity < 35 ? 5 : humidity > 80 ? 3 : 0;
-    impact += pollution === 'high' ? 4 : pollution === 'low' ? -1 : 0;
+    impact += this.getUvImpact(env.uvIndex ?? 5);
+    impact += this.getHumidityImpact(env.humidity ?? 55);
+    impact += this.getPollutionImpact(env.pollution);
+    
     return impact;
+  }
+
+  private getUvImpact(uv: number): number {
+    if (uv >= 8) return 7;
+    if (uv >= 6) return 4;
+    if (uv <= 2) return -1;
+    return 0;
+  }
+
+  private getHumidityImpact(humidity: number): number {
+    if (humidity < 35) return 5;
+    if (humidity > 80) return 3;
+    return 0;
+  }
+
+  private getPollutionImpact(pollution?: string): number {
+    const p = (pollution || 'moderate').toLowerCase();
+    if (p === 'high') return 4;
+    if (p === 'low') return -1;
+    return 0;
   }
 
   private getLifestyleImpact(habits?: SkinRiskInput['habits']): number {
     if (!habits) return 0;
-    const sleep = habits.sleepHours ?? 7;
-    const water = habits.waterIntake ?? 2;
-    const stress = (habits.stressLevel || 'moderate').toLowerCase();
-    const spf = (habits.sunProtection || 'occasional').toLowerCase();
-    const routine = (habits.skincarRoutine || 'basic').toLowerCase();
-
-    let impact = 0;
-    impact += sleep < 6 ? 6 : sleep > 8 ? -2 : 0;
-    impact += water < 1.5 ? 5 : water >= 2.5 ? -2 : 0;
-    impact += stress === 'high' ? 6 : stress === 'low' ? -2 : 0;
-    impact += spf === 'none' ? 7 : spf === 'regular' ? -3 : 0;
     
-    if (routine === 'none') impact += 6;
-    else if (routine === 'advanced') impact -= 3;
-    else if (routine === 'consistent') impact -= 2;
+    let impact = 0;
+    impact += this.getSleepImpact(habits.sleepHours ?? 7);
+    impact += this.getWaterImpact(habits.waterIntake ?? 2);
+    impact += this.getStressImpact(habits.stressLevel);
+    impact += this.getSpfImpact(habits.sunProtection);
+    impact += this.getRoutineImpact(habits.skincarRoutine);
     
     return impact;
+  }
+
+  private getSleepImpact(sleep: number): number {
+    if (sleep < 6) return 6;
+    if (sleep > 8) return -2;
+    return 0;
+  }
+
+  private getWaterImpact(water: number): number {
+    if (water < 1.5) return 5;
+    if (water >= 2.5) return -2;
+    return 0;
+  }
+
+  private getStressImpact(stress?: string): number {
+    const s = (stress || 'moderate').toLowerCase();
+    if (s === 'high') return 6;
+    if (s === 'low') return -2;
+    return 0;
+  }
+
+  private getSpfImpact(spf?: string): number {
+    const s = (spf || 'occasional').toLowerCase();
+    if (s === 'none') return 7;
+    if (s === 'regular') return -3;
+    return 0;
+  }
+
+  private getRoutineImpact(routine?: string): number {
+    const r = (routine || 'basic').toLowerCase();
+    if (r === 'none') return 6;
+    if (r === 'advanced') return -3;
+    if (r === 'consistent') return -2;
+    return 0;
   }
 
   private buildPersonalizedActions(input: SkinRiskInput, risks: SkinRiskAlert[]): string[] {
@@ -338,8 +385,8 @@ export class RiskPredictionService {
     const baseline = this.calculateBaselineRiskScore(input);
     const metricMap = this.getFallbackMetricMap(input, baseline);
 
-    const risks: SkinRiskAlert[] = metricMap
-      .sort((a, b) => b.score - a.score)
+    const sortedMetrics = [...metricMap].sort((a, b) => b.score - a.score);
+    const risks: SkinRiskAlert[] = sortedMetrics
       .slice(0, 3)
       .map((item) => ({
         type: item.type,
@@ -364,37 +411,63 @@ export class RiskPredictionService {
 
   private getFallbackMetricMap(input: SkinRiskInput, baseline: number) {
     return [
-      {
-        type: 'acne' as const,
-        score: this.clamp((input.acneScore ?? baseline) + ((input.habits?.stressLevel || 'moderate') === 'high' ? 6 : 0)),
-        cause: 'Sebum, pores congestion, and stress/sleep patterns suggest acne flare potential if routine consistency drops.',
-        prevention: ['Use a gentle cleanser twice daily', 'Apply salicylic acid 2-3 nights weekly', 'Avoid pore-clogging products'],
-      },
-      {
-        type: 'dryness' as const,
-        score: this.clamp((input.drynessScore ?? baseline) + ((input.habits?.waterIntake ?? 2) < 1.5 ? 8 : 0)),
-        cause: 'Hydration signal and water intake indicate barrier dehydration risk, especially in dry environments.',
-        prevention: ['Increase water intake to 2L/day', 'Use hyaluronic acid on damp skin', 'Seal with ceramide moisturizer'],
-      },
-      {
-        type: 'aging' as const,
-        score: this.clamp((input.wrinklesScore ?? baseline) + ((input.environment?.uvIndex ?? 5) >= 6 ? 8 : 0) + ((input.age ?? 30) > 35 ? 6 : 0)),
-        cause: 'UV exposure and wrinkle trend suggest elevated photo-aging risk over the next months.',
-        prevention: ['Apply SPF 30+ every morning', 'Add retinoid slowly at night', 'Use antioxidant serum in AM'],
-      },
-      {
-        type: 'sensitivity' as const,
-        score: this.clamp((input.sensitivityScore ?? baseline) + ((input.habits?.stressLevel || 'moderate') === 'high' ? 5 : 0)),
-        cause: 'Reactive skin markers suggest increased redness/irritation risk under stress and actives overuse.',
-        prevention: ['Use fragrance-free products', 'Pause harsh exfoliants', 'Prioritize barrier-repair ingredients'],
-      },
-      {
-        type: 'pigmentation' as const,
-        score: this.clamp((input.pigmentationScore ?? baseline) + ((input.environment?.uvIndex ?? 5) >= 6 ? 10 : 0)),
-        cause: 'UV index and pigmentation trend indicate risk of uneven tone and post-inflammatory marks.',
-        prevention: ['Use SPF 50 during high UV days', 'Add vitamin C or niacinamide', 'Avoid midday direct sun'],
-      },
+      this.getAcneMetric(input, baseline),
+      this.getDrynessMetric(input, baseline),
+      this.getAgingMetric(input, baseline),
+      this.getSensitivityMetric(input, baseline),
+      this.getPigmentationMetric(input, baseline),
     ];
+  }
+
+  private getAcneMetric(input: SkinRiskInput, baseline: number) {
+    const stressHigh = (input.habits?.stressLevel || 'moderate') === 'high';
+    return {
+      type: 'acne' as const,
+      score: this.clamp((input.acneScore ?? baseline) + (stressHigh ? 6 : 0)),
+      cause: 'Sebum, pores congestion, and stress/sleep patterns suggest acne flare potential if routine consistency drops.',
+      prevention: ['Use a gentle cleanser twice daily', 'Apply salicylic acid 2-3 nights weekly', 'Avoid pore-clogging products'],
+    };
+  }
+
+  private getDrynessMetric(input: SkinRiskInput, baseline: number) {
+    const waterLow = (input.habits?.waterIntake ?? 2) < 1.5;
+    return {
+      type: 'dryness' as const,
+      score: this.clamp((input.drynessScore ?? baseline) + (waterLow ? 8 : 0)),
+      cause: 'Hydration signal and water intake indicate barrier dehydration risk, especially in dry environments.',
+      prevention: ['Increase water intake to 2L/day', 'Use hyaluronic acid on damp skin', 'Seal with ceramide moisturizer'],
+    };
+  }
+
+  private getAgingMetric(input: SkinRiskInput, baseline: number) {
+    const uvHigh = (input.environment?.uvIndex ?? 5) >= 6;
+    const ageHigh = (input.age ?? 30) > 35;
+    return {
+      type: 'aging' as const,
+      score: this.clamp((input.wrinklesScore ?? baseline) + (uvHigh ? 8 : 0) + (ageHigh ? 6 : 0)),
+      cause: 'UV exposure and wrinkle trend suggest elevated photo-aging risk over the next months.',
+      prevention: ['Apply SPF 30+ every morning', 'Add retinoid slowly at night', 'Use antioxidant serum in AM'],
+    };
+  }
+
+  private getSensitivityMetric(input: SkinRiskInput, baseline: number) {
+    const stressHigh = (input.habits?.stressLevel || 'moderate') === 'high';
+    return {
+      type: 'sensitivity' as const,
+      score: this.clamp((input.sensitivityScore ?? baseline) + (stressHigh ? 5 : 0)),
+      cause: 'Reactive skin markers suggest increased redness/irritation risk under stress and actives overuse.',
+      prevention: ['Use fragrance-free products', 'Pause harsh exfoliants', 'Prioritize barrier-repair ingredients'],
+    };
+  }
+
+  private getPigmentationMetric(input: SkinRiskInput, baseline: number) {
+    const uvHigh = (input.environment?.uvIndex ?? 5) >= 6;
+    return {
+      type: 'pigmentation' as const,
+      score: this.clamp((input.pigmentationScore ?? baseline) + (uvHigh ? 10 : 0)),
+      cause: 'UV index and pigmentation trend indicate risk of uneven tone and post-inflammatory marks.',
+      prevention: ['Use SPF 50 during high UV days', 'Add vitamin C or niacinamide', 'Avoid midday direct sun'],
+    };
   }
 
   private getUrgencyByScore(score: number): 'low' | 'medium' | 'high' {

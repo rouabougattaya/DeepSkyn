@@ -1,7 +1,5 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
-import { Public } from '../auth/decorators/public.decorator';
+import { Controller, Get, Post, Query, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { MetricsService, DashboardMetrics, MonthlyData, TrendData } from './metrics.service';
-import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../user/user.entity';

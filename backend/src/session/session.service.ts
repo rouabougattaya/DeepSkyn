@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -111,7 +111,7 @@ export class SessionService {
     if (session.accessTokenExpiresAt < new Date()) return null;
     const valid = await bcrypt.compare(token, session.accessTokenHash);
     if (!valid) return null;
-    return { session, user: session.user as User };
+    return { session, user: session.user };
   }
 
   /**
@@ -127,7 +127,7 @@ export class SessionService {
     if (session.refreshTokenExpiresAt < new Date()) return null;
     const valid = await bcrypt.compare(token, session.refreshTokenHash);
     if (!valid) return null;
-    return { session, user: session.user as User };
+    return { session, user: session.user };
   }
 
   /**

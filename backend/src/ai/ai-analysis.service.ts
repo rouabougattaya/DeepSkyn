@@ -45,34 +45,17 @@ export class AiAnalysisService {
   ): Promise<GlobalScoreResult> {
     try {
       await this.enforceAnalysisLimit(userId);
-
-      const rawDetections = testType
-        ? this.fakeAiService.generateTestCase(testType)
-        : await this.fakeAiService.analyzeImage(imageId);
-
-      if (!this.detectionAdapter.validateDetections(rawDetections)) {
-        throw new Error('Invalid detection format from AI model');
-      }
-
-      const metrics = this.detectionAdapter.aggregateDetections(rawDetections);
-      const conditionScores = this.scoringEngine.computeConditionScores(metrics);
-      const result = this.scoringEngine.calculateGlobalScore(conditionScores, customWeights);
+      const result = await this.executeAnalysisFlow(imageId, customWeights, testType);
 
       if (userId && (imageId || testType || result.globalScore > 0)) {
-        const saved = await this.persistResult(result, imageId || 'test_scenario', userId, analysisAge);
-        if (saved?.recommendations) {
-          result.recommendations = saved.recommendations;
-        }
+        await this.handleAnalysisPersistence(result, imageId || 'test_scenario', userId, analysisAge);
       }
 
       if (!result.recommendations) {
         result.recommendations = await this.getGuestRecommendations(result);
       }
 
-      if (result.recommendations?.length > 0) {
-        const checkResult = this.incompatibilityService.checkRoutine(result.recommendations);
-        result.compatibilityWarning = checkResult.message;
-      }
+      await this.enrichResultWithCompatibility(result);
 
       if (userId) {
         await this.subscriptionService.incrementImages(userId);
@@ -81,6 +64,38 @@ export class AiAnalysisService {
       return result;
     } catch (error) {
       throw new Error(`AI analysis failed: ${error.message}`);
+    }
+  }
+
+  private async executeAnalysisFlow(
+    imageId?: string,
+    customWeights?: Partial<ConditionWeights>,
+    testType?: 'severe' | 'mild' | 'mixed'
+  ): Promise<GlobalScoreResult> {
+    const rawDetections = testType
+      ? this.fakeAiService.generateTestCase(testType)
+      : await this.fakeAiService.analyzeImage(imageId);
+
+    if (!this.detectionAdapter.validateDetections(rawDetections)) {
+      throw new Error('Invalid detection format from AI model');
+    }
+
+    const metrics = this.detectionAdapter.aggregateDetections(rawDetections);
+    const conditionScores = this.scoringEngine.computeConditionScores(metrics);
+    return this.scoringEngine.calculateGlobalScore(conditionScores, customWeights);
+  }
+
+  private async handleAnalysisPersistence(result: GlobalScoreResult, imageId: string, userId: string, age?: number) {
+    const saved = await this.persistResult(result, imageId, userId, age);
+    if (saved?.recommendations) {
+      result.recommendations = saved.recommendations;
+    }
+  }
+
+  private async enrichResultWithCompatibility(result: GlobalScoreResult) {
+    if (result.recommendations?.length > 0) {
+      const checkResult = this.incompatibilityService.checkRoutine(result.recommendations);
+      result.compatibilityWarning = checkResult.message;
     }
   }
 
@@ -139,33 +154,19 @@ export class AiAnalysisService {
       const result = await this.openRouterService.analyzeSkin(profile, plan);
 
       const hasPhoto = Boolean(profile.imageBase64 || (profile.imagesBase64 && profile.imagesBase64.length > 0));
-      const { aiWeight, userWeight } = this.calculateWeights(hasPhoto);
-      
-      const combinedInsights = this.processConditionScores(result, profile, hasPhoto, aiWeight, userWeight);
-      
-      this.calculateGlobalScoreAndAnalysis(result);
-
-      result.metaWeighting = { aiWeight, userWeight };
-      result.userInputs = this.extractUserInputs(profile);
-      result.combinedInsights = combinedInsights;
+      this.prepareLlmResult(result, profile, hasPhoto);
 
       await this.handleAgeEstimation(result, profile, hasPhoto);
 
       if (userId && result.globalScore > 0) {
-        const saved = await this.persistResult(result, 'unified_llm', userId, profile.age);
-        if (saved?.recommendations) {
-          result.recommendations = saved.recommendations;
-        }
+        await this.handleAnalysisPersistence(result, 'unified_llm', userId, profile.age);
       }
 
       if (!result.recommendations) {
         result.recommendations = await this.getFallbackRecommendations(userId, profile, result.conditionScores);
       }
 
-      if (result.recommendations?.length > 0) {
-        const checkResult = this.incompatibilityService.checkRoutine(result.recommendations);
-        result.compatibilityWarning = checkResult.message;
-      }
+      await this.enrichResultWithCompatibility(result);
 
       if (userId) {
         await this.subscriptionService.incrementImages(userId);
@@ -175,6 +176,14 @@ export class AiAnalysisService {
     } catch (error) {
       throw new Error(`LLM Analysis failed: ${error.message}`);
     }
+  }
+
+  private prepareLlmResult(result: any, profile: UserSkinProfile, hasPhoto: boolean) {
+    const { aiWeight, userWeight } = this.calculateWeights(hasPhoto);
+    result.metaWeighting = { aiWeight, userWeight };
+    result.userInputs = this.extractUserInputs(profile);
+    result.combinedInsights = this.processConditionScores(result, profile, hasPhoto, aiWeight, userWeight);
+    this.calculateGlobalScoreAndAnalysis(result);
   }
 
   private async getSubscriptionPlan(userId: string): Promise<string> {

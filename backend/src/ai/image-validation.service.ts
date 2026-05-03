@@ -23,10 +23,7 @@ export class ImageValidationService {
     }
 
     try {
-      this.logger.log('Desactivating local validation to prevent 500 error during model loading...');
-      return { isValid: true, message: 'Local validation disabled' };
-
-      // Strip the data URI prefix (e.g., "data:image/png;base64,") to get raw base64
+      // Stripping the data URI prefix (e.g., "data:image/png;base64,") to get raw base64
       const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
       this.logger.log(`Base64 data length: ${base64Data.length}`);
       

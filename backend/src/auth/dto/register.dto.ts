@@ -8,8 +8,8 @@ import {
   ArrayMinSize,
   ArrayMaxSize,
   IsNumber,
+  IsDateString,
 } from 'class-validator';
-import { IsDateString } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()

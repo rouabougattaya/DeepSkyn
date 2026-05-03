@@ -61,12 +61,7 @@ export class DetectionAdapterService {
    * Calcule la sévérité moyenne pour un groupe de détections
    */
   private calculateSeverity(detections: RawDetection[]): number {
-    if (detections.length === 0) return 0;
-    
-    // La sévérité est basée sur la confiance moyenne
-    // Plus haute confiance = plus sévère
-    const totalConfidence = detections.reduce((sum, detection) => sum + detection.confidence, 0);
-    return totalConfidence / detections.length;
+    return this.calculateAverageConfidence(detections);
   }
 
   /**

@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsEnum, IsDateString, IsInt, Min, Max } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ActivityType, RiskLevel } from './activity.entity';
 
 export class ActivityQueryDto {

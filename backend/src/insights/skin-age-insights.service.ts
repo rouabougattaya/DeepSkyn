@@ -274,10 +274,10 @@ export class SkinAgeInsightsService {
 
     // Add condition-specific advice based on the latest analysis scores
     if (latest) {
-      const acne = (latest as any).acne ?? null;
-      const hydration = (latest as any).hydration ?? null;
-      const wrinkles = (latest as any).wrinkles ?? null;
-      const oil = (latest as any).oil ?? null;
+      const acne = latest.acne ?? null;
+      const hydration = latest.hydration ?? null;
+      const wrinkles = latest.wrinkles ?? null;
+      const oil = latest.oil ?? null;
 
       console.log(`[buildGuidance] Condition scores - acne: ${acne}, hydration: ${hydration}, wrinkles: ${wrinkles}, oil: ${oil}`);
 

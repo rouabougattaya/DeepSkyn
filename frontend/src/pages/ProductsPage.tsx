@@ -57,12 +57,16 @@ export default function ProductsPage() {
 
     // ── Load types & ingredients once ───────────────────────────────────────────
     useEffect(() => {
+        let mounted = true;
         Promise.all([productService.getTypes(), productService.getIngredients()])
-            .then(([t, i]) => {
-                setTypes(t)
-                setIngredients(i)
+            .then(([fetchedTypes, fetchedIngredients]) => {
+                if (mounted) {
+                    setTypes(fetchedTypes)
+                    setIngredients(fetchedIngredients)
+                }
             })
             .catch(() => {/* non-blocking */ })
+        return () => { mounted = false; }
     }, [])
 
     // ── Fetch products when filters change ──────────────────────────────────────

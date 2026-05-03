@@ -12,8 +12,8 @@ async function checkSvrProducts() {
     console.log('SVR Products Count:', res.rows[0].count);
     
     if (res.rows[0].count > 0) {
-        const sample = await client.query("SELECT name FROM products WHERE name ILIKE '%SVR%' LIMIT 5");
-        console.log('Sample SVR Products:', res.rows.map(r => r.name));
+        const sampleRes = await client.query("SELECT name FROM products WHERE name ILIKE '%SVR%' LIMIT 5");
+        console.log('Sample SVR Products:', sampleRes.rows.map(r => r.name));
     }
   } catch (err) {
     console.error('Error:', err.message);

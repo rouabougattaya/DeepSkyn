@@ -344,11 +344,7 @@ export class RoutinePersonalizationService {
                     stepOrder: 2,
                     stepName: 'Serum',
                     rec: pickNth(serums, offset),
-                    adjustmentReason: activeRules.has('ACNE_WORSENING')
-                        ? 'Sérum anti-acné priorisé'
-                        : activeRules.has('WRINKLES_INCREASE')
-                            ? 'Sérum anti-rides priorisé'
-                            : undefined,
+                    adjustmentReason: this.resolveSerumAdjustmentReason(activeRules),
                 },
                 {
                     stepOrder: 3,
@@ -426,5 +422,11 @@ export class RoutinePersonalizationService {
         return this.productRepo.findOne({
             where: { type: Like(`%${typeKeyword}%`) },
         });
+    }
+
+    private resolveSerumAdjustmentReason(activeRules: Set<string>): string | undefined {
+        if (activeRules.has('ACNE_WORSENING')) return 'Sérum anti-acné priorisé';
+        if (activeRules.has('WRINKLES_INCREASE')) return 'Sérum anti-rides priorisé';
+        return undefined;
     }
 }

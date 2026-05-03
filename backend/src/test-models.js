@@ -17,7 +17,7 @@ async function testModels() {
         try {
             const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.generateContent("Say hello");
-            const response = await result.response;
+            const response = result.response;
             console.log(`✅ ${modelName} works: ${response.text().substring(0, 20)}...`);
             break;
         } catch (error) {

@@ -152,6 +152,23 @@ export class SkinAgeInsightsService {
     };
   }
 
+  private isOilySkin(acne?: number | null, oil?: number | null): boolean {
+    return (acne != null && acne > 60) || (oil != null && oil > 65);
+  }
+
+  private isDrySkin(hydration?: number | null, wrinkles?: number | null): boolean {
+    return (hydration != null && hydration < 35) || (wrinkles != null && wrinkles > 60);
+  }
+
+  private isSensitiveSkin(delta?: number | null, hydration?: number | null, acne?: number | null): boolean {
+    if (delta == null || delta < 4) return false;
+    return (hydration != null && hydration > 40) || (acne != null && acne > 30);
+  }
+
+  private isCombinationSkin(acne?: number | null, oil?: number | null): boolean {
+    return (acne != null && acne > 30 && acne <= 60) && (oil != null && oil > 40 && oil <= 65);
+  }
+
   private inferSkinType(
     skinScore?: number | null,
     delta?: number | null,
@@ -160,25 +177,12 @@ export class SkinAgeInsightsService {
     hydration?: number | null,
     wrinkles?: number | null
   ): string {
-    // Oily: high acne, high oil, high pore visibility
-    if ((acne != null && acne > 60) || (oil != null && oil > 65)) return 'Oily';
-    
-    // Dry: low hydration, high wrinkles, low oil
-    if ((hydration != null && hydration < 35) || (wrinkles != null && wrinkles > 60)) return 'Dry';
-    
-    // Sensitive: if skin is aging but hydration is moderate (needs care)
-    if (delta != null && delta >= 4) {
-      if (hydration != null && hydration > 40) return 'Sensitive';
-      if (acne != null && acne > 30) return 'Sensitive';
-      return 'Dry'; // Aging skin often needs more hydration
-    }
-    
-    // Combination: moderate levels of multiple concerns
-    if ((acne != null && acne > 30 && acne <= 60) && (oil != null && oil > 40 && oil <= 65)) return 'Combination';
-    
-    // Normal/Aligned: balanced metrics
+    if (this.isOilySkin(acne, oil)) return 'Oily';
+    if (this.isDrySkin(hydration, wrinkles)) return 'Dry';
+    if (this.isSensitiveSkin(delta, hydration, acne)) return 'Sensitive';
+    if (delta != null && delta >= 4) return 'Dry';
+    if (this.isCombinationSkin(acne, oil)) return 'Combination';
     if (delta != null && delta <= -3) return 'Normal';
-    
     return 'Normal';
   }
 
@@ -244,6 +248,34 @@ export class SkinAgeInsightsService {
     return 'aligned';
   }
 
+  private buildAcneAdvice(acne: number | null): string[] {
+    if (typeof acne !== 'number') return [];
+    if (acne > 70) return ['Acne significative detectee: nettoyant doux 2x/jour + niacinamide pour reducer les inflammations.'];
+    if (acne >= 50) return ['Acne moderee: exfoliant doux 2-3x/semaine + acide salicylique en lotion ciblée.'];
+    return [];
+  }
+
+  private buildHydrationAdvice(hydration: number | null): string[] {
+    if (typeof hydration !== 'number') return [];
+    if (hydration < 40) return ['Deshydratation severe: booster l\'hydratation avec acide hyaluronique + glycérine + ceramides en couches.'];
+    if (hydration <= 60) return ['Hydratation faible: ajouter un essence hydratant ou un toner avant la creme.'];
+    return [];
+  }
+
+  private buildWrinklesAdvice(wrinkles: number | null): string[] {
+    if (typeof wrinkles !== 'number') return [];
+    if (wrinkles > 70) return ['Rides profondes: commencez avec retinol 0.25% et augmentez progressivement + serum peptides la nuit.'];
+    if (wrinkles >= 45) return ['Ridules presentes: vitamine C le matin + creme contour yeux aux peptides le soir.'];
+    return [];
+  }
+
+  private buildOilAdvice(oil: number | null): string[] {
+    if (typeof oil !== 'number') return [];
+    if (oil > 70) return ['Peau tres grasse: nettoyant gel + serum matifiant 2x/jour + crème legère non-comedogene.'];
+    if (oil >= 50) return ['Peau grasse: utiliser une creme legère matifiante et papiers absorbants dans la journée.'];
+    return [];
+  }
+
   private buildGuidance({ status, delta, trendAverage, latest }: { status: SkinAgeStatus; delta: number | null; trendAverage: number | null; latest?: any }) {
     const advice: string[] = [];
     const productSuggestions: string[] = [];
@@ -281,41 +313,10 @@ export class SkinAgeInsightsService {
 
       console.log(`[buildGuidance] Condition scores - acne: ${acne}, hydration: ${hydration}, wrinkles: ${wrinkles}, oil: ${oil}`);
 
-      // Acne advice (higher score = worse acne)
-      if (typeof acne === 'number' && acne >= 50) {
-        if (acne > 70) {
-          advice.push('Acne significative detectee: nettoyant doux 2x/jour + niacinamide pour reducer les inflammations.');
-        } else if (acne >= 50) {
-          advice.push('Acne moderee: exfoliant doux 2-3x/semaine + acide salicylique en lotion ciblée.');
-        }
-      }
-
-      // Hydration advice (lower score = more dehydrated)
-      if (typeof hydration === 'number' && hydration <= 60) {
-        if (hydration < 40) {
-          advice.push('Deshydratation severe: booster l\'hydratation avec acide hyaluronique + glycérine + ceramides en couches.');
-        } else if (hydration <= 60) {
-          advice.push('Hydratation faible: ajouter un essence hydratant ou un toner avant la creme.');
-        }
-      }
-
-      // Wrinkles advice (higher score = more wrinkles)
-      if (typeof wrinkles === 'number' && wrinkles >= 45) {
-        if (wrinkles > 70) {
-          advice.push('Rides profondes: commencez avec retinol 0.25% et augmentez progressivement + serum peptides la nuit.');
-        } else if (wrinkles >= 45) {
-          advice.push('Ridules presentes: vitamine C le matin + creme contour yeux aux peptides le soir.');
-        }
-      }
-
-      // Oil advice (higher score = more oily)
-      if (typeof oil === 'number' && oil >= 50) {
-        if (oil > 70) {
-          advice.push('Peau tres grasse: nettoyant gel + serum matifiant 2x/jour + crème legère non-comedogene.');
-        } else if (oil >= 50) {
-          advice.push('Peau grasse: utiliser une creme legère matifiante et papiers absorbants dans la journée.');
-        }
-      }
+      advice.push(...this.buildAcneAdvice(acne));
+      advice.push(...this.buildHydrationAdvice(hydration));
+      advice.push(...this.buildWrinklesAdvice(wrinkles));
+      advice.push(...this.buildOilAdvice(oil));
     }
 
     if (trendAverage != null) {
@@ -331,6 +332,15 @@ export class SkinAgeInsightsService {
     }
 
     return { headline, advice, productSuggestions };
+  }
+
+  private parseDatasetLine(line: string): { realAge: number; skinAge: number } | null {
+    const cols = line.split(',');
+    if (cols.length < 9) return null;
+    const realAge = parseFloat(cols[1]);
+    const skinAge = parseFloat(cols[6]);
+    if (!Number.isFinite(realAge) || !Number.isFinite(skinAge)) return null;
+    return { realAge, skinAge };
   }
 
   private async loadDatasetStats(): Promise<DatasetStats> {
@@ -349,15 +359,12 @@ export class SkinAgeInsightsService {
         let sumReal = 0;
 
         for (const line of lines) {
-          const cols = line.split(',');
-          if (cols.length < 9) continue;
-          const realAge = parseFloat(cols[1]);
-          const skinAge = parseFloat(cols[6]);
-          if (!Number.isFinite(realAge) || !Number.isFinite(skinAge)) continue;
+          const parsed = this.parseDatasetLine(line);
+          if (!parsed) continue;
           sampleSize += 1;
-          sumReal += realAge;
-          sumSkin += skinAge;
-          sumDelta += skinAge - realAge;
+          sumReal += parsed.realAge;
+          sumSkin += parsed.skinAge;
+          sumDelta += parsed.skinAge - parsed.realAge;
         }
 
         if (sampleSize === 0) return fallback;

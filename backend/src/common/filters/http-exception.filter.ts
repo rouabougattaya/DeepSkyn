@@ -32,29 +32,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let details: Record<string, unknown> | undefined;
 
     if (isHttpException) {
-      const res = exception.getResponse();
-      const msg = typeof res === 'string' ? res : (res as { message?: string | string[] }).message;
-      message = Array.isArray(msg) ? msg.join(', ') : (msg ?? exception.message);
-      error = exception.name;
-
-      if (typeof res !== 'string') {
-        const responseObject = res as Record<string, unknown>;
-        if (typeof responseObject.code === 'string') {
-          code = responseObject.code;
-        }
-
-        const { statusCode: _statusCode, message: _message, error: _error, code: _code, ...rest } = responseObject;
-        if (Object.keys(rest).length > 0) {
-          details = rest;
-        }
-      }
+      ({ message, error, code, details } = this.parseHttpExceptionBody(exception));
     } else {
-      this.logger.error(exception);
-      message =
-        process.env.NODE_ENV === 'production'
-          ? 'Une erreur interne est survenue.'
-          : (exception as Error).message ?? 'Internal server error';
-      error = 'Internal Server Error';
+      ({ message, error } = this.handleNonHttpException(exception));
     }
 
     const body = {
@@ -68,5 +48,41 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
 
     response.status(status).json(body);
+  }
+
+  private parseHttpExceptionBody(exception: HttpException): {
+    message: string;
+    error: string;
+    code?: string;
+    details?: Record<string, unknown>;
+  } {
+    const res = exception.getResponse();
+    const msg = typeof res === 'string' ? res : (res as { message?: string | string[] }).message;
+    const message = Array.isArray(msg) ? msg.join(', ') : (msg ?? exception.message);
+    const error = exception.name;
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
+
+    if (typeof res !== 'string') {
+      const responseObject = res as Record<string, unknown>;
+      if (typeof responseObject.code === 'string') {
+        code = responseObject.code;
+      }
+      const { statusCode: _s, message: _m, error: _e, code: _c, ...rest } = responseObject;
+      if (Object.keys(rest).length > 0) {
+        details = rest;
+      }
+    }
+
+    return { message, error, code, details };
+  }
+
+  private handleNonHttpException(exception: unknown): { message: string; error: string } {
+    this.logger.error(exception);
+    const message =
+      process.env.NODE_ENV === 'production'
+        ? 'Une erreur interne est survenue.'
+        : (exception as Error).message ?? 'Internal server error';
+    return { message, error: 'Internal Server Error' };
   }
 }

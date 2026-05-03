@@ -124,14 +124,12 @@ export class ChatService {
 
     // Fetch message history for context (last 6 messages)
     let historyContext = '';
-    let messageCount = 0;
     if (sessionId) {
       const history = await this.messageRepo.find({
         where: { sessionId },
         order: { createdAt: 'DESC' },
         take: 6,
       });
-      messageCount = history.length;
       const reversedHistory = [...history].reverse();
       historyContext = reversedHistory
         .map(m => `${m.role === 'user' ? 'Utilisateur' : 'Assistant'}: ${m.content}`)
@@ -147,7 +145,7 @@ export class ChatService {
       await this.saveMessage(sessionId, 'assistant', aiMessage);
     }
 
-    const { allowed, remaining, limit } = await this.subscriptionService.checkChatLimit(resolvedUserId);
+    const { remaining, limit } = await this.subscriptionService.checkChatLimit(resolvedUserId);
 
     const result = {
       ...userSkinContext,
@@ -264,42 +262,39 @@ export class ChatService {
     return [];
   }
 
-  private extractAcneCondition(answers: any, skinConcerns: any, acneScore: number) {
-    const acneFromAnswers =
+  private getAcneSeverityFromScore(score: number): 'severe' | 'moderate' | 'mild' {
+    if (score >= 70) return 'severe';
+    if (score >= 45) return 'moderate';
+    return 'mild';
+  }
+
+  private findAcneSource(answers: any, skinConcerns: any): any {
+    const fromAnswers =
       answers?.conditions?.acne ??
       answers?.acne ??
       (Array.isArray(answers?.conditions)
         ? answers.conditions.find((item: any) => String(item?.type ?? item?.name ?? '').toLowerCase().includes('acne'))
         : null);
-
-    const acneFromConcerns =
+    const fromConcerns =
       skinConcerns?.acne ??
       (Array.isArray(skinConcerns)
         ? skinConcerns.find((item: any) => String(item?.type ?? item ?? '').toLowerCase().includes('acne'))
         : null);
+    return fromAnswers ?? fromConcerns ?? null;
+  }
 
-    const source = acneFromAnswers ?? acneFromConcerns ?? null;
-
+  private extractAcneCondition(answers: any, skinConcerns: any, acneScore: number) {
+    const source = this.findAcneSource(answers, skinConcerns);
     const enabled = Boolean(source) || acneScore >= 35;
+    const rawSeverity = source?.severity ?? source?.level ?? source?.intensity;
     const severity = this.normalizeSeverity(
-      source?.severity ??
-      source?.level ??
-      source?.intensity ??
-      (acneScore >= 70 ? 'severe' : acneScore >= 45 ? 'moderate' : 'mild')
+      rawSeverity ?? this.getAcneSeverityFromScore(acneScore)
     );
-
     const type =
       String(source?.type ?? source?.subtype ?? source?.kind ?? (enabled ? 'general' : 'none')).trim() ||
       'none';
-
     const location = this.extractLocations(source?.location ?? source?.locations ?? source?.zone ?? source?.areas);
-
-    return {
-      enabled,
-      severity,
-      type,
-      location,
-    };
+    return { enabled, severity, type, location };
   }
 
   private async buildUserSkinContext(userId: string): Promise<Omit<ChatContextPayload, 'message'>> {

@@ -22,7 +22,6 @@ async function listModels() {
     }
 
     console.log("✅ Using API Key starting with:", apiKey.substring(0, 10) + "...");
-    const genAI = new GoogleGenerativeAI(apiKey);
 
     // The SDK doesn't expose a direct listModels method, so we use a fetch to the REST endpoint
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;

@@ -13,6 +13,8 @@ import {
   MonthPrediction,
 } from './digital-twin.dto';
 
+type TimePoint = 'month1' | 'month3' | 'month6';
+
 @Injectable()
 export class DigitalTwinService {
   private readonly logger = new Logger('DigitalTwinService');
@@ -183,7 +185,7 @@ export class DigitalTwinService {
     const bestIndex = scores.indexOf(Math.max(...scores));
     const worstIndex = scores.indexOf(Math.min(...scores));
 
-    const monthLabels: ('month1' | 'month3' | 'month6')[] = ['month1', 'month3', 'month6'];
+    const monthLabels: TimePoint[] = ['month1', 'month3', 'month6'];
 
     return {
       currentState: {
@@ -312,7 +314,7 @@ Each should have: skinScore, skinAge, metrics{hydration, oil, acne, wrinkles}, i
    */
   private parseMonthPrediction(
     aiResponse: any,
-    month: 'month1' | 'month3' | 'month6',
+    month: TimePoint,
     baseAnalysis: SkinAnalysis,
   ): MonthPrediction {
     try {
@@ -365,11 +367,11 @@ Each should have: skinScore, skinAge, metrics{hydration, oil, acne, wrinkles}, i
    */
   private generateFallbackMonthPrediction(
     baseAnalysis: SkinAnalysis,
-    month: 'month1' | 'month3' | 'month6',
+    month: TimePoint,
     improvementRate?: number,
   ): MonthPrediction {
     const monthNum = parseInt(month.replace('month', ''));
-    const rate = improvementRate || (monthNum === 1 ? 0.02 : monthNum === 3 ? 0.06 : 0.15);
+    const rate = improvementRate ?? this.resolveImprovementRate(monthNum);
 
     const newScore = Math.min(100, baseAnalysis.skinScore + baseAnalysis.skinScore * rate);
     const newAge = Math.max(0, baseAnalysis.skinAge - monthNum * 0.5);
@@ -408,6 +410,12 @@ Each should have: skinScore, skinAge, metrics{hydration, oil, acne, wrinkles}, i
           : ['No significant degradation expected with consistent routine'],
       summary: `${monthNum}-month projection: Score ${Math.round(newScore)}/100. With consistent routine adherence, expect gradual skin improvement.`,
     };
+  }
+
+  private resolveImprovementRate(monthNum: number): number {
+    if (monthNum === 1) return 0.02;
+    if (monthNum === 3) return 0.06;
+    return 0.15;
   }
 
   /**

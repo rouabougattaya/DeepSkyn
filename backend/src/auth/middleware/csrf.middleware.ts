@@ -1,7 +1,6 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import csrf from 'csurf';
-import { Reflector } from '@nestjs/core';
 
 @Injectable()
 export class CsrfMiddleware implements NestMiddleware {

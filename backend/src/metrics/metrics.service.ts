@@ -14,12 +14,14 @@ import * as crypto from 'crypto';
  *  (no SQL aggregation: uses reduce, Map, Math).
  * ════════════════════════════════════════════════════════════════════════ */
 
+type TrendDirection = 'up' | 'down' | 'stable';
+
 export interface DashboardMetrics {
   averageScore: number;
   bestScore: number;
   worstScore: number;
   totalAnalyses: number;
-  trendDirection: 'up' | 'down' | 'stable';
+  trendDirection: TrendDirection;
   trendPercentage: number;
   standardDeviation: number;
   medianScore: number;
@@ -43,7 +45,7 @@ export interface TrendData {
   period: string;
   current: number;
   previous: number;
-  direction: 'up' | 'down' | 'stable';
+  direction: TrendDirection;
   percentage: number;
   label: string;
   sampleSize: number;

@@ -20,7 +20,6 @@ export class FingerprintService {
     const ip = 
       (req.headers['x-forwarded-for'] as string)?.split(',').shift()?.trim() ||
       req.socket?.remoteAddress ||
-      req.connection?.remoteAddress ||
       (req as any).ip ||
       'IP non disponible';
 

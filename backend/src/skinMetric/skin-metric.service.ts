@@ -12,6 +12,8 @@ import type {
   MetricKey,
 } from '../compare-analysis.dto';
 
+type GlobalTrend = 'improvement' | 'regression' | 'stable';
+
 @Injectable()
 export class SkinMetricService {
   private readonly logger = new Logger(SkinMetricService.name);
@@ -182,25 +184,12 @@ export class SkinMetricService {
 
     const keys: MetricKey[] = ['hydration', 'oil', 'acne', 'wrinkles'];
     const THRESHOLD = 2;
-    const differences: MetricDifference[] = keys.map(metric => {
-      const firstVal = m1[metric];
-      const secondVal = m2[metric];
-      const delta = Math.round((secondVal - firstVal) * 10) / 10;
-      let trend: 'improvement' | 'regression' | 'stable' = 'stable';
-      if (metric === 'hydration' || metric === 'oil') {
-        if (delta > THRESHOLD) trend = 'improvement';
-        else if (delta < -THRESHOLD) trend = 'regression';
-      } else {
-        if (delta < -THRESHOLD) trend = 'improvement';
-        else if (delta > THRESHOLD) trend = 'regression';
-      }
-      return { metric, firstValue: firstVal, secondValue: secondVal, delta, trend };
-    });
+    const differences: MetricDifference[] = keys.map(metric =>
+      this.computeMetricDifference(metric, m1, m2, THRESHOLD)
+    );
 
     const scoreDelta = (second.skinScore ?? 0) - (first.skinScore ?? 0);
-    let globalTrend: 'improvement' | 'regression' | 'stable' = 'stable';
-    if (scoreDelta > THRESHOLD) globalTrend = 'improvement';
-    else if (scoreDelta < -THRESHOLD) globalTrend = 'regression';
+    const globalTrend = this.computeGlobalTrend(scoreDelta, THRESHOLD);
 
     const firstRealAge = first.aiRawResponse?.realAgeSource === 'analysis-input' ? first.realAge ?? null : null;
     const secondRealAge = second.aiRawResponse?.realAgeSource === 'analysis-input' ? second.realAge ?? null : null;
@@ -235,15 +224,45 @@ export class SkinMetricService {
     };
   }
 
+  private computeMetricDifference(
+    metric: MetricKey,
+    m1: AnalysisMetricsView,
+    m2: AnalysisMetricsView,
+    threshold: number,
+  ): MetricDifference {
+    const firstVal = m1[metric];
+    const secondVal = m2[metric];
+    const delta = Math.round((secondVal - firstVal) * 10) / 10;
+    let trend: GlobalTrend = 'stable';
+    if (metric === 'hydration' || metric === 'oil') {
+      if (delta > threshold) trend = 'improvement';
+      else if (delta < -threshold) trend = 'regression';
+    } else {
+      if (delta < -threshold) trend = 'improvement';
+      else if (delta > threshold) trend = 'regression';
+    }
+    return { metric, firstValue: firstVal, secondValue: secondVal, delta, trend };
+  }
+
+  private computeGlobalTrend(scoreDelta: number, threshold: number): GlobalTrend {
+    if (scoreDelta > threshold) return 'improvement';
+    if (scoreDelta < -threshold) return 'regression';
+    return 'stable';
+  }
+
+  private formatMetricChange(d: MetricDifference, labels: Record<MetricKey, string>): string {
+    return `${labels[d.metric]} (${d.firstValue} → ${d.secondValue})`;
+  }
+
   private buildComparisonSummary(params: {
     first: SkinAnalysis;
     second: SkinAnalysis;
     m1: AnalysisMetricsView;
     m2: AnalysisMetricsView;
     differences: MetricDifference[];
-    globalTrend: 'improvement' | 'regression' | 'stable';
+    globalTrend: GlobalTrend;
   }): string {
-    const { first, second, m1, m2, differences, globalTrend } = params;
+    const { first, second, differences, globalTrend } = params;
     const score1 = first.skinScore ?? 0;
     const score2 = second.skinScore ?? 0;
     const date1 = new Date(first.createdAt).toLocaleDateString('fr-FR');
@@ -251,7 +270,7 @@ export class SkinMetricService {
     const parts: string[] = [];
 
     if (globalTrend === 'improvement') {
-      parts.push(`Entre le ${date1} et le ${date2}, votre peau s’est globalement améliorée : le score est passé de ${score1} à ${score2}/100.`);
+      parts.push(`Entre le ${date1} et le ${date2}, votre peau s'est globalement améliorée : le score est passé de ${score1} à ${score2}/100.`);
     } else if (globalTrend === 'regression') {
       parts.push(`Entre le ${date1} et le ${date2}, une légère baisse du score global est observée (${score1} → ${score2}/100).`);
     } else {
@@ -268,10 +287,10 @@ export class SkinMetricService {
     };
 
     if (improvements.length) {
-      parts.push(` Améliorations notables : ${improvements.map(d => `${labels[d.metric]} (${d.firstValue} → ${d.secondValue})`).join(', ')}.`);
+      parts.push(` Améliorations notables : ${improvements.map(d => this.formatMetricChange(d, labels)).join(', ')}.`);
     }
     if (regressions.length) {
-      parts.push(` Points de vigilance : ${regressions.map(d => `${labels[d.metric]} (${d.firstValue} → ${d.secondValue})`).join(', ')}.`);
+      parts.push(` Points de vigilance : ${regressions.map(d => this.formatMetricChange(d, labels)).join(', ')}.`);
     }
     if (improvements.length === 0 && regressions.length === 0 && globalTrend === 'stable') {
       parts.push(' Les métriques détaillées (hydratation, sébum, acné, rides) sont restées stables.');

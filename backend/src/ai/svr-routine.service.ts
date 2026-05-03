@@ -489,17 +489,17 @@ export class SvrRoutineService {
     });
 
     return {
-      recommendedProducts: [cleanser, serum1, moisturizer, sunscreen].filter(Boolean).map(p => toRecommended(p!, 'Adapté')),
+      recommendedProducts: [cleanser, serum1, moisturizer, sunscreen].filter(Boolean).map(p => toRecommended(p, 'Adapté')),
       morning: [
-        toStep(1, 'Nettoyage', cleanser!, "Appliquer sur peau humide.", 'Nettoyage doux.'),
-        toStep(2, 'Sérum', serum1!, 'Appliquer 3 gouttes.', 'Traitement.'),
-        toStep(3, 'Hydratant', moisturizer!, "Appliquer.", 'Hydratation.'),
-        toStep(4, 'SPF', sunscreen!, "Appliquer.", 'Protection.'),
+        toStep(1, 'Nettoyage', cleanser, "Appliquer sur peau humide.", 'Nettoyage doux.'),
+        toStep(2, 'Sérum', serum1, 'Appliquer 3 gouttes.', 'Traitement.'),
+        toStep(3, 'Hydratant', moisturizer, "Appliquer.", 'Hydratation.'),
+        toStep(4, 'SPF', sunscreen, "Appliquer.", 'Protection.'),
       ],
       night: [
-        toStep(1, 'Nettoyage', cleanser!, 'Appliquer.', 'Nettoyage.'),
-        toStep(2, 'Sérum', serum1!, 'Appliquer.', 'Traitement.'),
-        toStep(3, 'Hydratant', moisturizer!, 'Appliquer.', 'Hydratation.'),
+        toStep(1, 'Nettoyage', cleanser, 'Appliquer.', 'Nettoyage.'),
+        toStep(2, 'Sérum', serum1, 'Appliquer.', 'Traitement.'),
+        toStep(3, 'Hydratant', moisturizer, 'Appliquer.', 'Hydratation.'),
       ],
       skinProfile: `Peau ${skinType}`,
       generalAdvice: 'La régularité est clé.',
@@ -522,7 +522,7 @@ export class SvrRoutineService {
       const jsonPath = path.join(process.cwd(), 'data', 'svr_products.json');
       if (!fs.existsSync(jsonPath)) return [];
       const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-      this.scrapedCatalogCache = Array.isArray(data) ? data.map((item, idx) => this.mapScrapedToSvrProduct(item, idx)).filter(Boolean) as SvrProduct[] : [];
+      this.scrapedCatalogCache = Array.isArray(data) ? data.map((item, idx) => this.mapScrapedToSvrProduct(item, idx)).filter((p): p is SvrProduct => p !== null) : [];
       return this.scrapedCatalogCache;
     } catch { return []; }
   }
@@ -671,7 +671,7 @@ export class SvrRoutineService {
     return catalog
       .filter((p) => this.isAgeAppropriate(p, profile.age))
       .map((p) => {
-        const skinMatch = p.suitableSkinTypes.includes(profile.skinType as any) ? 3 : 0;
+        const skinMatch = p.suitableSkinTypes.includes(profile.skinType) ? 3 : 0;
         const concerns = p.suitableConcerns.map((c) => c.toLowerCase());
         const overlap = concerns.filter((c) => uniqueConcerns.includes(c)).length;
         const overlapScore = overlap * 2;

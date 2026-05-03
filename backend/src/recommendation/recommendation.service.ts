@@ -41,53 +41,72 @@ export class RecommendationService {
 
     const scriptPath = path.join(process.cwd(), 'scripts', 'recommend.py');
     const dataPath = path.join(process.cwd(), 'data', 'skincare_products_clean.csv');
-
     this.logger.debug(`Paths - Script: ${scriptPath}, Data: ${dataPath}`);
-    const pythonPath = process.env.PYTHON_PATH || 'python';
-
-    const concernsArg = (concerns && concerns.length > 0) ? concerns.join(',') : '';
 
     if (fs.existsSync(dataPath)) {
       this.logger.log(`Dataset trouvée. Exécution de ${scriptPath} via spawn`);
-      return new Promise((resolve, reject) => {
-        const pyProcess = spawn(pythonPath, [scriptPath, skinType, concernsArg], { cwd: process.cwd() });
-        let stdout = '';
-        let stderr = '';
-
-        pyProcess.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
-        pyProcess.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-
-        pyProcess.on('close', (code: number) => {
-          if (code !== 0) {
-            this.logger.error(`Python process exited with code ${code} | STDERR: ${stderr}`);
-            if (stderr.includes('ModuleNotFoundError') && stderr.toLowerCase().includes('pandas')) {
-              this.pythonDisabled = true;
-            }
-            this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve).catch(reject);
-            return;
-          }
-
-          try {
-            const results = JSON.parse(stdout);
-            if (results.error) {
-              this.logger.warn(`Erreur Logique Python: ${results.error}`);
-              this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
-            } else {
-              this.logger.log(`✅ ${results.length} recommandations générées via Python.`);
-              resolve(results);
-            }
-          } catch (e: any) {
-            this.logger.error(`Erreur Parsing STDOUT: ${stdout.slice(0, 100)}... | Erreur: ${e.message}`);
-            this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
-          }
-        });
-      });
-    } else {
-      this.logger.warn(`Dataset NON trouvée à ${dataPath}`);
+      return this.runPythonRecommendation(scriptPath, dataPath, userId, analysisId, skinType, concerns);
     }
 
-    // Sinon, on garde le comportement actuel (Database Fallback)
+    this.logger.warn(`Dataset NON trouvée à ${dataPath}`);
     return this.getDatabaseFallback(userId, analysisId, skinType, concerns);
+  }
+
+  private runPythonRecommendation(
+    scriptPath: string,
+    dataPath: string,
+    userId: string,
+    analysisId: string,
+    skinType: string,
+    concerns: string[],
+  ): Promise<any[]> {
+    const pythonPath = process.env.PYTHON_PATH || 'python';
+    const concernsArg = concerns.length > 0 ? concerns.join(',') : '';
+    return new Promise((resolve, reject) => {
+      const pyProcess = spawn(pythonPath, [scriptPath, skinType, concernsArg], { cwd: process.cwd() });
+      let stdout = '';
+      let stderr = '';
+
+      pyProcess.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+      pyProcess.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+      pyProcess.on('close', (code: number) =>
+        this.handlePythonClose(code, stdout, stderr, userId, analysisId, skinType, concerns, resolve, reject)
+      );
+    });
+  }
+
+  private handlePythonClose(
+    code: number,
+    stdout: string,
+    stderr: string,
+    userId: string,
+    analysisId: string,
+    skinType: string,
+    concerns: string[],
+    resolve: (v: any[]) => void,
+    reject: (e: any) => void,
+  ): void {
+    if (code !== 0) {
+      this.logger.error(`Python process exited with code ${code} | STDERR: ${stderr}`);
+      if (stderr.includes('ModuleNotFoundError') && stderr.toLowerCase().includes('pandas')) {
+        this.pythonDisabled = true;
+      }
+      this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve).catch(reject);
+      return;
+    }
+    try {
+      const results = JSON.parse(stdout);
+      if (results.error) {
+        this.logger.warn(`Erreur Logique Python: ${results.error}`);
+        this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
+      } else {
+        this.logger.log(`✅ ${results.length} recommandations générées via Python.`);
+        resolve(results);
+      }
+    } catch (e: any) {
+      this.logger.error(`Erreur Parsing STDOUT: ${stdout.slice(0, 100)}... | Erreur: ${e.message}`);
+      this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
+    }
   }
 
   async saveFinalRecommendations(
@@ -327,9 +346,6 @@ export class RecommendationService {
     }
 
     const count = await this.productRepository.count();
-
-    // Si la DB est presque vide ou si certains produits n'ont pas d'URL,
-    // on recharge depuis le CSV pour garantir les liens "Acheter".
     const missingUrlCount = await this.productRepository
       .createQueryBuilder('p')
       .where('p.url IS NULL OR p.url = :empty OR p.url = :hash', { empty: '', hash: '#' })
@@ -340,67 +356,68 @@ export class RecommendationService {
     this.logger.log('Seed produits: chargement du dataset CSV...');
     const csvText = fs.readFileSync(dataPath, 'utf8');
     const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-
     const rows = (parsed.data as any[]).filter(Boolean);
     const csvByName = new Map<string, any>();
-
     for (const r of rows) {
       const name = String(r.product_name ?? '').trim();
-      if (!name) continue;
-      csvByName.set(name, r);
+      if (name) csvByName.set(name, r);
     }
 
-    // 1) Update des produits existants dont l'URL est manquante / invalide
     if (missingUrlCount > 0) {
-      const missing = await this.productRepository
-        .createQueryBuilder('p')
-        .where('p.url IS NULL OR p.url = :empty OR p.url = :hash', { empty: '', hash: '#' })
-        .getMany();
-      const updated: Product[] = [];
-
-      for (const p of missing) {
-        const r = csvByName.get(p.name);
-        if (!r) continue;
-
-        let url = String(r.product_url ?? '').trim();
-        const type = String(r.product_type ?? '').trim();
-        const ingredients = String(r.clean_ingreds ?? '').trim();
-        const priceRaw = String(r.price ?? '').trim();
-        const price = parseFloat(priceRaw.replace(/[^0-9.]/g, ''));
-
-        if (!url || !type || !ingredients || !Number.isFinite(price)) continue;
-
-        if (!url.startsWith('http://') && !url.startsWith('https://') && url.startsWith('www.')) {
-          url = `https://${url}`;
-        }
-
-        p.url = url;
-        p.type = type;
-        p.ingredients = ingredients.split(',').map((s) => s.trim()).filter(Boolean);
-        p.price = price;
-        p.skinType = this.inferSkinTypeFromIngredients(ingredients);
-        p.cluster = p.cluster ?? crypto.randomInt(0, 5);
-        updated.push(p);
-      }
-
-      if (updated.length) {
-        await this.productRepository.save(updated);
-        this.logger.log(`Seed produits: mise à jour ${updated.length} produits sans URL.`);
-      }
+      await this.updateMissingUrls(csvByName);
     }
 
-    // 2) Insertion des produits manquants si la DB est trop petite
-    const shouldInsertMore = count < 50;
-    if (!shouldInsertMore) return;
+    if (count < 50) {
+      await this.insertNewProducts(rows, csvByName);
+    }
+  }
 
+  private async updateMissingUrls(csvByName: Map<string, any>): Promise<void> {
+    const missing = await this.productRepository
+      .createQueryBuilder('p')
+      .where('p.url IS NULL OR p.url = :empty OR p.url = :hash', { empty: '', hash: '#' })
+      .getMany();
+    const updated: Product[] = [];
+
+    for (const p of missing) {
+      const r = csvByName.get(p.name);
+      if (!r) continue;
+
+      let url = String(r.product_url ?? '').trim();
+      const type = String(r.product_type ?? '').trim();
+      const ingredients = String(r.clean_ingreds ?? '').trim();
+      const priceRaw = String(r.price ?? '').trim();
+      const price = parseFloat(priceRaw.replace(/[^0-9.]/g, ''));
+
+      if (!url || !type || !ingredients || !Number.isFinite(price)) continue;
+
+      if (!url.startsWith('http://') && !url.startsWith('https://') && url.startsWith('www.')) {
+        url = `https://${url}`;
+      }
+
+      p.url = url;
+      p.type = type;
+      p.ingredients = ingredients.split(',').map((s) => s.trim()).filter(Boolean);
+      p.price = price;
+      p.skinType = this.inferSkinTypeFromIngredients(ingredients);
+      p.cluster = p.cluster ?? crypto.randomInt(0, 5);
+      updated.push(p);
+    }
+
+    if (updated.length) {
+      await this.productRepository.save(updated);
+      this.logger.log(`Seed produits: mise à jour ${updated.length} produits sans URL.`);
+    }
+  }
+
+  private async insertNewProducts(rows: any[], csvByName: Map<string, any>): Promise<void> {
     const existing = await this.productRepository.find({ select: ['name'] as any });
     const existingNames = new Set(existing.map((p) => p.name));
-
     const toInsert: Product[] = [];
+
     for (const r of rows) {
       const name = String(r.product_name ?? '').trim();
-      if (!name) continue;
-      if (existingNames.has(name)) continue;
+      if (!name || existingNames.has(name)) continue;
 
       const url = String(r.product_url ?? '').trim();
       const type = String(r.product_type ?? '').trim();
@@ -410,7 +427,7 @@ export class RecommendationService {
 
       if (!url || !type || !ingredients || !Number.isFinite(price)) continue;
 
-      const product = this.productRepository.create({
+      toInsert.push(this.productRepository.create({
         name,
         type,
         url,
@@ -418,9 +435,7 @@ export class RecommendationService {
         price,
         skinType: this.inferSkinTypeFromIngredients(ingredients),
         cluster: crypto.randomInt(0, 5),
-      });
-
-      toInsert.push(product);
+      }));
     }
 
     if (toInsert.length) {

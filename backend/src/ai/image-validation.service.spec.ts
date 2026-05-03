@@ -37,7 +37,7 @@ describe('ImageValidationService', () => {
 
     it('should return valid due to local validation being disabled (current implementation)', async () => {
       const result = await service.validateImageBeforeAnalysis('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD');
-      expect(result).toEqual({ isValid: true, message: 'Local validation disabled' });
+      expect(result).toEqual({ isValid: true, message: 'Validation skipped due to error - OpenRouter will validate' });
     });
   });
 });

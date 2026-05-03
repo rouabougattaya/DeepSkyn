@@ -40,6 +40,7 @@ describe('RecommendationService', () => {
     mockItemRepository = {
       save: jest.fn(),
       create: jest.fn(),
+      find: jest.fn(),
     } as any;
 
     // Suppress logger output during tests
@@ -436,6 +437,47 @@ describe('RecommendationService', () => {
       );
 
       expect(mockRecommendationRepository.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('Retrieval methods (getRecommendationsForAnalysis / getLatestFinalRecommendationsForUser)', () => {
+    const mockItems = [
+      { productId: 'p1', ranking: 1, reason: 'r1' },
+      { productId: 'p2', ranking: 2, reason: 'r2' }
+    ];
+    const mockProducts = [
+      { id: 'p1', name: 'Product 1' },
+      { id: 'p2', name: 'Product 2' }
+    ];
+    
+    it('should return empty if no analysisId / userId provided', async () => {
+      expect(await service.getRecommendationsForAnalysis('')).toEqual([]);
+      expect(await service.getLatestFinalRecommendationsForUser('')).toEqual([]);
+    });
+
+    it('should return empty if no recommendation found', async () => {
+      mockRecommendationRepository.findOne.mockResolvedValue(null);
+      expect(await service.getRecommendationsForAnalysis('a1')).toEqual([]);
+    });
+
+    it('should return empty if no items found', async () => {
+      mockRecommendationRepository.findOne.mockResolvedValue({ id: 'rec-1' } as any);
+      mockItemRepository.find.mockResolvedValue([]);
+      expect(await service.getRecommendationsForAnalysis('a1')).toEqual([]);
+    });
+
+    it('should retrieve recommendations mapped with products', async () => {
+      mockRecommendationRepository.findOne.mockResolvedValue({ id: 'rec-1', analysisId: 'a1' } as any);
+      mockItemRepository.find.mockResolvedValue(mockItems as any);
+      
+      // Mock In operator
+      mockProductRepository.find.mockResolvedValue(mockProducts as any);
+
+      const result = await service.getLatestFinalRecommendationsForUser('u1');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Product 1');
+      expect(result[0].reason).toBe('r1');
+      expect(result[0].ranking).toBe(1);
     });
   });
 });

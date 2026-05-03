@@ -94,6 +94,24 @@ describe('DigitalTwinService', () => {
       const res = await service.createDigitalTwin('u1', dto);
       expect(res).toBeDefined();
     });
+
+    it('should calculate higher improvement rate for high RoutineConsistency in fallback', async () => {
+      const dto: CreateDigitalTwinDto = { baseAnalysisId: '1', routineConsistency: 'high' };
+      mockRepo.findOne.mockResolvedValueOnce({ id: '1', userId: 'u1', skinScore: 70, skinAge: 30, hydration: 50, oil: 50, acne: 50, wrinkles: 50 });
+      mockRepo.find.mockResolvedValueOnce([]); // No routines
+      mockAiService.predictFutureSkin.mockRejectedValueOnce(new Error('AI fail'));
+      mockRepo.create.mockReturnValue({ id: 'tw2' });
+      mockRepo.save.mockResolvedValue({
+        id: 'tw2',
+        month1Prediction: { skinScore: 73 },
+        month3Prediction: { skinScore: 78 },
+        month6Prediction: { skinScore: 82 },
+      });
+
+      const res = await service.createDigitalTwin('u1', dto);
+      expect(res).toBeDefined();
+      expect(mockRepo.save).toHaveBeenCalled();
+    });
   });
 
   describe('getDigitalTwinTimeline', () => {

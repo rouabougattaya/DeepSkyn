@@ -288,4 +288,87 @@ describe('SkinMetricService', () => {
       expect(result).toBe(100);
     });
   });
+
+  describe('compare', () => {
+    it('should correctly compare two analyses and return trends', async () => {
+      const mockFirstAnalysis = { ...mockAnalysis, id: 'a1', skinScore: 70, createdAt: new Date('2025-01-01') };
+      const mockSecondAnalysis = { ...mockAnalysis, id: 'a2', skinScore: 80, createdAt: new Date('2025-02-01') };
+
+      const mockFirstMetrics = [
+        { metricType: 'acne', score: 60 },
+        { metricType: 'hydration', score: 50 },
+      ];
+      const mockSecondMetrics = [
+        { metricType: 'acne', score: 80 }, 
+        { metricType: 'hydration', score: 70 },
+      ];
+
+      mockAnalysisRepo.findOne
+        .mockResolvedValueOnce(mockFirstAnalysis)
+        .mockResolvedValueOnce(mockSecondAnalysis);
+      
+      mockMetricRepo.find
+        .mockResolvedValueOnce(mockFirstMetrics)
+        .mockResolvedValueOnce(mockSecondMetrics);
+
+      const result = await service.compare('a1', 'a2');
+      
+      expect(result).toBeDefined();
+      expect(result.first.id).toBe('a1');
+      expect(result.second.id).toBe('a2');
+      expect(result.globalTrend).toBe('improvement');
+      expect(result.differences).toBeDefined();
+      expect(result.summaryText).toContain('globalement améliorée');
+      expect(result.differences.find((d: any) => d.metric === 'acne')?.trend).toBeDefined();
+    });
+
+    it('should return degraded trend when score drops', async () => {
+      const mockFirstAnalysis = { ...mockAnalysis, id: 'a1', skinScore: 80, createdAt: new Date() };
+      const mockSecondAnalysis = { ...mockAnalysis, id: 'a2', skinScore: 70, createdAt: new Date() };
+
+      mockAnalysisRepo.findOne.mockResolvedValueOnce(mockFirstAnalysis).mockResolvedValueOnce(mockSecondAnalysis);
+      mockMetricRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const result = await service.compare('a1', 'a2');
+      expect(result.globalTrend).toBe('regression');
+      expect(result.summaryText).toContain('baisse du score');
+    });
+
+    it('should return stable trend when score change is within threshold', async () => {
+      const mockFirstAnalysis = { ...mockAnalysis, id: 'a1', skinScore: 75, createdAt: new Date() };
+      const mockSecondAnalysis = { ...mockAnalysis, id: 'a2', skinScore: 76, createdAt: new Date() };
+
+      mockAnalysisRepo.findOne.mockResolvedValueOnce(mockFirstAnalysis).mockResolvedValueOnce(mockSecondAnalysis);
+      mockMetricRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const result = await service.compare('a1', 'a2');
+      expect(result.globalTrend).toBe('stable');
+      expect(result.summaryText).toContain('stable');
+    });
+
+    it('should throw NotFoundException if first analysis is missing', async () => {
+      mockAnalysisRepo.findOne.mockResolvedValueOnce(null);
+      await expect(service.compare('invalid1', 'a2')).rejects.toThrow('Analysis not found');
+    });
+    
+    it('should throw NotFoundException if second analysis is missing', async () => {
+      mockAnalysisRepo.findOne.mockResolvedValueOnce({ id: 'a1' });
+      mockMetricRepo.find.mockResolvedValueOnce([]);
+      mockAnalysisRepo.findOne.mockResolvedValueOnce(null);
+      await expect(service.compare('a1', 'invalid2')).rejects.toThrow('Analysis not found');
+    });
+
+    it('should flag metricsMissing if neither analysis has metric data', async () => {
+      const mockFirstAnalysis = { ...mockAnalysis, id: 'a1', skinScore: 70, createdAt: new Date() };
+      const mockSecondAnalysis = { ...mockAnalysis, id: 'a2', skinScore: 70, createdAt: new Date() };
+
+      mockAnalysisRepo.findOne.mockResolvedValueOnce(mockFirstAnalysis).mockResolvedValueOnce(mockSecondAnalysis);
+      mockMetricRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const result = await service.compare('a1', 'a2') as any;
+      expect(result.metricsMissing).toBe(true);
+      expect(result.metricsMessage).toBeDefined();
+    });
+  });
 });
+

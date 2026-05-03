@@ -70,7 +70,7 @@ export class RecommendationService {
       pyProcess.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
       pyProcess.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
       pyProcess.on('close', (code: number) =>
-        this.handlePythonClose(code, stdout, stderr, userId, analysisId, skinType, concerns, resolve, reject)
+        this.handlePythonClose(code, stdout, stderr, { userId, analysisId, skinType, concerns }, resolve, reject)
       );
     });
   }
@@ -79,10 +79,7 @@ export class RecommendationService {
     code: number,
     stdout: string,
     stderr: string,
-    userId: string,
-    analysisId: string,
-    skinType: string,
-    concerns: string[],
+    ctx: { userId: string; analysisId: string; skinType: string; concerns: string[] },
     resolve: (v: any[]) => void,
     reject: (e: any) => void,
   ): void {
@@ -91,21 +88,21 @@ export class RecommendationService {
       if (stderr.includes('ModuleNotFoundError') && stderr.toLowerCase().includes('pandas')) {
         this.pythonDisabled = true;
       }
-      this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve).catch(reject);
+      this.getDatabaseFallback(ctx.userId, ctx.analysisId, ctx.skinType, ctx.concerns).then(resolve).catch(reject);
       return;
     }
     try {
       const results = JSON.parse(stdout);
       if (results.error) {
         this.logger.warn(`Erreur Logique Python: ${results.error}`);
-        this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
+        this.getDatabaseFallback(ctx.userId, ctx.analysisId, ctx.skinType, ctx.concerns).then(resolve);
       } else {
         this.logger.log(`✅ ${results.length} recommandations générées via Python.`);
         resolve(results);
       }
     } catch (e: any) {
       this.logger.error(`Erreur Parsing STDOUT: ${stdout.slice(0, 100)}... | Erreur: ${e.message}`);
-      this.getDatabaseFallback(userId, analysisId, skinType, concerns).then(resolve);
+      this.getDatabaseFallback(ctx.userId, ctx.analysisId, ctx.skinType, ctx.concerns).then(resolve);
     }
   }
 

@@ -85,6 +85,10 @@ export class SkinMetricService {
   /**
    * Retourne les dernières analyses d'un utilisateur avec les champs skinAge/realAge pour les insights skin age.
    */
+  private parseNumOrNull(val: any): number | null {
+    return typeof val === 'number' ? val : null;
+  }
+
   async getUserSkinAgeSeries(
     userId: string,
     limit: number = 5
@@ -104,15 +108,13 @@ export class SkinMetricService {
     return list.map(item => ({
       id: item.id,
       createdAt: item.createdAt,
-      skinAge: typeof item.skinAge === 'number' ? item.skinAge : null,
-      realAge: item.aiRawResponse?.realAgeSource === 'analysis-input' && typeof item.realAge === 'number'
-        ? item.realAge
-        : null,
-      skinScore: typeof item.skinScore === 'number' ? item.skinScore : null,
-      acne: typeof (item as any).acne === 'number' ? (item as any).acne : null,
-      oil: typeof (item as any).oil === 'number' ? (item as any).oil : null,
-      hydration: typeof (item as any).hydration === 'number' ? (item as any).hydration : null,
-      wrinkles: typeof (item as any).wrinkles === 'number' ? (item as any).wrinkles : null,
+      skinAge: this.parseNumOrNull(item.skinAge),
+      realAge: item.aiRawResponse?.realAgeSource === 'analysis-input' ? this.parseNumOrNull(item.realAge) : null,
+      skinScore: this.parseNumOrNull(item.skinScore),
+      acne: this.parseNumOrNull((item as any).acne),
+      oil: this.parseNumOrNull((item as any).oil),
+      hydration: this.parseNumOrNull((item as any).hydration),
+      wrinkles: this.parseNumOrNull((item as any).wrinkles),
     }));
   }
 
@@ -150,6 +152,15 @@ export class SkinMetricService {
     };
   }
 
+  private async getAnalysisData(id: string) {
+    const analysis = await this.analysisRepo.findOne({ where: { id } });
+    if (!analysis) throw new NotFoundException(`Analysis not found: ${id}`);
+    const metrics = await this.metricRepo.find({ where: { analysisId: id } });
+    const view = this.buildMetricsView(analysis, metrics);
+    const realAge = analysis.aiRawResponse?.realAgeSource === 'analysis-input' ? analysis.realAge ?? null : null;
+    return { analysis, metrics, view, realAge };
+  }
+
   /**
    * Compare two analyses: side-by-side metrics, differences, trend, rule-based summary.
    * Logs compared analysis IDs and metric values for debugging.
@@ -157,20 +168,13 @@ export class SkinMetricService {
   async compare(firstId: string, secondId: string): Promise<CompareAnalysisResultDto> {
     this.logger.log(`Compare requested: firstId=${firstId}, secondId=${secondId}`);
 
-    const [first, second] = await Promise.all([
-      this.analysisRepo.findOne({ where: { id: firstId } }),
-      this.analysisRepo.findOne({ where: { id: secondId } }),
-    ]);
-    if (!first) throw new NotFoundException(`Analysis not found: ${firstId}`);
-    if (!second) throw new NotFoundException(`Analysis not found: ${secondId}`);
-
-    const [metricsFirst, metricsSecond] = await Promise.all([
-      this.metricRepo.find({ where: { analysisId: firstId } }),
-      this.metricRepo.find({ where: { analysisId: secondId } }),
+    const [data1, data2] = await Promise.all([
+      this.getAnalysisData(firstId),
+      this.getAnalysisData(secondId),
     ]);
 
-    const m1 = this.buildMetricsView(first, metricsFirst);
-    const m2 = this.buildMetricsView(second, metricsSecond);
+    const { analysis: first, metrics: metricsFirst, view: m1, realAge: firstRealAge } = data1;
+    const { analysis: second, metrics: metricsSecond, view: m2, realAge: secondRealAge } = data2;
 
     this.logger.debug(`Analysis ${firstId} metrics: ${JSON.stringify(m1)} (SkinMetric count: ${metricsFirst.length})`);
     this.logger.debug(`Analysis ${secondId} metrics: ${JSON.stringify(m2)} (SkinMetric count: ${metricsSecond.length})`);
@@ -190,9 +194,6 @@ export class SkinMetricService {
 
     const scoreDelta = (second.skinScore ?? 0) - (first.skinScore ?? 0);
     const globalTrend = this.computeGlobalTrend(scoreDelta, THRESHOLD);
-
-    const firstRealAge = first.aiRawResponse?.realAgeSource === 'analysis-input' ? first.realAge ?? null : null;
-    const secondRealAge = second.aiRawResponse?.realAgeSource === 'analysis-input' ? second.realAge ?? null : null;
 
     const summaryText = this.buildComparisonSummary(
       { first, second, m1, m2, differences, globalTrend }

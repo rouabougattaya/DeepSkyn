@@ -14,6 +14,7 @@ import {
 } from './digital-twin.dto';
 
 type TimePoint = 'month1' | 'month3' | 'month6';
+type RoutineConsistency = 'high' | 'medium' | 'low';
 
 @Injectable()
 export class DigitalTwinService {
@@ -231,7 +232,7 @@ export class DigitalTwinService {
   private async simulateFutureSkin(
     baseAnalysis: SkinAnalysis,
     productNames: string[],
-    routineConsistency: 'high' | 'medium' | 'low',
+    routineConsistency: RoutineConsistency,
     lifestyleFactors: string[],
   ): Promise<{
     month1: MonthPrediction;
@@ -270,7 +271,7 @@ export class DigitalTwinService {
   private buildSimulationContext(
     baseAnalysis: SkinAnalysis,
     productNames: string[],
-    routineConsistency: 'high' | 'medium' | 'low',
+    routineConsistency: RoutineConsistency,
     lifestyleFactors: string[],
   ): string {
     return `
@@ -344,7 +345,7 @@ Each should have: skinScore, skinAge, metrics{hydration, oil, acne, wrinkles}, i
    */
   private generateFallbackPredictions(
     baseAnalysis: SkinAnalysis,
-    routineConsistency: 'high' | 'medium' | 'low',
+    routineConsistency: RoutineConsistency,
   ) {
     // Define improvement rates based on routine consistency
     const improvementRates = {

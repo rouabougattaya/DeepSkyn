@@ -26,7 +26,7 @@ async function findWorkingModel() {
             console.log(`FOUND_WORKING_MODEL: ${m}`);
             process.exit(0);
         } catch (e) {
-            // console.log(`${m} failed`);
+            // Ignore failure and try next model
         }
     }
     console.log("NO_WORKING_MODEL_FOUND");

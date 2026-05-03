@@ -1,20 +1,15 @@
 import {
     Controller,
     Get,
-    Post,
     Param,
     Query,
     Req,
     Res,
     UseGuards,
-    HttpCode,
-    HttpStatus,
     NotFoundException,
-    ForbiddenException,
 } from '@nestjs/common';
-import type { Request } from 'express';
-import type { Response } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ActivityService } from './activity.service';
 import { ActivityQueryDto, ActivityExportDto } from './activity.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -41,8 +36,8 @@ export class ActivityController {
     @ApiQuery({ name: 'dateFrom', required: false, type: String })
     @ApiQuery({ name: 'dateTo', required: false, type: String })
     async findAll(@Query() query: ActivityQueryDto, @Req() req: AuthRequest) {
-        const userId = req.user!.userId;
-        const isAdmin = req.user!.role === 'ADMIN';
+        const userId = req.user.userId;
+        const isAdmin = req.user.role === 'ADMIN';
         return this.activityService.findAll(query, userId, isAdmin);
     }
 
@@ -50,14 +45,14 @@ export class ActivityController {
     @Get('summary')
     @ApiOperation({ summary: 'Get AI-generated 7-day security summary' })
     async getSecuritySummary(@Req() req: AuthRequest) {
-        return this.activityService.generateSecuritySummary(req.user!.userId);
+        return this.activityService.generateSecuritySummary(req.user.userId);
     }
 
     // GET /auth/activity/integrity — Verify hash chain
     @Get('integrity')
     @ApiOperation({ summary: 'Verify hash chain integrity for current user' })
     async verifyIntegrity(@Req() req: AuthRequest) {
-        return this.activityService.verifyIntegrity(req.user!.userId);
+        return this.activityService.verifyIntegrity(req.user.userId);
     }
 
     // GET /auth/activity/export — CSV/PDF export
@@ -68,8 +63,8 @@ export class ActivityController {
         @Req() req: AuthRequest,
         @Res() res: Response,
     ) {
-        const userId = req.user!.userId;
-        const isAdmin = req.user!.role === 'ADMIN';
+        const userId = req.user.userId;
+        const isAdmin = req.user.role === 'ADMIN';
         const csv = await this.activityService.exportCsv(userId, isAdmin, dto.dateFrom, dto.dateTo);
 
         res.setHeader('Content-Type', 'text/csv');
@@ -81,8 +76,8 @@ export class ActivityController {
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific activity by ID' })
     async findOne(@Param('id') id: string, @Req() req: AuthRequest) {
-        const userId = req.user!.userId;
-        const isAdmin = req.user!.role === 'ADMIN';
+        const userId = req.user.userId;
+        const isAdmin = req.user.role === 'ADMIN';
         const activity = await this.activityService.findOne(id, userId, isAdmin);
         if (!activity) throw new NotFoundException('Activity not found');
         return activity;

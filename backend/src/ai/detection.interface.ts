@@ -54,6 +54,8 @@ export interface GlobalScoreResult {
     combinedScore: number;
     weight: { ai: number; user: number };
   }>;
+  recommendations?: any[];
+  compatibilityWarning?: string;
 }
 
 export class UserSkinProfile {

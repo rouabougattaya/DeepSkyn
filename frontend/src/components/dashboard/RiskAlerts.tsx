@@ -147,6 +147,40 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
     fetchRiskPrediction(); // Refresh prediction explicitly with new habits
   };
 
+  const checkIfRefreshNeeded = (silent: boolean, latestId: string | null, twinId: string | null) => {
+    if (!silent) return true;
+    const analysisChanged = Boolean(latestId && latestId !== lastAnalysisIdRef.current);
+    const twinChanged = Boolean(twinId && twinId !== lastDigitalTwinIdRef.current);
+    return analysisChanged || twinChanged;
+  };
+
+  const prepareRiskInput = (analysisData: any, digitalTwinData: any) => {
+    const currentAnalysis = {
+      ...(JSON.parse(localStorage.getItem('currentAnalysis') || '{}')),
+      ...analysisData,
+      ...digitalTwinData,
+    };
+
+    return {
+      acneScore: currentAnalysis.acneScore,
+      drynessScore: currentAnalysis.drynessScore,
+      wrinklesScore: currentAnalysis.wrinklesScore,
+      sensitivityScore: currentAnalysis.sensitivityScore,
+      pigmentationScore: currentAnalysis.pigmentationScore,
+      poresScore: currentAnalysis.poresScore,
+      age: currentAnalysis.age,
+      skinType: currentAnalysis.skinType,
+      fitzpatrickSkin: currentAnalysis.fitzpatrickSkin,
+      environment: {
+        humidity: 60,
+        temperature: 24,
+        uvIndex: 6,
+        pollution: 'moderate',
+      },
+      habits,
+    };
+  };
+
   const fetchRiskPrediction = async (silentRefresh = false) => {
     if (!silentRefresh) {
       setLoading(true);
@@ -154,54 +188,17 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
     }
 
     try {
-      // 1. Fetch the latest analysis metrics
       const { analysisData, latestAnalysisId } = await fetchAnalysisData();
-
-      // 2. Fetch latest digital twin and blend projected near-future risk factors
       const { digitalTwinData, latestDigitalTwinId } = await fetchDigitalTwinData();
 
-      if (silentRefresh) {
-        const analysisChanged = Boolean(
-          latestAnalysisId && latestAnalysisId !== lastAnalysisIdRef.current,
-        );
-        const twinChanged = Boolean(
-          latestDigitalTwinId && latestDigitalTwinId !== lastDigitalTwinIdRef.current,
-        );
-
-        if (!analysisChanged && !twinChanged) {
-          return;
-        }
+      if (silentRefresh && !checkIfRefreshNeeded(silentRefresh, latestAnalysisId, latestDigitalTwinId)) {
+        return;
       }
 
       lastAnalysisIdRef.current = latestAnalysisId || null;
       lastDigitalTwinIdRef.current = latestDigitalTwinId || null;
 
-      // Combine real metrics (if any) with localStorage analysis as fallback
-      const currentAnalysis = {
-        ...(JSON.parse(localStorage.getItem('currentAnalysis') || '{}')),
-        ...analysisData,
-        ...digitalTwinData,
-      };
-
-      const riskInput = {
-        acneScore: currentAnalysis.acneScore,
-        drynessScore: currentAnalysis.drynessScore,
-        wrinklesScore: currentAnalysis.wrinklesScore,
-        sensitivityScore: currentAnalysis.sensitivityScore,
-        pigmentationScore: currentAnalysis.pigmentationScore,
-        poresScore: currentAnalysis.poresScore,
-        age: currentAnalysis.age,
-        skinType: currentAnalysis.skinType,
-        fitzpatrickSkin: currentAnalysis.fitzpatrickSkin,
-        environment: {
-          humidity: 60,
-          temperature: 24,
-          uvIndex: 6,
-          pollution: 'moderate',
-        },
-        habits: habits, // Send the real habits set by user
-      };
-
+      const riskInput = prepareRiskInput(analysisData, digitalTwinData);
       const response = await apiClient.post('/ai/skin-risk', riskInput) as any;
 
       if (response.data?.success && response.data?.data) {
@@ -212,15 +209,11 @@ export const RiskAlerts: React.FC<RiskAlertsProps> = ({ onRefresh, className }) 
     } catch (err: any) {
       console.error('Error fetching risk prediction:', err);
       if (!silentRefresh) {
-        // Since apiClient uses fetch, err is likely a standard Error object, not an Axios error
-        setError(err.message || err.response?.data?.error || 'Failed to load risk prediction');
-        // Set fallback risks for demo purposes
+        setError(err.message || 'Failed to load risk prediction');
         setFallbackRisks();
       }
     } finally {
-      if (!silentRefresh) {
-        setLoading(false);
-      }
+      if (!silentRefresh) setLoading(false);
     }
   };
 

@@ -119,7 +119,7 @@ function CheckoutModal({ plan, onClose, onSuccess }: CheckoutModalProps) {
     setExpiry(d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError('');
 

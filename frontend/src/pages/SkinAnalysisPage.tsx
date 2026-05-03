@@ -854,7 +854,7 @@ export default function SkinAnalysisPage() {
         }
     }, [chatMessages]);
 
-    const sendChatMessage = async (e: React.FormEvent) => {
+    const sendChatMessage = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!chatInput.trim() || chatLoading) return;
 
